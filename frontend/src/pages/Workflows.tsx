@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
+  Activity,
   ArrowRight,
   CheckCircle2,
   CircleDashed,
@@ -28,8 +29,12 @@ interface WorkflowsProps {
   onTestWorkflow: (workflowId: string) => void;
 }
 
+const BTN_BASE =
+  "inline-flex items-center justify-center gap-2 rounded-lg px-4 h-10 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-50 disabled:cursor-not-allowed";
 const PRIMARY = "bg-sky-500 text-white hover:bg-sky-400";
-const PRIMARY_DISABLED = "opacity-50 cursor-not-allowed";
+const SECONDARY =
+  "border border-input bg-background text-foreground hover:bg-muted";
+const DANGER = "bg-red-500 text-white hover:bg-red-400";
 
 export default function Workflows({
   onOpenWorkflow,
@@ -242,20 +247,20 @@ export default function Workflows({
                   </div>
                 </div>
 
-                <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end sm:pt-0">
+                <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     disabled={savingEdit}
                     onClick={() => setWorkflowToEdit(null)}
-                    className={`flex-1 sm:flex-none h-10 px-4 rounded-lg text-sm font-medium border border-input bg-background text-foreground transition hover:bg-muted disabled:${PRIMARY_DISABLED}`}
+                    className={`${BTN_BASE} ${SECONDARY}`}
                   >
                     Batal
                   </button>
-                  <div className="flex gap-2 flex-col sm:flex-row">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="submit"
                       disabled={savingEdit || !editName.trim()}
-                      className={`flex-1 sm:flex-none h-10 px-4 rounded-lg text-sm font-medium border border-transparent bg-background text-foreground transition hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed ${PRIMARY}`}
+                      className={`${BTN_BASE} ${SECONDARY}`}
                     >
                       {savingEdit ? (
                         <LoaderCircle size={16} className="animate-spin" />
@@ -270,7 +275,7 @@ export default function Workflows({
                       onClick={() => {
                         if (editFormRef.current?.reportValidity()) void saveEdit(true);
                       }}
-                      className={`flex-1 sm:flex-none h-10 px-4 rounded-lg text-sm font-medium ${PRIMARY} transition disabled:${PRIMARY_DISABLED}`}
+                      className={`${BTN_BASE} ${PRIMARY}`}
                     >
                       {savingEdit ? (
                         <LoaderCircle size={16} className="animate-spin" />
@@ -306,7 +311,7 @@ export default function Workflows({
               <button
                 type="button"
                 onClick={() => setShowCreate(true)}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${PRIMARY} transition shadow-sm`}
+                className={`${BTN_BASE} ${PRIMARY}`}
               >
                 <Plus size={17} />
                 Buat workflow baru
@@ -324,7 +329,7 @@ export default function Workflows({
                     aria-label="Cari workflow"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50 [&::-webkit-search-cancel-button]:hidden"
                   />
                   {search && (
                     <button
@@ -357,7 +362,7 @@ export default function Workflows({
                   size={15}
                   className={loading ? "animate-spin" : "hidden"}
                 />
-                {!loading && <ActivityIcon size={15} />}
+                {!loading && <Activity size={15} />}
                 {loading ? "Memuat..." : "Segarkan"}
               </button>
             </div>
@@ -584,19 +589,19 @@ export default function Workflows({
                   />
                 </div>
 
-                <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end sm:pt-0">
+                <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     disabled={creating}
                     onClick={() => setShowCreate(false)}
-                    className="flex-1 sm:flex-none h-10 px-4 rounded-lg text-sm font-medium border border-input bg-background text-foreground transition hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`${BTN_BASE} ${SECONDARY}`}
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
                     disabled={creating || !name.trim()}
-                    className={`flex-1 sm:flex-none h-10 px-4 rounded-lg text-sm font-medium ${PRIMARY} transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`${BTN_BASE} ${PRIMARY}`}
                   >
                     {creating && (
                       <LoaderCircle size={16} className="animate-spin" />
@@ -638,7 +643,7 @@ export default function Workflows({
                   type="button"
                   disabled={deleting}
                   onClick={() => setWorkflowToDelete(null)}
-                  className="flex-1 sm:flex-none h-10 px-4 rounded-lg text-sm font-medium border border-input bg-background text-foreground transition hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`${BTN_BASE} ${SECONDARY}`}
                 >
                   Batal
                 </button>
@@ -646,9 +651,9 @@ export default function Workflows({
                   type="button"
                   disabled={deleting}
                   onClick={() => void handleDelete()}
-                  className={`flex-1 sm:flex-none h-10 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-400 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`${BTN_BASE} ${DANGER}`}
                 >
-                  {deleting && <LoaderCircle size={15} className="animate-spin" />}
+                  {deleting && <LoaderCircle size={16} className="animate-spin" />}
                   {deleting ? "Menghapus..." : "Hapus workflow"}
                 </button>
               </div>
@@ -657,24 +662,5 @@ export default function Workflows({
         )}
       </div>
     </section>
-  );
-}
-
-function ActivityIcon({ size }: { size: number }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="lucide lucide-activity"
-    >
-      <path d="M22 12h-4l3 3L9 3l3 3H2" />
-    </svg>
   );
 }

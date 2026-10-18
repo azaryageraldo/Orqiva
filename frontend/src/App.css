@@ -783,13 +783,13 @@ a {
 
 /* Workflow dashboard and editor refresh */
 :root {
-  color: #17212f;
-  background: #f5f6f8;
+  color: #f4f4f5;
+  background: #09090b;
 }
 
 body {
-  color: #17212f;
-  background: #f5f6f8;
+  color: #f4f4f5;
+  background: #09090b;
 }
 
 .dashboard-sidebar {
@@ -1904,8 +1904,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #64748b;
-  background: #f8fafc;
+  color: #a1a1aa;
+  background: #09090b;
 }
 
 .auth-loading p {
