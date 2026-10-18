@@ -1,16 +1,46 @@
-
 import { useEffect, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 
 import Login from "./Login";
 import { getCurrentUser, logout } from "./services/auth";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import { Button } from "./components/ui/button";
+import Dashboard from "./pages/Dashboard";
 import Workflows from "./pages/Workflows";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import WorkflowChat from "./pages/WorkflowChat";
+import Activity from "./pages/Activity";
+import Settings from "./pages/Settings";
 import "./App.css";
 
 type Health = "checking" | "online" | "offline";
+type View = "dashboard" | "workflows" | "activity" | "settings";
+
+function ErrorBanner({
+  message,
+  onClose,
+}: {
+  message: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="mx-4 mt-4 flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive sm:mx-6 lg:mx-8"
+    >
+      <span>{message}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onClose}
+        className="text-destructive hover:text-destructive"
+      >
+        Tutup
+      </Button>
+    </div>
+  );
+}
 
 export default function App() {
   const [health, setHealth] = useState<Health>("checking");
@@ -18,6 +48,7 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
+  const [view, setView] = useState<View>("dashboard");
 
   const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(
     null,
@@ -75,6 +106,7 @@ export default function App() {
       setAuthenticated(false);
       setEditingWorkflowId(null);
       setTestingWorkflowId(null);
+      setView("dashboard");
     } catch {
       setError("Logout gagal. Silakan coba lagi.");
     } finally {
@@ -82,27 +114,40 @@ export default function App() {
     }
   }
 
-  const handleActivityClick = () => {
-    setError("Halaman Activity akan ditambahkan pada tahap berikutnya.");
-  };
-
-  const handleHelpClick = () => {
-    setError("Halaman Help akan ditambahkan pada tahap berikutnya.");
-  };
-
-  const handleBackToWorkflows = () => {
-    setEditingWorkflowId(null);
-    setTestingWorkflowId(null);
-    setError("");
+  const clearWorkflowUrls = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete("testWorkflow");
     window.history.replaceState({}, "", url);
   };
 
+  const goTo = (next: View, section?: string) => {
+    setError("");
+    setEditingWorkflowId(null);
+    setTestingWorkflowId(null);
+    clearWorkflowUrls();
+    setView(next);
+
+    if (section) {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          document
+            .getElementById(section)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+  };
+
+  const openWorkflow = (workflowId: string) => {
+    setError("");
+    setTestingWorkflowId(null);
+    setEditingWorkflowId(workflowId);
+  };
+
   if (authChecking) {
     return (
-      <div className="auth-loading">
-        <LoaderCircle size={28} className="spin" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-sm text-muted-foreground">
+        <LoaderCircle className="size-7 animate-spin text-primary" />
         <p>Memeriksa sesi login...</p>
       </div>
     );
@@ -122,8 +167,11 @@ export default function App() {
     health,
     loggingOut,
     onLogout: () => void handleLogout(),
-    onActivityClick: handleActivityClick,
-    onHelpClick: handleHelpClick,
+    onDashboardClick: () => goTo("dashboard"),
+    onWorkflowsClick: () => goTo("workflows"),
+    onActivityClick: () => goTo("activity"),
+    onHelpClick: () => goTo("settings", "settings-support"),
+    onSettingsClick: () => goTo("settings"),
   };
 
   // Halaman editor workflow
@@ -131,18 +179,15 @@ export default function App() {
     return (
       <DashboardLayout
         title="Workflow editor"
+        icon="editor"
+        activeNav="workflows"
         {...layoutProps}
       >
-        {error && (
-          <div className="error-banner" role="alert">
-            {error}
-            <button onClick={() => setError("")}>Tutup</button>
-          </div>
-        )}
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
         <WorkflowEditor
           workflowId={editingWorkflowId}
-          onBack={handleBackToWorkflows}
+          onBack={() => goTo("workflows")}
         />
       </DashboardLayout>
     );
@@ -153,19 +198,61 @@ export default function App() {
     return (
       <DashboardLayout
         title="Test Chat Widget"
+        icon="chat"
+        activeNav="workflows"
         {...layoutProps}
       >
-        {error && (
-          <div className="error-banner" role="alert">
-            {error}
-            <button onClick={() => setError("")}>Tutup</button>
-          </div>
-        )}
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
         <WorkflowChat
           workflowId={testingWorkflowId}
-          onBack={handleBackToWorkflows}
+          onBack={() => goTo("workflows")}
         />
+      </DashboardLayout>
+    );
+  }
+
+  if (view === "dashboard") {
+    return (
+      <DashboardLayout
+        title="Dashboard"
+        icon="dashboard"
+        activeNav="dashboard"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <Dashboard />
+      </DashboardLayout>
+    );
+  }
+
+  if (view === "activity") {
+    return (
+      <DashboardLayout
+        title="Activity"
+        icon="activity"
+        activeNav="activity"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <Activity onOpenWorkflow={openWorkflow} />
+      </DashboardLayout>
+    );
+  }
+
+  if (view === "settings") {
+    return (
+      <DashboardLayout
+        title="Settings"
+        icon="settings"
+        activeNav="settings"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <Settings health={health} />
       </DashboardLayout>
     );
   }
@@ -174,21 +261,14 @@ export default function App() {
   return (
     <DashboardLayout
       title="Workflows"
+      icon="workflows"
+      activeNav="workflows"
       {...layoutProps}
     >
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-          <button onClick={() => setError("")}>Tutup</button>
-        </div>
-      )}
+      {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
       <Workflows
-        onOpenWorkflow={(workflowId) => {
-          setError("");
-          setTestingWorkflowId(null);
-          setEditingWorkflowId(workflowId);
-        }}
+        onOpenWorkflow={openWorkflow}
         onTestWorkflow={(workflowId) => {
           const testUrl = new URL(window.location.href);
           testUrl.searchParams.set("testWorkflow", workflowId);

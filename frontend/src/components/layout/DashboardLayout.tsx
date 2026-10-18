@@ -1,60 +1,62 @@
+import type { CSSProperties, ReactNode } from "react";
 
-import { useState, type ReactNode } from "react";
-import Sidebar from "./Sidebar";
-import Header from "./Header";
-
-type Health = "checking" | "online" | "offline";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import Sidebar, { type Health, type NavKey } from "./Sidebar";
+import Header, { type HeaderIcon } from "./Header";
 
 interface DashboardLayoutProps {
   title: string;
+  icon: HeaderIcon;
   health: Health;
   loggingOut: boolean;
   onLogout: () => void;
+  activeNav: NavKey;
+  onDashboardClick: () => void;
+  onWorkflowsClick: () => void;
   onActivityClick: () => void;
   onHelpClick: () => void;
+  onSettingsClick: () => void;
   children: ReactNode;
 }
 
 export default function DashboardLayout({
   title,
+  icon,
   health,
   loggingOut,
   onLogout,
+  activeNav,
+  onDashboardClick,
+  onWorkflowsClick,
   onActivityClick,
   onHelpClick,
+  onSettingsClick,
   children,
 }: DashboardLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <SidebarProvider
+      style={{ "--sidebar-width": "17.5rem" } as CSSProperties}
+    >
       <Sidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
         health={health}
+        activeNav={activeNav}
+        onDashboardClick={onDashboardClick}
+        onWorkflowsClick={onWorkflowsClick}
         onActivityClick={onActivityClick}
         onHelpClick={onHelpClick}
+        onSettingsClick={onSettingsClick}
       />
 
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Tutup menu navigasi"
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/60 lg:hidden"
-        />
-      )}
-
-      <div className="flex min-w-0 flex-1 flex-col">
+      <SidebarInset>
         <Header
           title={title}
+          icon={icon}
           loggingOut={loggingOut}
           onLogout={onLogout}
-          onMenuClick={() => setSidebarOpen(true)}
         />
 
         {children}
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

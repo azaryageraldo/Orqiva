@@ -1,5 +1,4 @@
-
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
   Activity,
@@ -16,6 +15,30 @@ import {
   X,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createWorkflow,
   deleteWorkflow,
@@ -29,12 +52,8 @@ interface WorkflowsProps {
   onTestWorkflow: (workflowId: string) => void;
 }
 
-const BTN_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-4 h-10 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-50 disabled:cursor-not-allowed";
-const PRIMARY = "bg-sky-500 text-white hover:bg-sky-400";
-const SECONDARY =
-  "border border-input bg-background text-foreground hover:bg-muted";
-const DANGER = "bg-red-500 text-white hover:bg-red-400";
+const SELECT_CLASS =
+  "h-10 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
 
 export default function Workflows({
   onOpenWorkflow,
@@ -48,14 +67,17 @@ export default function Workflows({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
-  const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowItem | null>(null);
+  const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowItem | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
-  const [workflowToEdit, setWorkflowToEdit] = useState<WorkflowItem | null>(null);
+  const [workflowToEdit, setWorkflowToEdit] = useState<WorkflowItem | null>(
+    null,
+  );
   const [savingEdit, setSavingEdit] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editStatus, setEditStatus] = useState<WorkflowItem["status"]>("draft");
-  const editFormRef = useRef<HTMLFormElement>(null);
 
   async function loadWorkflows() {
     setLoading(true);
@@ -72,7 +94,24 @@ export default function Workflows({
   }
 
   useEffect(() => {
-    void loadWorkflows();
+    let active = true;
+
+    getWorkflows()
+      .then((result) => {
+        if (active) setWorkflows(result.data);
+      })
+      .catch(() => {
+        if (active) {
+          setError("Workflow gagal dimuat. Periksa koneksi dan autentikasi API.");
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const filteredWorkflows = useMemo(() => {
@@ -153,7 +192,9 @@ export default function Workflows({
       setWorkflowToEdit(updated);
       if (openCanvas) onOpenWorkflow(String(updated.id));
     } catch {
-      setError("Perubahan workflow gagal disimpan. Periksa koneksi API dan coba lagi.");
+      setError(
+        "Perubahan workflow gagal disimpan. Periksa koneksi API dan coba lagi.",
+      );
     } finally {
       setSavingEdit(false);
     }
@@ -169,21 +210,22 @@ export default function Workflows({
       <div className="w-full space-y-8">
         {workflowToEdit ? (
           <div className="mx-auto max-w-3xl">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => setWorkflowToEdit(null)}
-              className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-zinc-400 transition hover:text-white"
+              className="mb-6 text-muted-foreground"
             >
-              <ArrowRight className="rotate-180" size={16} /> Kembali ke daftar workflow
-            </button>
+              <ArrowRight className="rotate-180" />
+              Kembali ke daftar workflow
+            </Button>
             <form
-              ref={editFormRef}
               onSubmit={handleEditSubmit}
-              className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm"
+              className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
             >
               <div className="space-y-5">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                     Edit workflow
                   </p>
                   <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
@@ -195,96 +237,102 @@ export default function Workflows({
                 </div>
 
                 {error && (
-                  <p role="alert" className="rounded-lg border border-red-400/20 bg-red-400/[0.06] px-4 py-3 text-sm text-red-300">
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                  >
                     {error}
                   </p>
                 )}
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-foreground">
-                      Nama workflow
-                    </label>
-                    <input
+                    <Label htmlFor="edit-name">Nama workflow</Label>
+                    <Input
+                      id="edit-name"
                       required
                       maxLength={255}
                       value={editName}
                       onChange={(event) => setEditName(event.target.value)}
-                      className="h-11 w-full rounded-lg border border-input bg-background px-3.5 text-sm text-foreground outline-none transition focus:border-ring focus:ring-1 focus:ring-ring"
+                      className="h-10 dark:bg-input/30"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-foreground">
-                      Deskripsi <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </label>
-                    <textarea
+                    <Label htmlFor="edit-description">
+                      Deskripsi{" "}
+                      <span className="font-normal text-muted-foreground">
+                        (opsional)
+                      </span>
+                    </Label>
+                    <Textarea
+                      id="edit-description"
                       rows={4}
                       value={editDescription}
                       onChange={(event) => setEditDescription(event.target.value)}
                       placeholder="Jelaskan fungsi workflow ini"
-                      className="w-full resize-y rounded-lg border border-input bg-background px-3.5 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-ring focus:ring-1 focus:ring-ring"
+                      className="dark:bg-input/30"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-foreground">
-                      Status
-                    </label>
+                    <Label htmlFor="edit-status">Status</Label>
                     <select
+                      id="edit-status"
                       value={editStatus}
                       onChange={(event) =>
-                        setEditStatus(event.target.value as WorkflowItem["status"])
+                        setEditStatus(
+                          event.target.value as WorkflowItem["status"],
+                        )
                       }
-                      className="h-11 w-full rounded-lg border border-input bg-background px-3.5 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                      className={SELECT_CLASS}
                     >
                       <option value="draft">Draft</option>
                       <option value="active">Active</option>
                     </select>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Draft belum aktif untuk otomasi. Active menandai workflow siap digunakan.
+                    <p className="text-xs text-muted-foreground">
+                      Draft belum aktif untuk otomasi. Active menandai workflow
+                      siap digunakan.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     disabled={savingEdit}
                     onClick={() => setWorkflowToEdit(null)}
-                    className={`${BTN_BASE} ${SECONDARY}`}
+                    className="h-10 px-4"
                   >
                     Batal
-                  </button>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <button
-                      type="submit"
-                      disabled={savingEdit || !editName.trim()}
-                      className={`${BTN_BASE} ${SECONDARY}`}
-                    >
-                      {savingEdit ? (
-                        <LoaderCircle size={16} className="animate-spin" />
-                      ) : (
-                        <CheckCircle2 size={16} />
-                      )}
-                      {savingEdit ? "Menyimpan..." : "Simpan perubahan"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingEdit || !editName.trim()}
-                      onClick={() => {
-                        if (editFormRef.current?.reportValidity()) void saveEdit(true);
-                      }}
-                      className={`${BTN_BASE} ${PRIMARY}`}
-                    >
-                      {savingEdit ? (
-                        <LoaderCircle size={16} className="animate-spin" />
-                      ) : (
-                        <Pencil size={16} />
-                      )}
-                      Buka kanvas
-                    </button>
-                  </div>
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    disabled={savingEdit || !editName.trim()}
+                    className="h-10 px-4"
+                  >
+                    {savingEdit ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 />
+                    )}
+                    {savingEdit ? "Menyimpan..." : "Simpan perubahan"}
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={savingEdit || !editName.trim()}
+                    onClick={() => void saveEdit(true)}
+                    className="h-10 px-4"
+                  >
+                    {savingEdit ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <Pencil />
+                    )}
+                    Buka kanvas
+                  </Button>
                 </div>
               </div>
             </form>
@@ -294,8 +342,8 @@ export default function Workflows({
             {/* Page heading */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  <WorkflowIcon size={15} />
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                  <WorkflowIcon className="size-4" />
                   Workspace
                 </div>
 
@@ -304,44 +352,45 @@ export default function Workflows({
                 </h1>
 
                 <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-                  Buat, susun, dan kelola otomatisasi alur kerja dalam satu tempat.
+                  Buat, susun, dan kelola otomatisasi alur kerja dalam satu
+                  tempat.
                 </p>
               </div>
 
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowCreate(true)}
-                className={`${BTN_BASE} ${PRIMARY}`}
+                className="h-10 px-4"
               >
-                <Plus size={17} />
+                <Plus />
                 Buat workflow baru
-              </button>
+              </Button>
             </div>
 
             {/* Controls: search + refresh */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-                <label className="flex w-full items-center gap-3 rounded-lg border border-input bg-background px-3 py-2.5 transition focus-within:border-ring focus-within:ring-1 focus-within:ring-ring sm:max-w-md">
-                  <Search size={17} className="shrink-0 text-muted-foreground" />
-                  <input
+                <div className="relative w-full sm:max-w-md">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
                     type="search"
                     placeholder="Cari workflow..."
                     aria-label="Cari workflow"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50 [&::-webkit-search-cancel-button]:hidden"
+                    className="h-10 pr-9 pl-9 dark:bg-input/30 [&::-webkit-search-cancel-button]:hidden"
                   />
                   {search && (
                     <button
                       type="button"
                       aria-label="Hapus pencarian"
                       onClick={() => setSearch("")}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                     >
-                      <X size={17} />
+                      <X className="size-4" />
                     </button>
                   )}
-                </label>
+                </div>
 
                 <p className="text-xs text-muted-foreground">
                   Menampilkan{" "}
@@ -352,41 +401,42 @@ export default function Workflows({
                 </p>
               </div>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => void loadWorkflows()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4"
               >
-                <LoaderCircle
-                  size={15}
-                  className={loading ? "animate-spin" : "hidden"}
-                />
-                {!loading && <Activity size={15} />}
+                {loading ? (
+                  <LoaderCircle className="animate-spin" />
+                ) : (
+                  <Activity />
+                )}
                 {loading ? "Memuat..." : "Segarkan"}
-              </button>
+              </Button>
             </div>
 
             {error && (
               <div
                 role="alert"
-                className="flex items-start justify-between gap-4 rounded-lg border border-red-400/20 bg-red-400/[0.06] p-4 text-sm text-red-300"
+                className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
               >
                 <p>{error}</p>
                 <button
                   type="button"
                   onClick={() => setError("")}
                   aria-label="Abatalkan pesan error"
-                  className="text-red-400/70 hover:text-red-300"
+                  className="text-destructive/70 transition hover:text-destructive"
                 >
-                  <X size={17} />
+                  <X className="size-4" />
                 </button>
               </div>
             )}
 
             {loading ? (
               <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-border bg-background text-center">
-                <LoaderCircle size={28} className="animate-spin text-sky-500" />
+                <LoaderCircle className="size-7 animate-spin text-primary" />
                 <p className="mt-4 text-sm font-medium text-foreground">
                   Memuat workflows
                 </p>
@@ -396,8 +446,8 @@ export default function Workflows({
               </div>
             ) : filteredWorkflows.length === 0 ? (
               <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/50 p-8 text-center">
-                <span className="flex size-14 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground mb-4">
-                  <WorkflowIcon size={24} />
+                <span className="mb-4 flex size-14 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
+                  <WorkflowIcon className="size-6" />
                 </span>
 
                 <h3 className="mt-2 text-base font-semibold text-foreground">
@@ -409,18 +459,19 @@ export default function Workflows({
                 <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
                   {search
                     ? "Coba kata kunci nama atau deskripsi yang berbeda."
-                    : "Buat workflow pertama Anda untuk mulai membangun otomatisasi."}
+                    : "Buat workflow pertama Anda untuk mulai membangun otomasi."}
                 </p>
 
                 {!search && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setShowCreate(true)}
-                    className="mt-6 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-sky-500 hover:bg-sky-500/10 transition"
+                    className="mt-4 text-primary hover:text-primary"
                   >
-                    <Plus size={16} />
+                    <Plus />
                     Buat workflow
-                  </button>
+                  </Button>
                 )}
               </div>
             ) : (
@@ -434,16 +485,16 @@ export default function Workflows({
                       onClick={() => onOpenWorkflow(String(item.id))}
                       className="group flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border border-border bg-card p-4 transition hover:border-ring/50 hover:bg-muted/50 sm:gap-5 sm:p-5"
                     >
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-zinc-400 transition group-hover:border-sky-400/50 group-hover:bg-sky-400/10 group-hover:text-sky-400">
-                        <WorkflowIcon size={18} />
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition group-hover:border-primary/50 group-hover:bg-primary/10 group-hover:text-primary">
+                        <WorkflowIcon className="size-[18px]" />
                       </span>
 
                       <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-sm font-semibold text-foreground group-hover:text-white">
+                        <h3 className="truncate text-sm font-semibold text-foreground">
                           <button
                             type="button"
                             onClick={() => onOpenWorkflow(String(item.id))}
-                            className="text-left hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            className="text-left hover:underline focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                           >
                             {item.name}
                           </button>
@@ -455,65 +506,72 @@ export default function Workflows({
 
                         <p className="mt-2 text-xs text-muted-foreground">
                           {item.definition?.nodes?.length ?? 0} node
-                          <span className="mx-1 text-zinc-700">·</span>
+                          <span className="mx-1 text-border">·</span>
                           Diperbarui{" "}
                           {new Date(item.updated_at).toLocaleDateString("id-ID")}
                         </p>
                       </div>
 
-                      <span
-                        className={`hidden shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium sm:inline-flex ${
+                      <Badge
+                        variant="outline"
+                        className={`hidden h-6 shrink-0 px-2.5 sm:inline-flex ${
                           isActive
-                            ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-300"
-                            : "border-amber-400/20 bg-amber-400/[0.08] text-amber-300"
+                            ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                            : "border-amber-400/30 bg-amber-400/10 text-amber-300"
                         }`}
                       >
                         {isActive ? (
-                          <CheckCircle2 size={12} />
+                          <CheckCircle2 className="size-3" />
                         ) : (
-                          <CircleDashed size={12} />
+                          <CircleDashed className="size-3" />
                         )}
                         {item.status}
-                      </span>
+                      </Badge>
 
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="icon-lg"
                         aria-label={`Uji coba ${item.name}`}
                         title="Uji coba dengan Chat Widget"
                         onClick={(event) => {
                           event.stopPropagation();
                           onTestWorkflow(String(item.id));
                         }}
-                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-zinc-400 transition hover:border-sky-400/50 hover:bg-sky-400/10 hover:text-sky-400"
+                        className="shrink-0 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
                       >
-                        <MessageCircle size={15} />
-                      </button>
+                        <MessageCircle />
+                      </Button>
 
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="icon-lg"
                         aria-label={`Edit ${item.name}`}
                         title="Edit workflow"
                         onClick={(event) => {
                           event.stopPropagation();
                           beginEdit(item);
                         }}
-                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-zinc-400 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                        className="shrink-0 text-muted-foreground"
                       >
-                        <Pencil size={15} />
-                      </button>
+                        <Pencil />
+                      </Button>
 
-                      <button
+                      <Button
                         type="button"
+                        variant="destructive"
+                        size="icon-lg"
                         aria-label={`Hapus ${item.name}`}
                         title="Hapus workflow"
                         onClick={(event) => {
                           event.stopPropagation();
                           setWorkflowToDelete(item);
                         }}
-                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-red-400/15 text-red-400/80 transition hover:border-red-400/30 hover:bg-red-400/10 hover:text-red-300"
+                        className="shrink-0"
                       >
-                        <Trash2 size={15} />
-                      </button>
+                        <Trash2 />
+                      </Button>
                     </article>
                   );
                 })}
@@ -522,144 +580,119 @@ export default function Workflows({
           </>
         )}
 
-        {/* Create workflow modal */}
-        {showCreate && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setShowCreate(false);
-            }}
-          >
-            <section
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="create-title"
-              className="my-auto w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-lg sm:p-8"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Otomasi baru
-                  </p>
-                  <h2 id="create-title" className="mt-1 text-lg font-semibold text-foreground">
-                    Buat workflow
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Beri nama workflow dan tambahkan deskripsi singkat.
-                  </p>
-                </div>
+        {/* Create workflow dialog */}
+        <Dialog
+          open={showCreate}
+          onOpenChange={(open) => {
+            if (!creating) setShowCreate(open);
+          }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                Otomasi baru
+              </p>
+              <DialogTitle>Buat workflow</DialogTitle>
+              <DialogDescription>
+                Beri nama workflow dan tambahkan deskripsi singkat.
+              </DialogDescription>
+            </DialogHeader>
 
-                <button
+            <form onSubmit={handleCreate} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="create-name">Nama workflow</Label>
+                <Input
+                  id="create-name"
+                  autoFocus
+                  required
+                  maxLength={255}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Contoh: Alur Dukungan Pelanggan"
+                  className="h-10 dark:bg-input/30"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-description">
+                  Deskripsi{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (opsional)
+                  </span>
+                </Label>
+                <Textarea
+                  id="create-description"
+                  rows={4}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Apa yang akan diotomatisasi workflow ini?"
+                  className="dark:bg-input/30"
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
                   type="button"
-                  aria-label="Tutup dialog"
+                  variant="outline"
                   disabled={creating}
                   onClick={() => setShowCreate(false)}
-                  className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreate} className="mt-6 space-y-5">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">
-                    Nama workflow
-                  </label>
-                  <input
-                    autoFocus
-                    required
-                    maxLength={255}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Contoh: Alur Dukungan Pelanggan"
-                    className="h-11 w-full rounded-lg border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-ring focus:ring-1 focus:ring-ring"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">
-                    Deskripsi <span className="font-normal text-muted-foreground">(opsional)</span>
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    placeholder="Apa yang akan diotomatisasi workflow ini?"
-                    className="w-full resize-y rounded-lg border border-input bg-background px-3.5 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-ring focus:ring-1 focus:ring-ring"
-                  />
-                </div>
-
-                <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    disabled={creating}
-                    onClick={() => setShowCreate(false)}
-                    className={`${BTN_BASE} ${SECONDARY}`}
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creating || !name.trim()}
-                    className={`${BTN_BASE} ${PRIMARY}`}
-                  >
-                    {creating && (
-                      <LoaderCircle size={16} className="animate-spin" />
-                    )}
-                    {creating ? "Membuat..." : "Buat workflow"}
-                    {!creating && <ArrowRight size={16} />}
-                  </button>
-                </div>
-              </form>
-            </section>
-          </div>
-        )}
-
-        {/* Delete workflow dialog */}
-        {workflowToDelete && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4"
-          >
-            <section
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="delete-title"
-              className="my-auto w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-lg sm:p-8"
-            >
-              <span className="flex size-10 items-center justify-center rounded-lg border border-red-400/20 bg-red-400/[0.08] text-red-400 mb-4">
-                <Trash2 size={18} />
-              </span>
-              <h2 id="delete-title" className="text-lg font-semibold text-foreground">
-                Hapus workflow?
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  {workflowToDelete.name}
-                </span>{" "}
-                dan konfigurasi node yang disimpan akan dihapus secara permanen.
-              </p>
-              <div className="mt-6 flex justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={deleting}
-                  onClick={() => setWorkflowToDelete(null)}
-                  className={`${BTN_BASE} ${SECONDARY}`}
+                  className="h-10 px-4"
                 >
                   Batal
-                </button>
-                <button
-                  type="button"
-                  disabled={deleting}
-                  onClick={() => void handleDelete()}
-                  className={`${BTN_BASE} ${DANGER}`}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={creating || !name.trim()}
+                  className="h-10 px-4"
                 >
-                  {deleting && <LoaderCircle size={16} className="animate-spin" />}
-                  {deleting ? "Menghapus..." : "Hapus workflow"}
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
+                  {creating ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : (
+                    <ArrowRight />
+                  )}
+                  {creating ? "Membuat..." : "Buat workflow"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete workflow dialog */}
+        <AlertDialog
+          open={Boolean(workflowToDelete)}
+          onOpenChange={(open) => {
+            if (!open && !deleting) setWorkflowToDelete(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                <Trash2 />
+              </AlertDialogMedia>
+              <AlertDialogTitle>Hapus workflow?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="font-medium text-foreground">
+                  {workflowToDelete?.name}
+                </span>{" "}
+                dan konfigurasi node yang disimpan akan dihapus secara permanen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting} className="h-10 px-4">
+                Batal
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={deleting}
+                onClick={() => void handleDelete()}
+                className="h-10 px-4"
+              >
+                {deleting && <LoaderCircle className="animate-spin" />}
+                {deleting ? "Menghapus..." : "Hapus workflow"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </section>
   );

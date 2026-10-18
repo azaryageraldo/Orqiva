@@ -98,11 +98,11 @@ type WorkflowEditorProps = {
   onBack: () => void;
 };
 
-const panelClass = "rounded-xl border border-white/10 bg-[#111318]";
+const panelClass = "rounded-xl border border-border bg-card";
 const inputClass =
-  "mt-2.5 w-full rounded-xl border border-white/10 bg-[#090b10] px-4 py-3 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10";
+  "mt-2.5 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
 
-const labelClass = "text-sm font-medium leading-6 text-zinc-300";
+const labelClass = "text-sm font-medium leading-6 text-muted-foreground";
 const buttonClass =
   "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -226,13 +226,13 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
   return (
     <div
       title={data.description}
-      className={`relative min-w-[248px] rounded-xl border bg-[#15171c] shadow-xl shadow-black/25 transition ${
+      className={`relative min-w-[248px] rounded-xl border bg-border shadow-xl shadow-black/25 transition ${
         selected
-          ? "border-sky-400/80 ring-2 ring-sky-400/20 shadow-sky-950/30"
-          : "border-white/[0.14] hover:border-white/25"
+          ? "border-primary/80 ring-2 ring-primary/20 shadow-primary/20"
+          : "border-input hover:border-ring/40"
       }`}
     >
-      <NodeToolbar isVisible={selected} position={Position.Top} className="!flex !items-center !rounded-lg !border !border-white/10 !bg-[#17191f] !p-1 !shadow-xl">
+      <NodeToolbar isVisible={selected} position={Position.Top} className="!flex !items-center !rounded-lg !border !border-border !bg-[#17191f] !p-1 !shadow-xl">
         <button
           type="button"
           aria-label={`Delete ${data.nodeName || data.label}`}
@@ -241,7 +241,7 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
             event.stopPropagation();
             deleteNode?.(id);
           }}
-          className="flex size-8 items-center justify-center rounded-md text-red-300 transition hover:bg-red-400/15 hover:text-red-200"
+          className="flex size-8 items-center justify-center rounded-md text-destructive transition hover:bg-destructive/15 hover:text-destructive"
         >
           <Trash2 size={15} />
         </button>
@@ -249,7 +249,7 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!size-3.5 !border-2 !border-[#15171c] !bg-sky-400"
+        className="!size-3.5 !border-2 !border-background !bg-primary"
       />
 
       <div className="flex items-center gap-3 p-3.5">
@@ -263,15 +263,15 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
                   ? "bg-orange-400/10 text-orange-300"
                   : data.label === "Stopper"
                     ? "bg-rose-400/10 text-rose-300"
-                    : "bg-sky-400/10 text-sky-300"
+                    : "bg-primary/10 text-primary"
           }`}
         >
           <Icon size={19} />
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">{data.label}</p>
-          <p className="mt-1 max-w-[180px] truncate text-sm font-semibold text-zinc-100" title={data.nodeName || data.label}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{data.label}</p>
+          <p className="mt-1 max-w-[180px] truncate text-sm font-semibold text-foreground" title={data.nodeName || data.label}>
             {data.nodeName || data.label}
           </p>
         </div>
@@ -279,47 +279,47 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
 
       {isCondition ? (
         <>
-          <div className="border-t border-white/[0.07] px-3.5 py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          <div className="border-t border-border px-3.5 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Condition branches
             </p>
           </div>
 
-          <div className="relative flex justify-between border-t border-white/[0.07] px-3.5 py-2.5">
+          <div className="relative flex justify-between border-t border-border px-3.5 py-2.5">
             <span className="text-xs font-medium text-emerald-300">True →</span>
-            <span className="text-xs font-medium text-red-300">False ↓</span>
+            <span className="text-xs font-medium text-destructive">False ↓</span>
             <Handle
               id="true"
               type="source"
               position={Position.Right}
               style={{ top: "35%", background: "#34d399" }}
-              className="!size-3 !border-2 !border-[#111318]"
+              className="!size-3 !border-2 !border-background"
             />
             <Handle
               id="false"
               type="source"
               position={Position.Bottom}
               style={{ left: "50%", background: "#f87171" }}
-              className="!size-3 !border-2 !border-[#111318]"
+              className="!size-3 !border-2 !border-background"
             />
           </div>
         </>
       ) : isStopper ? (
         <>
-          <div className="border-t border-white/[0.07] px-3.5 py-2.5">
+          <div className="border-t border-border px-3.5 py-2.5">
             <span className="text-xs font-medium text-rose-300">Waits for next message</span>
           </div>
           <Handle
             type="source"
             position={Position.Bottom}
-            className="!size-3 !border-2 !border-[#111318] !bg-rose-400"
+            className="!size-3 !border-2 !border-background !bg-rose-400"
           />
         </>
       ) : (
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!size-3 !border-2 !border-[#111318] !bg-sky-400"
+          className="!size-3 !border-2 !border-background !bg-primary"
         />
       )}
     </div>
@@ -425,15 +425,15 @@ function SmartValueTextarea({
 
   return (
     <div>
-      <div className="relative mt-2.5 overflow-hidden rounded-xl border border-white/10 bg-[#090b10] transition focus-within:border-sky-400/60 focus-within:ring-2 focus-within:ring-sky-400/10">
+      <div className="relative mt-2.5 overflow-hidden rounded-xl border border-border bg-background transition focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10">
         <pre
           ref={highlightRef}
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6 text-zinc-100"
+          className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6 text-foreground"
         >
           {parts.map((part, index) =>
             /^\{\{\s*[\w.-]+\s*\}\}$/.test(part) ? (
-              <span key={index} className="rounded bg-sky-400/10 text-sky-300">
+              <span key={index} className="rounded bg-primary/10 text-primary">
                 {part}
               </span>
             ) : (
@@ -454,13 +454,13 @@ function SmartValueTextarea({
             }
           }}
           placeholder={placeholder}
-          className="relative block w-full resize-y bg-transparent px-4 py-3 text-sm leading-6 text-transparent caret-sky-300 outline-none selection:bg-sky-300/20 placeholder:text-zinc-600"
+          className="relative block w-full resize-y bg-transparent px-4 py-3 text-sm leading-6 text-transparent caret-primary outline-none selection:bg-primary/20 placeholder:text-muted-foreground/70"
           spellCheck={false}
         />
       </div>
       {variables.length > 0 ? (
         <div className="mt-3">
-          <p className="text-xs font-medium text-zinc-500">Available values</p>
+          <p className="text-xs font-medium text-muted-foreground">Available values</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {variables.map((variable) => (
               <button
@@ -468,7 +468,7 @@ function SmartValueTextarea({
                 type="button"
                 onClick={() => insertVariable(variable.name)}
                 title={variable.description || variable.type}
-                className="rounded-md border border-sky-400/20 bg-sky-400/[0.07] px-2 py-1 font-mono text-xs text-sky-300 transition hover:border-sky-400/40 hover:bg-sky-400/15"
+                className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-xs text-primary transition hover:border-primary/40 hover:bg-primary/15"
               >
                 {`{{${variable.name}}}`}
               </button>
@@ -476,7 +476,7 @@ function SmartValueTextarea({
           </div>
         </div>
       ) : (
-        <p className="mt-3 text-xs leading-5 text-zinc-500">
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">
           Connect an AI Agent before this step and define its variables to see suggestions.
         </p>
       )}
@@ -499,7 +499,14 @@ export default function WorkflowEditor({
   const [isLoading, setIsLoading] = useState(Boolean(workflowId));
   const [isSaving, setIsSaving] = useState(false);
   const [workflowName, setWorkflowName] = useState("");
-  const savedSnapshot = useRef(makeSnapshot(initialNodes, initialEdges));
+  const [savedSnapshot, setSavedSnapshot] = useState(() =>
+    makeSnapshot(initialNodes, initialEdges),
+  );
+
+  const changeSelection = useCallback((id: string | null) => {
+    setAgentTab("node");
+    setSelectedNodeId(id);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -508,7 +515,7 @@ export default function WorkflowEditor({
       if (!workflowId) {
         setNodes(initialNodes);
         setEdges(initialEdges);
-        savedSnapshot.current = makeSnapshot(initialNodes, initialEdges);
+        setSavedSnapshot(makeSnapshot(initialNodes, initialEdges));
         setIsLoading(false);
         return;
       }
@@ -539,9 +546,9 @@ export default function WorkflowEditor({
 
         setNodes(loadedNodes);
         setEdges(loadedEdges);
-        savedSnapshot.current = makeSnapshot(loadedNodes, loadedEdges);
+        setSavedSnapshot(makeSnapshot(loadedNodes, loadedEdges));
 
-        setSelectedNodeId(null);
+        changeSelection(null);
       } catch (error) {
         if (cancelled) return;
 
@@ -559,7 +566,7 @@ export default function WorkflowEditor({
     return () => {
       cancelled = true;
     };
-  }, [workflowId]);
+  }, [workflowId, changeSelection]);
 
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -577,7 +584,7 @@ export default function WorkflowEditor({
     [nodes, selectedNodeId, draftData],
   );
   const isDirty =
-    !isLoading && makeSnapshot(nodesForSave, edges) !== savedSnapshot.current;
+    !isLoading && makeSnapshot(nodesForSave, edges) !== savedSnapshot;
   const upstreamVariables = useMemo(
     () =>
       selectedNodeId
@@ -588,10 +595,6 @@ export default function WorkflowEditor({
   const booleanVariables = upstreamVariables.filter(
     (variable) => variable.type === "boolean",
   );
-
-  useEffect(() => {
-    setAgentTab("node");
-  }, [selectedNodeId]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -702,7 +705,7 @@ export default function WorkflowEditor({
 
     setNodes((current) => [...current, newNode]);
     setDraftData({ ...newNode.data });
-    setSelectedNodeId(id);
+    changeSelection(id);
     setShowLibrary(false);
     setNotice("");
   }
@@ -721,7 +724,7 @@ export default function WorkflowEditor({
       );
     }
     setDraftData({ ...node.data });
-    setSelectedNodeId(node.id);
+    changeSelection(node.id);
     setShowLibrary(false);
   }
 
@@ -734,7 +737,7 @@ export default function WorkflowEditor({
           : node,
       ),
     );
-    setSelectedNodeId(null);
+    changeSelection(null);
     setDraftData(null);
     setShowLibrary(false);
     setNotice("Changes applied to the canvas. Save the workflow to keep them.");
@@ -742,7 +745,7 @@ export default function WorkflowEditor({
 
   function cancelNodeChanges() {
     setDraftData(null);
-    setSelectedNodeId(null);
+    changeSelection(null);
   }
 
   const removeNode = useCallback((nodeId: string) => {
@@ -755,6 +758,7 @@ export default function WorkflowEditor({
       ),
     );
     setSelectedNodeId((current) => (current === nodeId ? null : current));
+    setAgentTab("node");
     setDraftData(null);
   }, []);
 
@@ -779,9 +783,9 @@ export default function WorkflowEditor({
 
     try {
       await updateWorkflow(workflowId, { definition });
-      savedSnapshot.current = makeSnapshot(nodesForSave, edges);
+      setSavedSnapshot(makeSnapshot(nodesForSave, edges));
       setNodes(nodesForSave);
-      setSelectedNodeId(null);
+      changeSelection(null);
       setDraftData(null);
       setShowLibrary(false);
       setNotice("Workflow saved.");
@@ -804,32 +808,32 @@ export default function WorkflowEditor({
   }
 
   return (
-    <section className="relative flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-[#09090b] text-zinc-100">
+    <section className="relative flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-background text-foreground">
       {/* Editor header */}
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-white/[0.08] bg-[#0c0d10] px-5 py-3.5 lg:px-7">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border bg-card px-5 py-3.5 lg:px-7">
         <div className="flex min-w-0 items-center gap-4">
           <button
             type="button"
             onClick={requestBack}
-            className={`${buttonClass} border border-white/10 bg-white/[0.035] text-zinc-300 hover:bg-white/[0.08]`}
+            className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}
           >
             <ArrowLeft size={16} />
             <span className="hidden sm:inline">All workflows</span>
           </button>
 
-          <div className="h-8 w-px bg-white/10" />
+          <div className="h-8 w-px bg-muted" />
 
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-white">
+            <h1 className="truncate text-sm font-semibold text-foreground">
               {workflowName || "Workflow editor"}
             </h1>
-            <p className="mt-1 truncate text-xs text-zinc-500">
+            <p className="mt-1 truncate text-xs text-muted-foreground">
               Workflow canvas · {nodes.length} steps
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 text-xs text-zinc-500 md:flex">
+          <span className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
             <span className={`size-1.5 rounded-full ${isDirty ? "bg-amber-400" : "bg-emerald-400"}`} />
             {isLoading ? "Loading" : isDirty ? "Unsaved changes" : "Saved"}
           </span>
@@ -837,7 +841,7 @@ export default function WorkflowEditor({
             type="button"
             onClick={() => void saveWorkflow()}
             disabled={isSaving || isLoading || !isDirty}
-            className={`${buttonClass} bg-sky-500 text-white hover:bg-sky-400`}
+            className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}
           >
             <Save size={16} />
             {isSaving ? "Saving..." : "Save workflow"}
@@ -847,7 +851,7 @@ export default function WorkflowEditor({
 
       {/* Workspace */}
       <div className="flex h-0 min-h-0 flex-1 overflow-hidden">
-        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#09090b]">
+        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
           <button
             type="button"
             onClick={() => {
@@ -858,7 +862,7 @@ export default function WorkflowEditor({
                 setShowLibrary(true);
               }
             }}
-            className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#111318]/95 px-3 py-2 text-xs font-medium text-zinc-300 shadow-lg backdrop-blur transition hover:border-white/20 hover:bg-[#191b21] hover:text-white"
+            className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-lg border border-border bg-card/95 px-3 py-2 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur transition hover:border-ring/50 hover:bg-muted hover:text-foreground"
             aria-expanded={showLibrary}
             aria-label={showLibrary ? "Close node library" : "Open node library"}
           >
@@ -866,13 +870,13 @@ export default function WorkflowEditor({
             {showLibrary ? "Close library" : "Node library"}
           </button>
           {isLoading && (
-            <div role="status" className="absolute left-4 top-4 z-10 rounded-lg border border-white/10 bg-[#111318]/90 px-3 py-2 text-xs text-zinc-400">
+            <div role="status" className="absolute left-4 top-4 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">
               Loading workflow...
             </div>
           )}
           {!isLoading && !selectedNode && (
-            <div className="pointer-events-none absolute left-4 top-4 z-10 hidden items-center gap-2 rounded-lg border border-white/[0.08] bg-[#111318]/90 px-3 py-2 text-xs text-zinc-400 shadow-lg sm:flex">
-              <MousePointer2 size={14} className="text-zinc-500" />
+            <div className="pointer-events-none absolute left-4 top-4 z-10 hidden items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground shadow-lg sm:flex">
+              <MousePointer2 size={14} className="text-muted-foreground" />
               Drag between ports to connect steps · Select a node to configure it
             </div>
           )}
@@ -903,7 +907,7 @@ export default function WorkflowEditor({
             proOptions={{ hideAttribution: true }}
           >
             <Background color="#343945" gap={24} size={1} />
-            <Controls className="!overflow-hidden !rounded-xl !border !border-white/10 !bg-[#111318] [&>button]:!border-white/10 [&>button]:!bg-[#111318] [&>button]:!fill-zinc-300 [&>button:hover]:!bg-white/10" />
+            <Controls className="!overflow-hidden !rounded-xl !border !border-border !bg-card [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-foreground [&>button:hover]:!bg-muted" />
             <MiniMap
               pannable
               zoomable
@@ -919,7 +923,7 @@ export default function WorkflowEditor({
                         : "#0ea5e9"
               }
               maskColor="rgba(0,0,0,0.65)"
-              className="!overflow-hidden !rounded-xl !border !border-white/10 !bg-[#111318]"
+              className="!overflow-hidden !rounded-xl !border !border-border !bg-card"
             />
           </ReactFlow>
           </NodeActionsContext.Provider>
@@ -927,14 +931,14 @@ export default function WorkflowEditor({
 
         {/* Right-side node library */}
         {showLibrary && !selectedNode && (
-          <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-white/[0.08] bg-[#0c0d10] p-4">
+          <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-border bg-card p-4">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-400">Builder</p>
-                <h2 className="mt-2 text-base font-semibold text-white">Node library</h2>
-                <p className="mt-1 text-xs leading-5 text-zinc-500">Choose a step to add to your workflow.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Builder</p>
+                <h2 className="mt-2 text-base font-semibold text-foreground">Node library</h2>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose a step to add to your workflow.</p>
               </div>
-              <button type="button" onClick={() => setShowLibrary(false)} aria-label="Close node library" className="rounded-lg p-2 text-zinc-500 hover:bg-white/[0.06] hover:text-white">
+              <button type="button" onClick={() => setShowLibrary(false)} aria-label="Close node library" className="rounded-lg p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground">
                 <X size={16} />
               </button>
             </div>
@@ -945,32 +949,32 @@ export default function WorkflowEditor({
                   type="button"
                   key={label}
                   onClick={() => addNode(label)}
-                  className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 text-left transition hover:border-sky-400/30 hover:bg-sky-400/[0.045]"
+                  className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.045]"
                 >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-zinc-300 group-hover:bg-sky-400/10 group-hover:text-sky-300">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">
                     <Icon size={17} />
                   </span>
 
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold text-zinc-200">
+                    <span className="block truncate text-xs font-semibold text-foreground">
                       {label}
                     </span>
-                    <span className="mt-1 block truncate text-[10px] leading-4 text-zinc-500">
+                    <span className="mt-1 block truncate text-[10px] leading-4 text-muted-foreground">
                       {description}
                     </span>
                   </span>
 
-                  <Plus size={14} className="shrink-0 text-zinc-600 group-hover:text-sky-300" />
+                  <Plus size={14} className="shrink-0 text-muted-foreground/70 group-hover:text-primary" />
                 </button>
               ))}
             </div>
 
-            <div className="mt-5 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
-                <Webhook size={14} className="text-sky-400" />
+            <div className="mt-5 rounded-xl border border-border bg-muted/40 p-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Webhook size={14} className="text-primary" />
                 Chat Widget
               </div>
-              <p className="mt-2 text-xs leading-5 text-zinc-500">
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
                 The Trigger starts the workflow when a customer message arrives
                 from the chat widget.
               </p>
@@ -980,17 +984,17 @@ export default function WorkflowEditor({
         {/* Node settings inspector */}
 
         {selectedNode && (
-          <aside className="flex h-full max-h-full w-[min(420px,88vw)] max-w-[88vw] shrink-0 flex-col overflow-hidden border-l border-white/[0.08] bg-[#0c0d10]">
-            <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-6 py-5">
+          <aside className="flex h-full max-h-full w-[min(420px,88vw)] max-w-[88vw] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-5">
               <div className="flex items-center gap-2.5">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-sky-400/10 text-sky-300">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Settings2 size={17} />
                 </span>
                 <div>
-                  <h2 className="text-sm font-semibold text-white">
+                  <h2 className="text-sm font-semibold text-foreground">
                     Node settings
                   </h2>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {inspectorData?.label}
                   </p>
                 </div>
@@ -1000,7 +1004,7 @@ export default function WorkflowEditor({
                 type="button"
                 onClick={saveNodeChanges}
                 aria-label="Close node settings"
-                className="rounded-lg p-2 text-zinc-500 hover:bg-white/[0.06] hover:text-white"
+                className="rounded-lg p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               >
                 <X size={16} />
               </button>
@@ -1033,10 +1037,10 @@ export default function WorkflowEditor({
               {inspectorData?.label === "Trigger" && (
                 <div className="space-y-5">
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-foreground">
                       Trigger configuration
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       Define what starts this workflow.
                     </p>
                   </div>
@@ -1062,11 +1066,11 @@ export default function WorkflowEditor({
                   </label>
 
                   <div className={`${panelClass} p-3.5`}>
-                    <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                      <MessageSquare size={16} className="text-sky-400" />
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <MessageSquare size={16} className="text-primary" />
                       Website Chat Widget
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-zinc-500">
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
                       Incoming visitor messages will be passed to the workflow
                       runtime after the chat widget and backend integration are
                       connected.
@@ -1077,8 +1081,8 @@ export default function WorkflowEditor({
               {inspectorData?.label === "AI Agent" && (
                 <div className="space-y-5">
                   <div>
-                    <p className="text-sm font-semibold text-white">AI Agent settings</p>
-                    <div className="mt-4 grid grid-cols-3 rounded-lg border border-white/10 bg-white/[0.025] p-1">
+                    <p className="text-sm font-semibold text-foreground">AI Agent settings</p>
+                    <div className="mt-4 grid grid-cols-3 rounded-lg border border-border bg-muted/40 p-1">
                       {([
                         ["node", "Node"],
                         ["prompt", "Prompt"],
@@ -1088,7 +1092,7 @@ export default function WorkflowEditor({
                           key={tab}
                           type="button"
                           onClick={() => setAgentTab(tab)}
-                          className={`rounded-md px-2 py-2 text-xs font-medium transition ${agentTab === tab ? "bg-white/10 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-200"}`}
+                          className={`rounded-md px-2 py-2 text-xs font-medium transition ${agentTab === tab ? "bg-muted text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                         >
                           {label}
                         </button>
@@ -1113,7 +1117,7 @@ export default function WorkflowEditor({
                         updateNode({ systemMessage: event.target.value })
                       }
                     />
-                    <span className="mt-2 block text-xs leading-5 text-zinc-500">
+                    <span className="mt-2 block text-xs leading-5 text-muted-foreground">
                       Define the AI's role, instructions, tone, and constraints.
                     </span>
                   </label>
@@ -1121,13 +1125,13 @@ export default function WorkflowEditor({
 
                   {agentTab === "variables" && <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2 text-sm font-medium text-zinc-300">
-                        <Variable size={15} className="text-sky-300" />{" "}
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Variable size={15} className="text-primary" />{" "}
                         Variables
                       </span>
                       <button
                         type="button"
-                        className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-white/5"
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/60"
                         onClick={() =>
                           updateNode({
                             variableDefinitions: [
@@ -1191,7 +1195,7 @@ export default function WorkflowEditor({
                           className={`${panelClass} space-y-3 p-3`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-zinc-400">
+                            <span className="text-xs font-semibold text-muted-foreground">
                               Variable {index + 1}
                             </span>
                             <button
@@ -1210,7 +1214,7 @@ export default function WorkflowEditor({
                                     .join("\n"),
                                 })
                               }
-                              className="rounded p-1 text-zinc-500 hover:bg-red-400/10 hover:text-red-300"
+                              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -1271,7 +1275,7 @@ export default function WorkflowEditor({
                         </div>
                       );
                     })}
-                    <p className="text-xs leading-5 text-zinc-500">
+                    <p className="text-xs leading-5 text-muted-foreground">
                       Give each variable a clear name and type. Connected Send
                       Message and Condition nodes can use these values.
                     </p>
@@ -1291,10 +1295,10 @@ export default function WorkflowEditor({
                     <div className={`${panelClass} p-4`}>
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium text-zinc-200">AI model</p>
-                          <p className="mt-1 text-xs text-zinc-500">Gemini is the default provider.</p>
+                          <p className="text-sm font-medium text-foreground">AI model</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Gemini is the default provider.</p>
                         </div>
-                        <span className="rounded-md border border-sky-400/20 bg-sky-400/[0.07] px-2 py-1 text-xs font-medium text-sky-300">Gemini</span>
+                        <span className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 text-xs font-medium text-primary">Gemini</span>
                       </div>
                       <select
                         className={inputClass}
@@ -1318,7 +1322,7 @@ export default function WorkflowEditor({
                         min={0}
                         max={1}
                         step={0.1}
-                        className="mt-3 w-full accent-sky-400"
+                        className="mt-3 w-full accent-primary"
                         value={Number(inspectorData?.temperature ?? 0.7)}
                         onChange={(event) =>
                           updateNode({
@@ -1326,7 +1330,7 @@ export default function WorkflowEditor({
                           })
                         }
                       />
-                      <span className="mt-1 flex justify-between text-xs text-zinc-500">
+                      <span className="mt-1 flex justify-between text-xs text-muted-foreground">
                         <span>More focused</span>
                         <span>More creative</span>
                       </span>
@@ -1337,10 +1341,10 @@ export default function WorkflowEditor({
               {inspectorData?.label === "Send Message" && (
                 <div className="space-y-5">
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-foreground">
                       Message configuration
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       Compose a static reply or use dynamic values.
                     </p>
                   </div>
@@ -1357,16 +1361,16 @@ export default function WorkflowEditor({
                   </label>
 
                   <div className={`${panelClass} p-3.5`}>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Preview
                     </p>
-                    <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-200">
+                    <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
                       {String(inspectorData?.messageTemplate ?? "").trim() ? (
                         String(inspectorData?.messageTemplate ?? "")
                           .split(/(\{\{\s*[\w.-]+\s*\}\})/g)
                           .map((part, index) =>
                             /^\{\{\s*[\w.-]+\s*\}\}$/.test(part) ? (
-                              <span key={index} className="rounded bg-sky-400/10 px-0.5 text-sky-300">{part}</span>
+                              <span key={index} className="rounded bg-primary/10 px-0.5 text-primary">{part}</span>
                             ) : (
                               <span key={index}>{part}</span>
                             ),
@@ -1377,7 +1381,7 @@ export default function WorkflowEditor({
                     </p>
                   </div>
 
-                  <p className="text-xs leading-5 text-zinc-500">
+                  <p className="text-xs leading-5 text-muted-foreground">
                     Blue tokens are dynamic values provided by connected AI Agent nodes.
                   </p>
                 </div>
@@ -1385,10 +1389,10 @@ export default function WorkflowEditor({
               {inspectorData?.label === "Condition" && (
                 <div className="space-y-5">
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-foreground">
                       Condition rule
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       Choose what value should be checked before branching.
                     </p>
                   </div>
@@ -1396,7 +1400,7 @@ export default function WorkflowEditor({
                   <label className="block">
                     <span className="flex items-center justify-between gap-2">
                       <span className={labelClass}>Boolean smart value</span>
-                      <span className="rounded-md bg-sky-400/10 px-2 py-1 font-mono text-[10px] text-sky-300">SMART VALUE</span>
+                      <span className="rounded-md bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary">SMART VALUE</span>
                     </span>
                     <select
                       className={inputClass}
@@ -1413,11 +1417,11 @@ export default function WorkflowEditor({
                       ))}
                     </select>
                     {String(inspectorData?.conditionVariable ?? booleanVariables[0]?.name ?? "") && (
-                      <span className="mt-2 inline-flex rounded-md border border-sky-400/20 bg-sky-400/[0.07] px-2 py-1 font-mono text-xs text-sky-300">
+                      <span className="mt-2 inline-flex rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-xs text-primary">
                         {`{{${String(inspectorData?.conditionVariable ?? booleanVariables[0]?.name)}}}`}
                       </span>
                     )}
-                    <span className="mt-2 block text-xs leading-5 text-zinc-500">Select a boolean variable from a connected AI Agent.</span>
+                    <span className="mt-2 block text-xs leading-5 text-muted-foreground">Select a boolean variable from a connected AI Agent.</span>
                   </label>
 
                   <label className="block">
@@ -1440,7 +1444,7 @@ export default function WorkflowEditor({
                     <label className="block">
                       <span className="flex items-center justify-between gap-2">
                         <span className={labelClass}>Compare value</span>
-                        <span className="rounded-md bg-sky-400/10 px-2 py-1 font-mono text-[10px] text-sky-300">BOOLEAN</span>
+                        <span className="rounded-md bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary">BOOLEAN</span>
                       </span>
                       <select
                         className={inputClass}
@@ -1460,25 +1464,25 @@ export default function WorkflowEditor({
                         <p className="text-sm font-medium text-emerald-300">
                           True
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Rule matches.
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.05] p-3">
-                      <X size={15} className="text-red-300" />
+                    <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/[0.05] p-3">
+                      <X size={15} className="text-destructive" />
                       <div>
-                        <p className="text-sm font-medium text-red-300">
+                        <p className="text-sm font-medium text-destructive">
                           False
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Rule does not match.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <p className="text-xs leading-5 text-zinc-500">
+                  <p className="text-xs leading-5 text-muted-foreground">
                     Connect the True and False outputs to the steps for each result.
                   </p>
                 </div>
@@ -1488,23 +1492,23 @@ export default function WorkflowEditor({
                   <div className="flex items-center gap-2 text-sm font-medium text-rose-200">
                     <CircleStop size={17} /> Pause point
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-zinc-400">
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
                     This step pauses the workflow. When the customer sends another message, execution continues from the next connected step.
                   </p>
                 </div>
               )}
-              <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-white/[0.08] bg-[#0c0d10] pt-4 pb-1">
+              <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-border bg-card pt-4 pb-1">
                 <button
                   type="button"
                   onClick={cancelNodeChanges}
-                  className={`${buttonClass} border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]`}
+                  className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}
                 >
                   <X size={14} /> Cancel
                 </button>
                 <button
                   type="button"
                   onClick={saveNodeChanges}
-                  className={`${buttonClass} bg-sky-500 text-white hover:bg-sky-400`}
+                  className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}
                 >
                   <Check size={14} /> Save changes
                 </button>
@@ -1515,36 +1519,36 @@ export default function WorkflowEditor({
       </div>
 
       {/* Editor footer */}
-      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] bg-[#0c0d10] px-5 py-3 text-xs text-zinc-500">
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-5 py-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-amber-400" />
           Draft workflow
         </span>
         <span>
-          {nodes.length} steps <span className="mx-2 text-zinc-700">·</span>{" "}
+          {nodes.length} steps <span className="mx-2 text-muted-foreground/50">·</span>{" "}
           {edges.length} connections
         </span>
       </footer>
 
       {notice && (
-        <div role="status" className="fixed bottom-5 right-5 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-white/10 bg-[#191b21] px-4 py-3 text-sm text-zinc-200 shadow-2xl shadow-black/50">
-          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-sky-400/10 text-sky-300"><Check size={13} /></span>
+        <div role="status" className="fixed bottom-5 right-5 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground shadow-2xl shadow-black/50">
+          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check size={13} /></span>
           <p className="flex-1 leading-5">{notice}</p>
-          <button type="button" aria-label="Dismiss notification" onClick={() => setNotice("")} className="text-zinc-500 hover:text-white"><X size={15} /></button>
+          <button type="button" aria-label="Dismiss notification" onClick={() => setNotice("")} className="text-muted-foreground hover:text-foreground"><X size={15} /></button>
         </div>
       )}
 
       {confirmLeave && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-title" className="w-full max-w-md rounded-2xl border border-white/10 bg-[#14161b] p-6 shadow-2xl shadow-black/60">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-title" className="w-full max-w-md rounded-2xl border border-border bg-[#14161b] p-6 shadow-2xl shadow-black/60">
             <div className="flex size-10 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300"><Save size={18} /></div>
-            <h2 id="unsaved-title" className="mt-4 text-lg font-semibold text-white">Unsaved workflow changes</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">You have changes that are not saved yet. Save them before leaving?</p>
+            <h2 id="unsaved-title" className="mt-4 text-lg font-semibold text-foreground">Unsaved workflow changes</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">You have changes that are not saved yet. Save them before leaving?</p>
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setConfirmLeave(false)} className={`${buttonClass} border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]`}>Continue editing</button>
-              <button type="button" disabled={isSaving} onClick={() => { setConfirmLeave(false); onBack(); }} className={`${buttonClass} border border-white/10 bg-transparent text-zinc-400 hover:bg-white/[0.06]`}>Leave without saving</button>
-              <button type="button" disabled={isSaving || isLoading} onClick={() => void saveAndLeave()} className={`${buttonClass} bg-sky-500 text-white hover:bg-sky-400`}>
-                {isSaving && <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+              <button type="button" onClick={() => setConfirmLeave(false)} className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}>Continue editing</button>
+              <button type="button" disabled={isSaving} onClick={() => { setConfirmLeave(false); onBack(); }} className={`${buttonClass} border border-border bg-transparent text-muted-foreground hover:bg-muted/60`}>Leave without saving</button>
+              <button type="button" disabled={isSaving || isLoading} onClick={() => void saveAndLeave()} className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}>
+                {isSaving && <span className="size-4 animate-spin rounded-full border-2 border-ring/40 border-t-white" />}
                 Save and leave
               </button>
             </div>

@@ -1,20 +1,59 @@
-
-import { useEffect, useState } from "react";
 import {
+  Activity,
   ChevronDown,
-  ChevronRight,
+  LayoutDashboard,
   LoaderCircle,
   LogOut,
-  LayoutGrid,
-  Menu,
+  MessageSquare,
+  Settings,
+  Workflow,
+  type LucideIcon,
 } from "lucide-react";
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+
+export type HeaderIcon =
+  | "dashboard"
+  | "workflows"
+  | "editor"
+  | "chat"
+  | "activity"
+  | "settings";
 
 interface HeaderProps {
   title: string;
+  icon: HeaderIcon;
   loggingOut: boolean;
   onLogout: () => void;
-  onMenuClick: () => void;
 }
+
+const ICONS: Record<HeaderIcon, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  workflows: Workflow,
+  editor: Workflow,
+  chat: MessageSquare,
+  activity: Activity,
+  settings: Settings,
+};
 
 const ACCOUNT = {
   name: "Azarya Geraldo",
@@ -25,125 +64,90 @@ const ACCOUNT = {
 
 export default function Header({
   title,
+  icon,
   loggingOut,
   onLogout,
-  onMenuClick,
 }: HeaderProps) {
-  const [accountOpen, setAccountOpen] = useState(false);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setAccountOpen(false);
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  const Icon = ICONS[icon];
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-md">
-      <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-8">
-        {/* Menu + breadcrumb */}
-        <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onMenuClick}
-            aria-label="Buka menu navigasi"
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 lg:hidden"
-          >
-            <Menu size={18} />
-          </button>
+    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-md sm:px-6">
+      <SidebarTrigger className="-ml-1" />
 
-          <nav
-            aria-label="Breadcrumb"
-            className="flex min-w-0 items-center gap-2 text-sm"
-          >
-            <LayoutGrid
-              size={16}
-              className="hidden shrink-0 text-muted-foreground sm:block"
-            />
-            <span className="hidden text-muted-foreground sm:inline">
-              Workspace
+      <Separator
+        orientation="vertical"
+        className="mr-1 h-5 w-px self-center bg-border"
+      />
+
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem className="hidden md:flex">
+            <span className="flex size-6 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Icon className="size-3.5" />
             </span>
-            <ChevronRight
-              size={14}
-              className="hidden shrink-0 text-muted-foreground/50 sm:inline"
-            />
-            <span className="truncate font-medium text-foreground">{title}</span>
-          </nav>
-        </div>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator className="hidden md:flex" />
+          <BreadcrumbItem className="hidden sm:flex">
+            <span>Workspace</span>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator className="hidden sm:flex" />
+          <BreadcrumbItem>
+            <BreadcrumbPage className="truncate font-medium">{title}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-        {/* Account */}
-        <div className="relative flex shrink-0 items-center">
-          <button
-            type="button"
-            onClick={() => setAccountOpen((open) => !open)}
-            aria-label="Account menu"
-            aria-expanded={accountOpen}
-            className="flex items-center gap-3 rounded-lg border border-transparent py-1.5 pl-1.5 pr-2 transition-colors hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      <div className="ml-auto flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="ghost" className="h-10 gap-2 px-1.5 sm:px-2" />
+            }
           >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-xs font-semibold text-sky-300 ring-1 ring-sky-400/25">
-              {ACCOUNT.initials}
-            </span>
-
+            <Avatar size="sm">
+              <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                {ACCOUNT.initials}
+              </AvatarFallback>
+            </Avatar>
             <span className="hidden text-left leading-tight sm:block">
               <span className="block text-sm font-medium text-foreground">
                 {ACCOUNT.name}
               </span>
-              <span className="block text-xs text-muted-foreground">
+              <span className="block text-xs font-normal text-muted-foreground">
                 {ACCOUNT.role}
               </span>
             </span>
+            <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
+          </DropdownMenuTrigger>
 
-            <ChevronDown
-              size={16}
-              className={`hidden shrink-0 text-muted-foreground transition-transform sm:block ${
-                accountOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <span className="block text-sm font-medium text-foreground">
+                  {ACCOUNT.name}
+                </span>
+                <span className="block truncate text-xs font-normal text-muted-foreground">
+                  {ACCOUNT.email}
+                </span>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
 
-          {accountOpen && (
-            <>
-              <button
-                type="button"
-                aria-label="Close account menu"
-                className="fixed inset-0 z-30 cursor-default"
-                onClick={() => setAccountOpen(false)}
-              />
+            <DropdownMenuSeparator />
 
-              <div className="absolute right-0 top-12 z-40 w-64 overflow-hidden rounded-xl border border-border bg-popover shadow-lg shadow-black/30">
-                <div className="border-b border-border px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">
-                    {ACCOUNT.name}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {ACCOUNT.email}
-                  </p>
-                </div>
-
-                <div className="p-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAccountOpen(false);
-                      onLogout();
-                    }}
-                    disabled={loggingOut}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {loggingOut ? (
-                      <LoaderCircle size={16} className="animate-spin" />
-                    ) : (
-                      <LogOut size={16} />
-                    )}
-                    {loggingOut ? "Logging out..." : "Logout"}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={loggingOut}
+              onClick={onLogout}
+            >
+              {loggingOut ? (
+                <LoaderCircle className="animate-spin" />
+              ) : (
+                <LogOut />
+              )}
+              {loggingOut ? "Logging out..." : "Logout"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
