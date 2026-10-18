@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\WorkflowController;
 use App\Http\Controllers\Api\WorkflowExecutionController;
+use App\Http\Controllers\Api\UsageStatsController;
 use App\Http\Controllers\Api\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,16 @@ use Illuminate\Support\Facades\Route;
         ]));
 
         Route::apiResource('workflows', WorkflowController::class);
+
+        Route::get(
+            '/stats/token-usage',
+            [UsageStatsController::class, 'tokenUsage']
+        );
+
+        Route::get(
+            '/stats/activity',
+            [UsageStatsController::class, 'activity']
+        );
 
     Route::get(
         '/workflows/{workflow}/executions',

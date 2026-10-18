@@ -88,6 +88,8 @@ class WorkflowExecutionController extends Controller
                 $resumeContext
             );
 
+            $tokens = $result['tokens'] ?? [];
+
             if ($result['paused'] ?? false) {
                 $execution->update([
                     'status' => 'waiting',
@@ -97,6 +99,9 @@ class WorkflowExecutionController extends Controller
                     'current_node_id' => $result['resume_node_id'],
                     'waiting_since' => now(),
                     'finished_at' => null,
+                    'prompt_tokens' => $tokens['prompt_tokens'] ?? null,
+                    'completion_tokens' => $tokens['completion_tokens'] ?? null,
+                    'total_tokens' => $tokens['total_tokens'] ?? null,
                 ]);
             } else {
                 $execution->update([
@@ -107,6 +112,9 @@ class WorkflowExecutionController extends Controller
                     'current_node_id' => null,
                     'waiting_since' => null,
                     'finished_at' => now(),
+                    'prompt_tokens' => $tokens['prompt_tokens'] ?? null,
+                    'completion_tokens' => $tokens['completion_tokens'] ?? null,
+                    'total_tokens' => $tokens['total_tokens'] ?? null,
                 ]);
             }
 
@@ -451,6 +459,9 @@ $context = array_replace($context, $input);
 $messageOutput = null;
 $stoppedAtStopper = false;
 $resumeAtNodeId = null;
+$promptTokens = 0;
+$completionTokens = 0;
+$totalTokens = 0;
 
 
 // Petakan variableDefinitions dari seluruh node ke runtime context.
@@ -561,12 +572,18 @@ foreach ($nodeMap as $node) {
         );
     }
 
-    $messageOutput = app(GeminiService::class)->generate(
+    $aiResult = app(GeminiService::class)->generate(
         $systemMessage,
         $userMessage,
         (float) ($data['temperature'] ?? 0.7),
         is_string($data['model'] ?? null) ? $data['model'] : null
     );
+
+    $messageOutput = $aiResult['text'];
+
+    $promptTokens += $aiResult['usage']['prompt_tokens'];
+    $completionTokens += $aiResult['usage']['completion_tokens'];
+    $totalTokens += $aiResult['usage']['total_tokens'];
 
     $context['ai_response'] = $messageOutput;
 
@@ -579,6 +596,9 @@ foreach ($nodeMap as $node) {
         'message' => $message,
         'provider' => 'gemini',
         'model' => $model,
+        'prompt_tokens' => $aiResult['usage']['prompt_tokens'],
+        'completion_tokens' => $aiResult['usage']['completion_tokens'],
+        'total_tokens' => $aiResult['usage']['total_tokens'],
         'timestamp' => now()->toISOString(),
     ];
 
@@ -667,6 +687,11 @@ foreach ($nodeMap as $node) {
             'paused' => $stoppedAtStopper,
             'resume_node_id' => $resumeAtNodeId,
             'executed_nodes' => count($visited),
+            'tokens' => [
+                'prompt_tokens' => $promptTokens,
+                'completion_tokens' => $completionTokens,
+                'total_tokens' => $totalTokens,
+            ],
         ];
     }
 

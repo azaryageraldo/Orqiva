@@ -7,12 +7,15 @@ use RuntimeException;
 
 class GeminiService
 {
+    /**
+     * @return array{text: string, usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int}}
+     */
     public function generate(
         string $systemMessage,
         string $userMessage,
         float $temperature = 0.7,
         ?string $modelOverride = null
-    ): string {
+    ): array {
         $apiKey = config('services.gemini.api_key');
         $model = $modelOverride ?: config('services.gemini.model', 'gemini-2.5-flash');
         $timeout = (int) config('services.gemini.timeout', 30);
@@ -69,6 +72,22 @@ class GeminiService
             );
         }
 
-        return trim($text);
+        return [
+            'text' => trim($text),
+            'usage' => [
+                'prompt_tokens' => (int) $response->json(
+                    'usageMetadata.promptTokenCount',
+                    0
+                ),
+                'completion_tokens' => (int) $response->json(
+                    'usageMetadata.candidatesTokenCount',
+                    0
+                ),
+                'total_tokens' => (int) $response->json(
+                    'usageMetadata.totalTokenCount',
+                    0
+                ),
+            ],
+        ];
     }
 }

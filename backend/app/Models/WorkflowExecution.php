@@ -19,6 +19,9 @@ class WorkflowExecution extends Model
         'current_node_id',
         'context',
         'waiting_since',
+        'prompt_tokens',
+        'completion_tokens',
+        'total_tokens',
     ];
 
     protected function casts(): array
@@ -31,6 +34,9 @@ class WorkflowExecution extends Model
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
             'waiting_since' => 'datetime',
+            'prompt_tokens' => 'integer',
+            'completion_tokens' => 'integer',
+            'total_tokens' => 'integer',
         ];
     }
 
