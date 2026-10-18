@@ -1,0 +1,26 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+/backend/vendor/
+/backend/node_modules/
+/backend/public/build/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+
+# Laravel runtime files
+/backend/storage/*.key
+/backend/storage/logs/*.log
+/backend/bootstrap/cache/*.php
+
+# Local tooling
+.DS_Store
+.idea/
+.vscode/
+.playwright-mcp/
+
+# Laravel compiled views
+/backend/storage/framework/views/*.php
