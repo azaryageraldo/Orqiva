@@ -4,10 +4,20 @@ import {
   ChevronRight,
   LoaderCircle,
   RefreshCw,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
 import {
   getActivity,
@@ -23,8 +33,19 @@ interface ActivityProps {
   onOpenExecution: (execution: ActivityExecution) => void;
 }
 
-const SELECT_CLASS =
-  "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+const STATUS_LABELS: Record<ExecutionStatus, string> = {
+  success: "Sukses",
+  failed: "Gagal",
+  waiting: "Menunggu",
+  running: "Berjalan",
+  escalated: "Ke admin",
+};
+
+const DATE_PRESETS = [
+  { label: "Hari ini", days: 0 },
+  { label: "7 hari", days: 6 },
+  { label: "30 hari", days: 29 },
+] as const;
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "medium",
@@ -37,55 +58,126 @@ function formatDate(value: string | null): string {
   return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
 }
 
+function toDateInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export default function Activity({
   onOpenWorkflow,
   onOpenExecution,
 }: ActivityProps) {
   const [stats, setStats] = useState<ActivityStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState<ActivityFilters>({});
   const [draft, setDraft] = useState<ActivityFilters>({});
 
-  async function refresh(next: ActivityFilters = filters) {
-    setLoading(true);
+  async function loadPage(
+    next: ActivityFilters,
+    page: number,
+    append = false,
+  ) {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
     setError("");
 
     try {
-      setStats(await getActivity(20, next));
+      const result = await getActivity(20, next, page);
+
+      setStats((current) =>
+        append && current
+          ? {
+              ...result,
+              executions: [...current.executions, ...result.executions],
+            }
+          : result,
+      );
     } catch (caught) {
       setError(
-        getErrorMessage(caught, "Riwayat eksekusi gagal dimuat. Periksa koneksi backend."),
+        getErrorMessage(
+          caught,
+          "Riwayat eksekusi gagal dimuat. Periksa koneksi backend.",
+        ),
       );
     } finally {
-      setLoading(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
+  }
+
+  function refresh() {
+    void loadPage(filters, 1);
   }
 
   function applyFilters() {
     setFilters(draft);
-    void refresh(draft);
+    void loadPage(draft, 1);
   }
 
   function resetFilters() {
     setDraft({});
     setFilters({});
-    void refresh({});
+    void loadPage({}, 1);
+  }
+
+  function applyPreset(days: number) {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(to.getDate() - days);
+
+    const next: ActivityFilters = {
+      ...draft,
+      from: toDateInput(from),
+      to: toDateInput(to),
+    };
+
+    setDraft(next);
+    setFilters(next);
+    void loadPage(next, 1);
+  }
+
+  function loadMore() {
+    if (!stats || loadingMore) return;
+
+    void loadPage(filters, stats.meta.page + 1, true);
   }
 
   const hasFilters = Boolean(filters.status || filters.from || filters.to);
+  const hasDraft = Boolean(
+    draft.status ||
+      draft.from ||
+      draft.to ||
+      filters.status ||
+      filters.from ||
+      filters.to,
+  );
 
   useEffect(() => {
     let active = true;
 
-    getActivity()
+    getActivity(20, {}, 1)
       .then((result) => {
         if (active) setStats(result);
       })
       .catch((caught: unknown) => {
         if (active) {
           setError(
-            getErrorMessage(caught, "Riwayat eksekusi gagal dimuat. Periksa koneksi backend."),
+            getErrorMessage(
+              caught,
+              "Riwayat eksekusi gagal dimuat. Periksa koneksi backend.",
+            ),
           );
         }
       })
@@ -119,7 +211,7 @@ export default function Activity({
           <Button
             type="button"
             variant="outline"
-            onClick={() => void refresh()}
+            onClick={refresh}
             disabled={loading}
             className="h-10 px-4"
           >
@@ -134,12 +226,7 @@ export default function Activity({
             className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           >
             <span>{error}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void refresh()}
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={refresh}>
               Coba lagi
             </Button>
           </div>
@@ -169,89 +256,189 @@ export default function Activity({
         </div>
 
         <Card className="gap-0 py-0">
-          <div className="flex flex-col gap-4 border-b border-border px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                Eksekusi terbaru
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Filter berdasarkan status dan tanggal, lalu buka detail untuk
-                audit per langkah.
-              </p>
+          <div className="border-b border-border px-5 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">
+                  Eksekusi terbaru
+                </h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Filter berdasarkan status dan tanggal, lalu buka detail untuk
+                  audit per langkah.
+                </p>
+              </div>
+
+              <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+                {stats?.executions.length ?? 0} eksekusi dimuat
+              </span>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <label className="space-y-1 text-xs text-muted-foreground">
-                <span>Status</span>
-                <select
-                  value={draft.status ?? ""}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      status: event.target.value as ExecutionStatus | "",
-                    }))
-                  }
-                  className={`${SELECT_CLASS} sm:w-36`}
-                >
-                  <option value="">Semua status</option>
-                  <option value="success">Sukses</option>
-                  <option value="failed">Gagal</option>
-                  <option value="waiting">Menunggu</option>
-                  <option value="running">Berjalan</option>
-                  <option value="escalated">Ke admin</option>
-                </select>
-              </label>
+            <div className="mt-4 rounded-xl border border-border bg-background/40 p-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_180px_180px_auto] xl:items-end">
+                <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
+                  <Label
+                    htmlFor="activity-status"
+                    className="text-xs font-normal text-muted-foreground"
+                  >
+                    Status
+                  </Label>
+                  <Select
+                    value={draft.status || "all"}
+                    onValueChange={(value) =>
+                      setDraft((current) => ({
+                        ...current,
+                        status:
+                          value === "all" || value === null
+                            ? ""
+                            : (value as ExecutionStatus),
+                      }))
+                    }
+                  >
+                    <SelectTrigger
+                      id="activity-status"
+                      className="h-9 w-full dark:bg-input/30"
+                    >
+                      <SelectValue>
+                        {(value) =>
+                          value && value !== "all"
+                            ? STATUS_LABELS[value as ExecutionStatus]
+                            : "Semua status"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua status</SelectItem>
+                      <SelectItem value="success">Sukses</SelectItem>
+                      <SelectItem value="failed">Gagal</SelectItem>
+                      <SelectItem value="waiting">Menunggu</SelectItem>
+                      <SelectItem value="running">Berjalan</SelectItem>
+                      <SelectItem value="escalated">Ke admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <label className="space-y-1 text-xs text-muted-foreground">
-                <span>Dari tanggal</span>
-                <input
-                  type="date"
-                  value={draft.from ?? ""}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      from: event.target.value,
-                    }))
-                  }
-                  className={`${SELECT_CLASS} sm:w-40`}
-                />
-              </label>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="activity-from"
+                    className="text-xs font-normal text-muted-foreground"
+                  >
+                    Dari tanggal
+                  </Label>
+                  <Input
+                    id="activity-from"
+                    type="date"
+                    value={draft.from ?? ""}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        from: event.target.value,
+                      }))
+                    }
+                    className="h-9 [color-scheme:dark]"
+                  />
+                </div>
 
-              <label className="space-y-1 text-xs text-muted-foreground">
-                <span>Sampai tanggal</span>
-                <input
-                  type="date"
-                  value={draft.to ?? ""}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      to: event.target.value,
-                    }))
-                  }
-                  className={`${SELECT_CLASS} sm:w-40`}
-                />
-              </label>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="activity-to"
+                    className="text-xs font-normal text-muted-foreground"
+                  >
+                    Sampai tanggal
+                  </Label>
+                  <Input
+                    id="activity-to"
+                    type="date"
+                    value={draft.to ?? ""}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        to: event.target.value,
+                      }))
+                    }
+                    className="h-9 [color-scheme:dark]"
+                  />
+                </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                onClick={applyFilters}
-                disabled={loading}
-                className="h-9 px-3"
-              >
-                Terapkan
-              </Button>
+                <div className="flex gap-2 sm:col-span-2 xl:col-span-1">
+                  <Button
+                    type="button"
+                    onClick={applyFilters}
+                    disabled={loading}
+                    className="h-9 flex-1 xl:flex-none"
+                  >
+                    Terapkan
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetFilters}
+                    disabled={loading || !hasDraft}
+                    className="h-9"
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  Rentang cepat
+                </span>
+                {DATE_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.label}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => applyPreset(preset.days)}
+                    disabled={loading}
+                    className="h-7 rounded-full px-3 text-xs"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
 
               {hasFilters && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={resetFilters}
-                  disabled={loading}
-                  className="h-9 px-3 text-muted-foreground"
-                >
-                  Reset
-                </Button>
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/70 pt-3 text-xs">
+                  <span className="text-muted-foreground">Filter aktif</span>
+                  {filters.status && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-primary">
+                      {STATUS_LABELS[filters.status]}
+                      <button
+                        type="button"
+                        aria-label="Hapus filter status"
+                        onClick={() => {
+                          const next = { ...draft, status: "" as const };
+                          setDraft(next);
+                          setFilters(next);
+                          void loadPage(next, 1);
+                        }}
+                        className="rounded-full hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  )}
+                  {(filters.from || filters.to) && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-muted-foreground">
+                      {filters.from || "Awal"} – {filters.to || "Sekarang"}
+                      <button
+                        type="button"
+                        aria-label="Hapus filter tanggal"
+                        onClick={() => {
+                          const next = { ...draft, from: "", to: "" };
+                          setDraft(next);
+                          setFilters(next);
+                          void loadPage(next, 1);
+                        }}
+                        className="rounded-full hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -266,7 +453,9 @@ export default function Activity({
                 <ActivityIcon className="size-5" />
               </span>
               <p className="text-sm font-medium text-foreground">
-                {hasFilters ? "Tidak ada eksekusi yang cocok" : "Belum ada eksekusi"}
+                {hasFilters
+                  ? "Tidak ada eksekusi yang cocok"
+                  : "Belum ada eksekusi"}
               </p>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {hasFilters
@@ -275,16 +464,35 @@ export default function Activity({
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-border">
-              {stats.executions.map((execution) => (
-                <ActivityRow
-                  key={execution.id}
-                  execution={execution}
-                  onOpenWorkflow={onOpenWorkflow}
-                  onOpenExecution={onOpenExecution}
-                />
-              ))}
-            </ul>
+            <>
+              <ul className="divide-y divide-border">
+                {stats.executions.map((execution) => (
+                  <ActivityRow
+                    key={execution.id}
+                    execution={execution}
+                    onOpenWorkflow={onOpenWorkflow}
+                    onOpenExecution={onOpenExecution}
+                  />
+                ))}
+              </ul>
+
+              {stats.meta.has_more && (
+                <div className="border-t border-border p-4 text-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="h-9 px-4"
+                  >
+                    {loadingMore && (
+                      <LoaderCircle className="animate-spin" />
+                    )}
+                    Muat lebih banyak
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </Card>
       </div>

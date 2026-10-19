@@ -76,6 +76,9 @@ class UsageStatsController extends Controller
         $limit = (int) $request->query('limit', 20);
         $limit = max(1, min($limit, 50));
 
+        $page = (int) $request->query('page', 1);
+        $page = max(1, $page);
+
         $status = $request->query('status');
         $status = is_string($status) && in_array(
             $status,
@@ -85,13 +88,17 @@ class UsageStatsController extends Controller
 
         $from = $request->query('from');
         $from = is_string($from) && strtotime($from) !== false
-            ? date('Y-m-d', strtotime($from))
+            ? CarbonImmutable::parse($from)
             : null;
 
-        $to = $request->query('to');
-        $to = is_string($to) && strtotime($to) !== false
-            ? date('Y-m-d', strtotime($to))
+        $rawTo = $request->query('to');
+        $to = is_string($rawTo) && strtotime($rawTo) !== false
+            ? CarbonImmutable::parse($rawTo)
             : null;
+
+        // Tanggal tanpa jam mencakup seluruh hari tersebut.
+        $toIsDateOnly = is_string($rawTo)
+            && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawTo) === 1;
 
         $userId = $request->user()->id;
 
@@ -113,15 +120,25 @@ class UsageStatsController extends Controller
             )
             ->when(
                 $from !== null,
-                fn ($query) => $query->whereDate('created_at', '>=', $from)
+                fn ($query) => $query->where('created_at', '>=', $from)
             )
             ->when(
                 $to !== null,
-                fn ($query) => $query->whereDate('created_at', '<=', $to)
+                fn ($query) => $query->where(
+                    'created_at',
+                    '<=',
+                    $toIsDateOnly ? $to->endOfDay() : $to
+                )
             )
             ->latest()
-            ->limit($limit)
-            ->get()
+            ->orderByDesc('id')
+            ->skip(($page - 1) * $limit)
+            ->take($limit + 1)
+            ->get();
+
+        $hasMore = $executions->count() > $limit;
+        $executions = $executions
+            ->take($limit)
             ->map(fn (WorkflowExecution $execution) => [
                 'id' => $execution->id,
                 'workflow_id' => $execution->workflow_id,
@@ -146,7 +163,12 @@ class UsageStatsController extends Controller
                     'running' => (int) ($summary['running'] ?? 0),
                     'escalated' => (int) ($summary['escalated'] ?? 0),
                 ],
-                'executions' => $executions,
+                'executions' => $executions->values(),
+                'meta' => [
+                    'page' => $page,
+                    'per_page' => $limit,
+                    'has_more' => $hasMore,
+                ],
             ],
         ]);
     }

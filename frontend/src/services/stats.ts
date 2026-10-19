@@ -62,6 +62,11 @@ export type ActivityStats = {
     escalated: number;
   };
   executions: ActivityExecution[];
+  meta: {
+    page: number;
+    per_page: number;
+    has_more: boolean;
+  };
 };
 
 export type ActivityFilters = {
@@ -70,15 +75,31 @@ export type ActivityFilters = {
   to?: string;
 };
 
+function utcBoundary(date: string, endOfDay: boolean): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const boundary = new Date(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  );
+
+  return boundary.toISOString().slice(0, 19).replace("T", " ");
+}
+
 export async function getActivity(
   limit = 20,
   filters: ActivityFilters = {},
+  page = 1,
 ): Promise<ActivityStats> {
-  const params: Record<string, string | number> = { limit };
+  const params: Record<string, string | number> = { limit, page };
 
   if (filters.status) params.status = filters.status;
-  if (filters.from) params.from = filters.from;
-  if (filters.to) params.to = filters.to;
+  if (filters.from) params.from = utcBoundary(filters.from, false);
+  if (filters.to) params.to = utcBoundary(filters.to, true);
 
   const response = await api.get<{ data: ActivityStats }>("/stats/activity", {
     params,

@@ -92,6 +92,47 @@ class UsageStatsTest extends TestCase
         $this->assertNotSame($success->id, $escalated->id);
     }
 
+    public function test_activity_paginates_without_skipping_executions(): void
+    {
+        $owner = $this->user('owner@example.com');
+        $expected = [];
+
+        foreach (range(1, 5) as $index) {
+            $execution = $this->execution($owner, $index * 10);
+            $execution->forceFill(['created_at' => now()->subMinutes($index)])->save();
+            $expected[] = $execution->id;
+        }
+
+        $first = $this->actingAs($owner)
+            ->getJson('/api/v1/stats/activity?limit=2&page=1')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.executions')
+            ->assertJsonPath('data.meta.page', 1)
+            ->assertJsonPath('data.meta.per_page', 2)
+            ->assertJsonPath('data.meta.has_more', true);
+
+        $second = $this->actingAs($owner)
+            ->getJson('/api/v1/stats/activity?limit=2&page=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.executions')
+            ->assertJsonPath('data.meta.has_more', true);
+
+        $third = $this->actingAs($owner)
+            ->getJson('/api/v1/stats/activity?limit=2&page=3')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.executions')
+            ->assertJsonPath('data.meta.has_more', false);
+
+        $ids = array_merge(
+            array_column($first->json('data.executions'), 'id'),
+            array_column($second->json('data.executions'), 'id'),
+            array_column($third->json('data.executions'), 'id'),
+        );
+
+        $this->assertCount(count($expected), array_unique($ids));
+        $this->assertEqualsCanonicalizing($expected, $ids);
+    }
+
     public function test_token_usage_only_counts_own_executions(): void
     {
         $owner = $this->user('owner@example.com');
