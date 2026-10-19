@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-The repository has a Phase 1 foundation: `README.md` defines the product requirements, `backend/` contains the Laravel API shell, and `frontend/` contains the React/Vite starter. Workflow persistence and execution are not implemented yet. Keep backend domain code under `backend/app/Services/Workflows/` and `backend/app/Services/AI/`, with tests in `backend/tests/Feature/` and `backend/tests/Unit/`. Organize React code under `frontend/src/` by pages, reusable components, and domain features such as `workflows/`, `workflow-editor/`, and `executions/`.
+The repository contains a working MVP: `README.md` defines the product requirements, `backend/` contains the Laravel API (Sanctum session auth, workflow CRUD with per-user ownership, execution engine, Gemini integration, usage stats), and `frontend/` contains the React/Vite app (dashboard, workflow list with pagination, visual editor, chat tester). Workflow validation lives in `backend/app/Services/Workflows/`; keep future domain code there and in `backend/app/Services/AI/`, with tests in `backend/tests/Feature/` and `backend/tests/Unit/`. Organize React code under `frontend/src/` by pages, reusable components, and domain features such as `workflows/`, `workflow-editor/`, and `executions/`.
 
 ## Build, Test, and Development Commands
 
@@ -21,7 +21,7 @@ Follow PSR-12 and Laravel conventions in PHP, and strict TypeScript in React. Us
 
 ## Testing Guidelines
 
-Add Laravel unit tests for workflow validation, graph ordering, branching, and node execution; add feature tests for API validation, CRUD, authorization, execution, and logs. Mock Gemini so tests never require credentials or call the live provider. Test files belong in `backend/tests/Unit/` or `backend/tests/Feature/`. Add frontend tests for important utilities and interactions as a test setup is introduced.
+Add Laravel unit tests for workflow validation, graph ordering, branching, and node execution; add feature tests for API validation, CRUD, authorization, execution, and logs. Mock Gemini so tests never require credentials or call the live provider. Test files belong in `backend/tests/Unit/` or `backend/tests/Feature/`. The suite runs against in-memory SQLite (configured in `phpunit.xml`), so `php artisan test` never touches the local MySQL data. Add frontend tests for important utilities and interactions as a test setup is introduced.
 
 ## Security & Configuration
 

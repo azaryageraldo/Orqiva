@@ -28,7 +28,16 @@ npm install
 npm run dev
 ```
 
-Backend berjalan di `http://127.0.0.1:8000`; frontend di Vite (default `5173`) dan proxies `/api` ke backend.
+Backend berjalan di `http://127.0.0.1:8000`; frontend di Vite (default `5173`) dan proxies `/api` ke backend. Semua endpoint workflow, eksekusi, dan statistik memerlukan sesi login (Sanctum); data dibatasi pada pemilik workflow.
+
+## Test
+
+```sh
+cd backend
+php artisan test
+```
+
+Test memakai SQLite in-memory dan memock Gemini, jadi tidak membutuhkan kredensial maupun menyentuh database lokal.
 
 Detail lengkap: [`README-SETUP.md`](README-SETUP.md).
 

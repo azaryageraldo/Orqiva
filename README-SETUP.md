@@ -1,17 +1,18 @@
 # FlowPilot AI — Local Setup
 
-The repository is being initialized in phases. The current foundation contains a Laravel API shell and a React/Vite frontend; workflow persistence, CRUD, and execution are not implemented yet.
+Repository ini berisi MVP yang sudah berjalan: autentikasi Sanctum, CRUD workflow dengan kepemilikan per pengguna, editor visual berbasis React Flow, eksekusi workflow dengan Gemini, chat tester, serta statistik penggunaan token.
 
 ## Requirements
 
-- PHP 8.3+ with PDO MySQL and common Laravel extensions
+- PHP 8.3+ dengan ekstensi PDO MySQL (dan PDO SQLite untuk menjalankan test)
 - Composer
-- Node.js and npm
-- MySQL 8 (use an existing local service; this project does not start or reconfigure one)
+- Node.js dan npm
+- MySQL 8 (gunakan layanan lokal yang sudah ada)
+- Gemini API key (hanya disimpan di backend)
 
 ## Install dependencies
 
-From the repository root:
+Dari root repository:
 
 ```sh
 cd backend && composer install
@@ -19,16 +20,38 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-Set the local MySQL connection values in `backend/.env`. Keep the Gemini key in this backend file only; it is not needed for the current foundation.
+Isi koneksi MySQL dan `GEMINI_API_KEY` di `backend/.env`. Kunci API tidak boleh diletakkan di frontend.
 
 ```sh
 cd ../frontend
 npm install
-cp .env.example .env
 ```
 
-## Run locally
+## Siapkan database
 
-In separate terminals, from `backend/` run `php artisan serve`, and from `frontend/` run `npm run dev`. Vite proxies `/api` to `http://127.0.0.1:8000` by default. The starter UI checks `GET /api/v1/health`; workflow controls remain disabled until the workflow API is implemented.
+```sh
+cd backend
+php artisan migrate
+```
 
-Frontend production bundle: `npm run build` from `frontend/`. Backend smoke endpoint: `GET /up` and `GET /api/v1/health`.
+Belum ada endpoint registrasi. Buat pengguna pertama (atau gunakan seeder demo):
+
+```sh
+php artisan db:seed --class=AdminUserSeeder
+# email: admin@gmail.com — ganti password sebelum dipakai di luar lokal
+```
+
+## Jalankan
+
+Di dua terminal terpisah, dari `backend/` jalankan `php artisan serve`, dan dari `frontend/` jalankan `npm run dev`. Vite mem-proxy `/api` ke `http://127.0.0.1:8000`. Semua endpoint workflow dan statistik memerlukan sesi login.
+
+Build produksi frontend: `npm run build` dari `frontend/`. Endpoint kesehatan backend: `GET /up` dan `GET /api/v1/health`.
+
+## Test
+
+```sh
+cd backend
+php artisan test
+```
+
+Test berjalan pada SQLite in-memory (lihat `phpunit.xml`) sehingga tidak menyentuh data MySQL lokal. Panggilan Gemini dimock di test, jadi tidak butuh kredensial atau kuota.
