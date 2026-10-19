@@ -317,7 +317,6 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             caption="Seluruh alur di workspace"
             tone="primary"
             loading={loading}
-            delay={0}
           />
           <StatCard
             icon={CheckCircle2}
@@ -330,7 +329,6 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             }
             tone="emerald"
             loading={loading}
-            delay={0.05}
           />
           <StatCard
             icon={CircleDashed}
@@ -339,7 +337,6 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             caption="Perlu ditinjau sebelum aktif"
             tone="amber"
             loading={loading}
-            delay={0.1}
           />
         </div>
 
@@ -712,7 +709,6 @@ function StatCard({
   caption,
   tone,
   loading,
-  delay = 0,
 }: {
   icon: LucideIcon;
   label: string;
@@ -720,15 +716,11 @@ function StatCard({
   caption: string;
   tone: keyof typeof TONE_STYLES;
   loading: boolean;
-  delay?: number;
 }) {
   const styles = TONE_STYLES[tone];
 
   return (
-    <div
-      className="animate-rise relative overflow-hidden rounded-xl border border-border bg-card p-5"
-      style={{ animationDelay: `${delay}s` }}
-    >
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">{label}</p>
@@ -747,9 +739,7 @@ function StatCard({
         </span>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">{caption}</p>
-      <span
-        className={`absolute inset-x-0 bottom-0 h-0.5 ${styles.bar} animate-sheen`}
-      />
+      <span className={`absolute inset-x-0 bottom-0 h-0.5 ${styles.bar}`} />
     </div>
   );
 }
@@ -845,7 +835,7 @@ function SystemRow({
 
 function AutomationPipeline() {
   return (
-    <div className="animate-rise relative overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8">
       <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-[30rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
 
       <div className="relative">
@@ -857,9 +847,9 @@ function AutomationPipeline() {
         <div className="mt-6 overflow-x-auto pb-1">
           <div className="flex min-w-[520px] items-center gap-4">
             <PipelineNode icon={Zap} label="Trigger" hint="Pesan masuk" />
-            <PipelineConnector delay="0s" />
+            <PipelineConnector />
             <PipelineNode icon={Bot} label="AI Agent" hint="Gemini" active />
-            <PipelineConnector delay="0.7s" />
+            <PipelineConnector />
             <PipelineNode icon={Send} label="Send Message" hint="Balasan" />
           </div>
         </div>
@@ -883,14 +873,11 @@ function PipelineNode({
     <div
       className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
         active
-          ? "animate-float border-primary/40 bg-primary/[0.06] shadow-[0_0_35px_-12px_var(--primary)]"
+          ? "border-primary/40 bg-primary/[0.06] shadow-[0_0_35px_-12px_var(--primary)]"
           : "border-border bg-background/60"
       }`}
     >
       <span className="relative flex size-10 shrink-0 items-center justify-center">
-        {active && (
-          <span className="animate-pulse-ring absolute inset-0 rounded-lg border border-primary/50" />
-        )}
         <span
           className={`relative flex size-10 items-center justify-center rounded-lg ${
             active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
@@ -907,18 +894,9 @@ function PipelineNode({
   );
 }
 
-function PipelineConnector({ delay }: { delay: string }) {
+function PipelineConnector() {
   return (
-    <div className="relative h-0.5 min-w-10 flex-1 overflow-hidden rounded-full bg-border">
-      <span
-        className="animate-flow-x absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,transparent_35%,var(--primary)_50%,transparent_65%)]"
-        style={{ animationDelay: delay }}
-      />
-      <span
-        className="animate-flow-x-slow absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,transparent_40%,var(--primary)_50%,transparent_60%)] opacity-60"
-        style={{ animationDelay: `calc(${delay} + 1.1s)` }}
-      />
-    </div>
+    <div className="h-0.5 min-w-10 flex-1 rounded-full bg-border" />
   );
 }
 
