@@ -42,7 +42,10 @@ interface DashboardProps {
   onViewActivity?: () => void;
 }
 
-const HEALTH_STYLES: Record<Health, { label: string; dot: string; text: string }> = {
+const HEALTH_STYLES: Record<
+  Health,
+  { label: string; dot: string; text: string }
+> = {
   online: {
     label: "Operational",
     dot: "bg-emerald-400",
@@ -78,13 +81,43 @@ const FREE_MODELS: Array<{
   context: string;
   tag: string;
 }> = [
-  { name: "Nemotron 3 Ultra", author: "NVIDIA", context: "1M", tag: "Reasoning" },
-  { name: "Nemotron 3.5 Lightning", author: "NVIDIA", context: "1M", tag: "Fast" },
+  {
+    name: "Nemotron 3 Ultra",
+    author: "NVIDIA",
+    context: "1M",
+    tag: "Reasoning",
+  },
+  {
+    name: "Nemotron 3.5 Lightning",
+    author: "NVIDIA",
+    context: "1M",
+    tag: "Fast",
+  },
   { name: "Laguna S 2.1", author: "Poolside", context: "262K", tag: "Coding" },
-  { name: "Dots3-Note Preview", author: "Dots Studio", context: "512K", tag: "Multimodal" },
-  { name: "Nemotron 3 Super", author: "NVIDIA", context: "262K", tag: "Agentic" },
-  { name: "Nemotron 3.5 Super VL", author: "NVIDIA", context: "1M", tag: "Vision" },
-  { name: "Inkling", author: "Thinking Machines", context: "1.05M", tag: "Multimodal" },
+  {
+    name: "Dots3-Note Preview",
+    author: "Dots Studio",
+    context: "512K",
+    tag: "Multimodal",
+  },
+  {
+    name: "Nemotron 3 Super",
+    author: "NVIDIA",
+    context: "262K",
+    tag: "Agentic",
+  },
+  {
+    name: "Nemotron 3.5 Super VL",
+    author: "NVIDIA",
+    context: "1M",
+    tag: "Vision",
+  },
+  {
+    name: "Inkling",
+    author: "Thinking Machines",
+    context: "1.05M",
+    tag: "Multimodal",
+  },
   { name: "North Mini Code", author: "Cohere", context: "256K", tag: "Coding" },
 ];
 
@@ -153,7 +186,9 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
         if (workflowsResult.status === "fulfilled") {
           setWorkflows(workflowsResult.value.data);
         } else {
-          setError("Sebagian data dashboard gagal dimuat. Periksa koneksi API.");
+          setError(
+            "Sebagian data dashboard gagal dimuat. Periksa koneksi API.",
+          );
         }
 
         if (activityResult.status === "fulfilled") {
@@ -201,7 +236,11 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
     setUsageLoading(true);
 
     const [workflowsResult, activityResult, usageResult] =
-      await Promise.allSettled([getWorkflows(), getActivity(8), getTokenUsage(period)]);
+      await Promise.allSettled([
+        getWorkflows(),
+        getActivity(8),
+        getTokenUsage(period),
+      ]);
 
     if (workflowsResult.status === "fulfilled") {
       setWorkflows(workflowsResult.value.data);
@@ -260,8 +299,8 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
               Dashboard
             </h1>
             <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              Pantau otomatisasi, konsumsi token AI, dan kesehatan eksekusi dalam
-              satu layar.
+              Pantau otomatisasi, konsumsi token AI, dan kesehatan eksekusi
+              dalam satu layar.
             </p>
           </div>
 
@@ -277,7 +316,11 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
               Segarkan
             </Button>
             {onViewActivity && (
-              <Button type="button" onClick={onViewActivity} className="h-10 px-4">
+              <Button
+                type="button"
+                onClick={onViewActivity}
+                className="h-10 px-4"
+              >
                 <ActivityIcon />
                 Lihat aktivitas
               </Button>
@@ -415,8 +458,16 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   </p>
                 </div>
 
-                <Legend color="bg-primary" label="Input" value={usage?.totals.prompt_tokens ?? 0} />
-                <Legend color="bg-primary/40" label="Output" value={usage?.totals.completion_tokens ?? 0} />
+                <Legend
+                  color="bg-primary"
+                  label="Input"
+                  value={usage?.totals.prompt_tokens ?? 0}
+                />
+                <Legend
+                  color="bg-primary/40"
+                  label="Output"
+                  value={usage?.totals.completion_tokens ?? 0}
+                />
                 <Legend
                   color="bg-muted-foreground/40"
                   label="Eksekusi"
@@ -497,7 +548,8 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   Belum ada eksekusi
                 </p>
                 <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                  Jalankan workflow dari Chat Widget untuk melihat riwayat di sini.
+                  Jalankan workflow dari Chat Widget untuk melihat riwayat di
+                  sini.
                 </p>
               </div>
             ) : (
@@ -509,14 +561,17 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                       key={execution.id}
                       className="flex items-center gap-4 px-5 py-3"
                     >
-                      <span className={`size-2 shrink-0 rounded-full ${meta.dot}`} />
+                      <span
+                        className={`size-2 shrink-0 rounded-full ${meta.dot}`}
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">
                           {execution.workflow_name ||
                             `Workflow #${execution.workflow_id}`}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          Eksekusi #{execution.id} · {formatDate(execution.started_at)}
+                          Eksekusi #{execution.id} ·{" "}
+                          {formatDate(execution.started_at)}
                         </p>
                       </div>
                       <span
@@ -601,8 +656,16 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                 <SystemRow
                   label="Pencatatan token"
                   value={summary.total > 0 ? "Aktif" : "Menunggu data"}
-                  dot={summary.total > 0 ? "bg-emerald-400" : "bg-muted-foreground/40"}
-                  text={summary.total > 0 ? "text-emerald-400" : "text-muted-foreground"}
+                  dot={
+                    summary.total > 0
+                      ? "bg-emerald-400"
+                      : "bg-muted-foreground/40"
+                  }
+                  text={
+                    summary.total > 0
+                      ? "text-emerald-400"
+                      : "text-muted-foreground"
+                  }
                 />
                 <SystemRow
                   label="Zona waktu"
@@ -698,7 +761,10 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
 
 const TONE_STYLES = {
   primary: { icon: "bg-primary/10 text-primary", bar: "bg-primary" },
-  emerald: { icon: "bg-emerald-400/10 text-emerald-400", bar: "bg-emerald-400" },
+  emerald: {
+    icon: "bg-emerald-400/10 text-emerald-400",
+    bar: "bg-emerald-400",
+  },
   amber: { icon: "bg-amber-400/10 text-amber-400", bar: "bg-amber-400" },
 } as const;
 
@@ -880,24 +946,28 @@ function PipelineNode({
       <span className="relative flex size-10 shrink-0 items-center justify-center">
         <span
           className={`relative flex size-10 items-center justify-center rounded-lg ${
-            active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+            active
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground"
           }`}
         >
           <Icon className="size-[18px]" />
         </span>
       </span>
       <span className="pr-1">
-        <span className="block text-sm font-semibold text-foreground">{label}</span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>
+        <span className="block text-sm font-semibold text-foreground">
+          {label}
+        </span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          {hint}
+        </span>
       </span>
     </div>
   );
 }
 
 function PipelineConnector() {
-  return (
-    <div className="h-0.5 min-w-10 flex-1 rounded-full bg-border" />
-  );
+  return <div className="h-0.5 min-w-10 flex-1 rounded-full bg-border" />;
 }
 
 function Legend({
@@ -927,7 +997,9 @@ function Legend({
 function EmptyChart() {
   return (
     <div className="flex h-52 flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
-      <p className="text-sm font-medium text-foreground">Belum ada token tercatat</p>
+      <p className="text-sm font-medium text-foreground">
+        Belum ada token tercatat
+      </p>
       <p className="mt-1 max-w-xs text-sm text-muted-foreground">
         Token akan terhitung otomatis setiap kali AI Agent dijalankan.
       </p>
@@ -949,7 +1021,10 @@ function TokenAreaChart({ series }: { series: TokenUsageBucket[] }) {
 
   const line = (getter: (bucket: TokenUsageBucket) => number) =>
     series
-      .map((bucket, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(getter(bucket)).toFixed(1)}`)
+      .map(
+        (bucket, index) =>
+          `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(getter(bucket)).toFixed(1)}`,
+      )
       .join(" ");
 
   const completionLine = line((bucket) => bucket.completion_tokens);
@@ -960,7 +1035,10 @@ function TokenAreaChart({ series }: { series: TokenUsageBucket[] }) {
 
   const backAlongCompletion = series
     .map((_, index) => count - 1 - index)
-    .map((index) => `L${x(index).toFixed(1)},${y(series[index].completion_tokens).toFixed(1)}`)
+    .map(
+      (index) =>
+        `L${x(index).toFixed(1)},${y(series[index].completion_tokens).toFixed(1)}`,
+    )
     .join(" ");
 
   const promptArea = `${totalLine} ${backAlongCompletion} Z`;
@@ -978,7 +1056,11 @@ function TokenAreaChart({ series }: { series: TokenUsageBucket[] }) {
           <defs>
             <linearGradient id="token-prompt" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.05" />
+              <stop
+                offset="100%"
+                stopColor="var(--primary)"
+                stopOpacity="0.05"
+              />
             </linearGradient>
           </defs>
 
