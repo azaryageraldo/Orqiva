@@ -33,7 +33,12 @@ export async function getTokenUsage(
   return response.data.data;
 }
 
-export type ExecutionStatus = "running" | "waiting" | "success" | "failed";
+export type ExecutionStatus =
+  | "running"
+  | "waiting"
+  | "success"
+  | "failed"
+  | "escalated";
 
 export type ActivityExecution = {
   id: number;

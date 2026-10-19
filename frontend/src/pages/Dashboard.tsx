@@ -145,6 +145,11 @@ const STATUS_META: Record<
     dot: "bg-primary",
     badge: "border-primary/30 bg-primary/10 text-primary",
   },
+  escalated: {
+    label: "Ke admin",
+    dot: "bg-teal-400",
+    badge: "border-teal-400/30 bg-teal-400/10 text-teal-300",
+  },
 };
 
 const numberFormat = new Intl.NumberFormat("id-ID");
@@ -613,7 +618,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                 tone="amber"
                 label="Menunggu pesan"
                 value={summary.waiting}
-                hint="Workflow tertahan di node Stopper"
+                hint="Workflow menunggu pesan pelanggan berikutnya"
               />
               <AttentionRow
                 icon={CircleDashed}

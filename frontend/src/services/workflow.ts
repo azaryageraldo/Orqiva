@@ -66,18 +66,24 @@ export type WorkflowExecutionResult = {
   data: {
     id: number;
     workflow_id: number;
-    status: "running" | "waiting" | "success" | "failed";
+    status: "running" | "waiting" | "success" | "failed" | "escalated";
     input?: Record<string, unknown>;
     output?: unknown;
     error?: string | null;
     logs?: Array<{
+      step?: number;
       node_id?: string;
       node?: string;
+      name?: string;
       status: string;
       message: string;
       timestamp?: string;
+      duration_ms?: number;
       provider?: string;
       model?: string;
+      variables?: Record<string, unknown>;
+      branch?: string;
+      messages?: string[];
     }>;
   };
 };

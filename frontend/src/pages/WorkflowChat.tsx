@@ -26,32 +26,43 @@ interface ChatMessage {
   content: string;
 }
 
-function extractReply(output: unknown): string {
-  if (typeof output === "string" && output.trim()) {
-    return output;
+function extractReplies(output: unknown): string[] {
+  if (typeof output === "string") {
+    return output.trim() ? [output] : [];
   }
 
   if (!output || typeof output !== "object") {
-    return "";
+    return [];
   }
 
   const data = output as Record<string, unknown>;
 
-  // Prioritaskan jawaban AI dari hasil node workflow.
+  // Send Message bisa menghasilkan beberapa bubble.
+  if (Array.isArray(data.messages)) {
+    const bubbles = data.messages
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (bubbles.length > 0) {
+      return bubbles;
+    }
+  }
+
   if (typeof data.output === "string" && data.output.trim()) {
-    return data.output;
+    return [data.output];
   }
 
   if (typeof data.ai_response === "string" && data.ai_response.trim()) {
-    return data.ai_response;
+    return [data.ai_response];
   }
 
   if (typeof data.response === "string" && data.response.trim()) {
-    return data.response;
+    return [data.response];
   }
 
   if (typeof data.text === "string" && data.text.trim()) {
-    return data.text;
+    return [data.text];
   }
 
   // Periksa context jika jawaban belum ditemukan.
@@ -59,16 +70,16 @@ function extractReply(output: unknown): string {
     const context = data.context as Record<string, unknown>;
 
     if (typeof context.ai_response === "string" && context.ai_response.trim()) {
-      return context.ai_response;
+      return [context.ai_response];
     }
 
     if (typeof context.message === "string" && context.message.trim()) {
-      return context.message;
+      return [context.message];
     }
   }
 
   // Jangan tampilkan pesan status sebagai jawaban AI.
-  return "";
+  return [];
 }
 
 export default function WorkflowChat({
@@ -85,6 +96,7 @@ export default function WorkflowChat({
     "idle" | "success" | "failed"
   >("idle");
   const [executionError, setExecutionError] = useState("");
+  const [escalated, setEscalated] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [conversationId] = useState(() => crypto.randomUUID());
 
@@ -141,6 +153,12 @@ export default function WorkflowChat({
 
       const data = result.data;
 
+      if (data.status === "escalated") {
+        setEscalated(true);
+        setExecutionStatus("idle");
+        return;
+      }
+
       if (data.status === "waiting") {
         setExecutionStatus("idle");
         return;
@@ -152,9 +170,9 @@ export default function WorkflowChat({
         );
       }
 
-      const reply = extractReply(data.output);
+      const replies = extractReplies(data.output);
 
-      if (!reply) {
+      if (replies.length === 0) {
         throw new Error(
           "Workflow berhasil dijalankan, tetapi balasan tidak ditemukan pada output.",
         );
@@ -162,11 +180,11 @@ export default function WorkflowChat({
 
       setMessages((current) => [
         ...current,
-        {
+        ...replies.map((content) => ({
           id: crypto.randomUUID(),
-          role: "assistant",
-          content: reply,
-        },
+          role: "assistant" as const,
+          content,
+        })),
       ]);
       setExecutionStatus("success");
     } catch (error) {
@@ -305,6 +323,13 @@ export default function WorkflowChat({
                   </div>
                 )}
 
+                {escalated && (
+                  <div className="rounded-xl border border-teal-400/20 bg-teal-400/[0.06] p-3 text-xs leading-5 text-teal-200">
+                    Percakapan dialihkan ke admin manusia. AI tidak membalas
+                    lagi sampai ada percakapan baru.
+                  </div>
+                )}
+
                 <div ref={bottomRef} />
               </div>
 
@@ -327,9 +352,13 @@ export default function WorkflowChat({
                         event.currentTarget.form?.requestSubmit();
                       }
                     }}
-                    placeholder="Type a message to test your workflow..."
+                    placeholder={
+                      escalated
+                        ? "Percakapan sedang ditangani admin."
+                        : "Type a message to test your workflow..."
+                    }
                     aria-label="Test message"
-                    disabled={sending}
+                    disabled={sending || escalated}
                     className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm text-foreground shadow-none focus-visible:ring-0 dark:bg-transparent"
                   />
 
@@ -337,7 +366,7 @@ export default function WorkflowChat({
                     type="submit"
                     size="icon-lg"
                     aria-label="Send message"
-                    disabled={sending || !draft.trim()}
+                    disabled={sending || escalated || !draft.trim()}
                     className="shrink-0"
                   >
                     {sending ? (

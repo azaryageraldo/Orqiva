@@ -3,6 +3,7 @@ import {
   Activity as ActivityIcon,
   CheckCircle2,
   CircleDashed,
+  Handshake,
   LoaderCircle,
   RefreshCw,
   XCircle,
@@ -46,6 +47,11 @@ const STATUS_STYLES: Record<
     label: "Berjalan",
     className: "border-primary/30 bg-primary/10 text-primary",
     icon: LoaderCircle,
+  },
+  escalated: {
+    label: "Ke admin",
+    className: "border-teal-400/30 bg-teal-400/10 text-teal-300",
+    icon: Handshake,
   },
 };
 
