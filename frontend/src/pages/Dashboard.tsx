@@ -889,7 +889,7 @@ function PipelineNode({
     >
       <span className="relative flex size-10 shrink-0 items-center justify-center">
         {active && (
-          <span className="absolute inset-0 rounded-lg bg-primary/40 animate-pulse-ring" />
+          <span className="animate-pulse-ring absolute inset-0 rounded-lg border border-primary/50" />
         )}
         <span
           className={`relative flex size-10 items-center justify-center rounded-lg ${
@@ -911,11 +911,11 @@ function PipelineConnector({ delay }: { delay: string }) {
   return (
     <div className="relative h-0.5 min-w-10 flex-1 overflow-hidden rounded-full bg-border">
       <span
-        className="animate-flow-x absolute inset-y-0 w-10 rounded-full bg-linear-to-r from-transparent via-primary to-transparent"
+        className="animate-flow-x absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,transparent_35%,var(--primary)_50%,transparent_65%)]"
         style={{ animationDelay: delay }}
       />
       <span
-        className="animate-flow-x-slow absolute inset-y-0 w-6 rounded-full bg-linear-to-r from-transparent via-primary/60 to-transparent"
+        className="animate-flow-x-slow absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,transparent_40%,var(--primary)_50%,transparent_60%)] opacity-60"
         style={{ animationDelay: `calc(${delay} + 1.1s)` }}
       />
     </div>
