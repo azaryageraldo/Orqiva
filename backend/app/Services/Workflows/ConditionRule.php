@@ -3,92 +3,48 @@
 namespace App\Services\Workflows;
 
 /**
- * Membaca konfigurasi Condition dari data node dan mengevaluasinya.
+ * Aturan node Condition: satu variabel boolean, dua cabang
+ * (If match / Else).
  */
 class ConditionRule
 {
-    public const OPERATORS = [
-        'equals',
-        'not_equals',
-        'contains',
-        'not_contains',
-        'is_empty',
-        'is_not_empty',
-    ];
-
-    /**
-     * Mendukung format Condition frontend dan format lama.
-     *
-     * @return array{field: string, operator: string, value: mixed}|null
-     */
-    public function fromData(array $data): ?array
+    public function field(array $data): ?string
     {
-        if (isset($data['condition']) && is_array($data['condition'])) {
-            $condition = $data['condition'];
+        $field = $data['conditionVariable'] ?? null;
 
-            $field = $condition['field'] ?? null;
-            $operator = $condition['operator'] ?? null;
-            $value = $condition['value'] ?? null;
-        } else {
-            $field = $data['conditionVariable'] ?? null;
-            $operator = $data['conditionOperator'] ?? null;
-            $value = $data['conditionValue'] ?? null;
+        if ($field === null && isset($data['condition']) && is_array($data['condition'])) {
+            $field = $data['condition']['field'] ?? null;
         }
 
-        if (
-            ! is_string($field)
-            || trim($field) === ''
-            || ! is_string($operator)
-            || ! in_array($operator, self::OPERATORS, true)
-        ) {
+        if (! is_string($field) || trim($field) === '') {
             return null;
         }
 
-        if (
-            ! in_array($operator, ['is_empty', 'is_not_empty'], true)
-            && ! is_scalar($value)
-            && $value !== null
-        ) {
-            return null;
-        }
-
-        return [
-            'field' => trim($field),
-            'operator' => $operator,
-            'value' => $value,
-        ];
+        return trim($field);
     }
 
-    public function matches(
-        mixed $actual,
-        string $operator,
-        mixed $expected
-    ): bool {
-        return match ($operator) {
-            'equals' => $actual === $expected,
-            'not_equals' => $actual !== $expected,
+    public function isTruthy(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
 
-            'contains' => is_string($actual)
-                && is_string($expected)
-                && str_contains($actual, $expected),
+        if (is_int($value) || is_float($value)) {
+            return (float) $value !== 0.0;
+        }
 
-            'not_contains' => ! (
-                is_string($actual)
-                && is_string($expected)
-                && str_contains($actual, $expected)
-            ),
+        if (is_string($value)) {
+            return in_array(
+                mb_strtolower(trim($value)),
+                ['true', '1', 'yes', 'ya', 'on'],
+                true
+            );
+        }
 
-            'is_empty' => $actual === null
-                || $actual === ''
-                || $actual === [],
+        if (is_array($value)) {
+            return $value !== [];
+        }
 
-            'is_not_empty' => ! (
-                $actual === null
-                || $actual === ''
-                || $actual === []
-            ),
-
-            default => false,
-        };
+        return false;
     }
 }

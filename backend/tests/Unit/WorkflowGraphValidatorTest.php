@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Services\Workflows\AiAgentVariables;
 use App\Services\Workflows\ConditionRule;
 use App\Services\Workflows\WorkflowGraphValidator;
 use PHPUnit\Framework\TestCase;
@@ -18,7 +19,10 @@ class WorkflowGraphValidatorTest extends TestCase
     {
         parent::setUp();
 
-        $this->validator = new WorkflowGraphValidator(new ConditionRule);
+        $this->validator = new WorkflowGraphValidator(
+            new ConditionRule,
+            new AiAgentVariables
+        );
     }
 
     public function test_valid_graph_is_accepted(): void
@@ -28,40 +32,60 @@ class WorkflowGraphValidatorTest extends TestCase
         );
 
         $this->assertSame('trigger-1', $graph['trigger_id']);
-        $this->assertArrayHasKey('trigger-1:default', $graph['next']);
+        $this->assertSame('trigger-1', $graph['entry_id']);
+        $this->assertNull($graph['starting_point_id']);
         $this->assertSame('ai_agent', $graph['nodes']['ai-1']['type']);
     }
 
-    public function test_cycle_is_rejected(): void
-    {
-        $definition = $this->singleAgentDefinition();
-        $definition['edges'][] = [
-            'id' => 'e3',
-            'source' => 'send-1',
-            'target' => 'ai-1',
-        ];
-
-        $this->expectException(RuntimeException::class);
-
-        $this->validator->validateDefinition($definition);
-    }
-
-    public function test_cycle_is_rejected_for_incomplete_draft(): void
+    public function test_go_to_loop_is_allowed(): void
     {
         $definition = [
             'nodes' => [
+                $this->triggerNode(),
                 $this->aiNode('ai-1'),
-                $this->sendNode('send-1'),
+                $this->conditionNode(),
+                $this->aiNode('ai-2', 'Menu'),
+                $this->sendNode('send-1', 'Halo'),
+                $this->goToNode('goto-1', 'ai-1'),
             ],
             'edges' => [
-                ['source' => 'ai-1', 'target' => 'send-1'],
-                ['source' => 'send-1', 'target' => 'ai-1'],
+                ['source' => 'trigger-1', 'target' => 'ai-1'],
+                ['source' => 'ai-1', 'target' => 'condition-1'],
+                ['source' => 'condition-1', 'target' => 'ai-2', 'sourceHandle' => 'true'],
+                ['source' => 'condition-1', 'target' => 'send-1', 'sourceHandle' => 'false'],
+                ['source' => 'ai-2', 'target' => 'goto-1'],
             ],
         ];
 
-        $this->expectException(RuntimeException::class);
+        $graph = $this->validator->validateDefinition($definition);
 
-        $this->validator->validateDefinition($definition, null, false);
+        // Loop lewat Go To diizinkan; runtime dibatasi MAX_STEPS.
+        $this->assertSame('ai-1', $graph['nodes']['goto-1']['data']['targetNodeId']);
+    }
+
+    public function test_fan_in_is_allowed(): void
+    {
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->aiNode('ai-1'),
+                $this->conditionNode(),
+                $this->aiNode('ai-2', 'Second reply'),
+                $this->sendNode('send-1', 'Halo'),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'ai-1'],
+                ['source' => 'ai-1', 'target' => 'condition-1'],
+                ['source' => 'condition-1', 'target' => 'ai-2', 'sourceHandle' => 'true'],
+                ['source' => 'condition-1', 'target' => 'ai-2', 'sourceHandle' => 'false'],
+                ['source' => 'ai-2', 'target' => 'send-1'],
+            ],
+        ];
+
+        $graph = $this->validator->validateDefinition($definition);
+
+        $this->assertSame('ai-2', $graph['next']['condition-1:true']);
+        $this->assertSame('ai-2', $graph['next']['condition-1:false']);
     }
 
     public function test_duplicate_node_id_is_rejected(): void
@@ -104,25 +128,13 @@ class WorkflowGraphValidatorTest extends TestCase
         $this->validator->validateDefinition($definition, null, true);
     }
 
-    public function test_condition_requires_true_and_false_edges(): void
+    public function test_condition_requires_match_and_else_edges(): void
     {
-        $condition = [
-            'id' => 'condition-1',
-            'type' => 'Condition',
-            'position' => ['x' => 0, 'y' => 0],
-            'data' => [
-                'label' => 'Condition',
-                'conditionVariable' => 'customer_message',
-                'conditionOperator' => 'contains',
-                'conditionValue' => 'harga',
-            ],
-        ];
-
         $definition = [
             'nodes' => [
                 $this->triggerNode(),
                 $this->aiNode('ai-1'),
-                $condition,
+                $this->conditionNode(),
                 $this->sendNode('send-1'),
             ],
             'edges' => [
@@ -137,30 +149,18 @@ class WorkflowGraphValidatorTest extends TestCase
         ];
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Condition harus memiliki koneksi true dan false');
+        $this->expectExceptionMessage('If match dan Else');
 
         $this->validator->validateDefinition($definition);
     }
 
-    public function test_condition_requires_valid_config(): void
+    public function test_condition_requires_boolean_variable(): void
     {
-        $condition = [
-            'id' => 'condition-1',
-            'type' => 'Condition',
-            'position' => ['x' => 0, 'y' => 0],
-            'data' => [
-                'label' => 'Condition',
-                'conditionVariable' => null,
-                'conditionOperator' => 'equals',
-                'conditionValue' => 'true',
-            ],
-        ];
-
         $definition = [
             'nodes' => [
                 $this->triggerNode(),
                 $this->aiNode('ai-1'),
-                $condition,
+                $this->conditionNode('condition-1', null),
                 $this->sendNode('send-1'),
                 $this->sendNode('send-2'),
             ],
@@ -173,7 +173,7 @@ class WorkflowGraphValidatorTest extends TestCase
         ];
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Konfigurasi Condition tidak valid');
+        $this->expectExceptionMessage('belum memilih variabel boolean');
 
         $this->validator->validateDefinition($definition);
     }
@@ -183,7 +183,6 @@ class WorkflowGraphValidatorTest extends TestCase
         $definition = $this->singleAgentDefinition();
         $definition['nodes'][] = $this->sendNode('send-2');
         $definition['edges'][] = [
-            'id' => 'e3',
             'source' => 'send-1',
             'target' => 'send-2',
         ];
@@ -194,13 +193,33 @@ class WorkflowGraphValidatorTest extends TestCase
         $this->validator->validateDefinition($definition);
     }
 
+    public function test_relocate_cannot_have_outgoing_edge(): void
+    {
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->relocateNode(),
+                $this->sendNode('send-1'),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'relocate-1'],
+                ['source' => 'relocate-1', 'target' => 'send-1'],
+            ],
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Relocate tidak boleh memiliki koneksi keluar');
+
+        $this->validator->validateDefinition($definition);
+    }
+
     public function test_source_handle_only_allowed_on_condition(): void
     {
         $definition = $this->singleAgentDefinition();
         $definition['edges'][1]['sourceHandle'] = 'true';
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('sourceHandle hanya didukung');
+        $this->expectExceptionMessage('If match/Else hanya didukung');
 
         $this->validator->validateDefinition($definition);
     }
@@ -211,8 +230,118 @@ class WorkflowGraphValidatorTest extends TestCase
         $definition['nodes'][] = $this->sendNode('send-orphan');
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('tidak terhubung ke Trigger');
+        $this->expectExceptionMessage('tidak terhubung ke alur');
 
         $this->validator->validateDefinition($definition);
+    }
+
+    public function test_go_to_requires_target_when_runnable(): void
+    {
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->goToNode('goto-1', ''),
+                $this->relocateNode(),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'goto-1'],
+            ],
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('harus memilih node tujuan');
+
+        $this->validator->validateDefinition($definition);
+    }
+
+    public function test_go_to_rejects_self_target(): void
+    {
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->goToNode('goto-1', 'goto-1'),
+                $this->relocateNode(),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'goto-1'],
+            ],
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('tidak boleh mengarah ke dirinya sendiri');
+
+        $this->validator->validateDefinition($definition);
+    }
+
+    public function test_go_to_starting_point_changes_entry(): void
+    {
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->aiNode('ai-1'),
+                $this->sendNode('send-1', 'Halo'),
+                $this->aiNode('ai-2', 'Menu'),
+                $this->goToNode('goto-1', 'ai-2', true, true),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'ai-1'],
+                ['source' => 'ai-1', 'target' => 'goto-1'],
+                ['source' => 'ai-2', 'target' => 'send-1'],
+            ],
+        ];
+
+        $graph = $this->validator->validateDefinition($definition);
+
+        $this->assertSame('ai-2', $graph['entry_id']);
+        $this->assertSame('ai-2', $graph['starting_point_id']);
+    }
+
+    public function test_only_one_starting_point_is_allowed(): void
+    {
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->aiNode('ai-1'),
+                $this->sendNode('send-1', 'Halo'),
+                $this->goToNode('goto-1', 'ai-1', false, true),
+                $this->goToNode('goto-2', 'send-1', false, true),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'goto-1'],
+                ['source' => 'ai-1', 'target' => 'send-1'],
+            ],
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Hanya boleh ada satu');
+
+        $this->validator->validateDefinition($definition);
+    }
+
+    public function test_ai_agent_variables_are_validated(): void
+    {
+        $definition = $this->singleAgentDefinition();
+        $definition['nodes'][1]['data']['outputVariables'] = [
+            ['name' => 'respond', 'type' => 'string'],
+            ['name' => 'respond', 'type' => 'boolean'],
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('duplikat');
+
+        $this->validator->validateDefinition($definition, null, false);
+    }
+
+    public function test_ai_agent_rejects_unknown_variable_type(): void
+    {
+        $definition = $this->singleAgentDefinition();
+        $definition['nodes'][1]['data']['outputVariables'] = [
+            ['name' => 'respond', 'type' => 'object'],
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Tipe variabel tidak didukung');
+
+        $this->validator->validateDefinition($definition, null, false);
     }
 }

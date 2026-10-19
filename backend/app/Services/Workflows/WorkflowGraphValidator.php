@@ -5,8 +5,11 @@ namespace App\Services\Workflows;
 use RuntimeException;
 
 /**
- * Memvalidasi definisi workflow (node, koneksi, siklus) sebelum
+ * Memvalidasi definisi workflow (node, koneksi, tujuan Go To) sebelum
  * disimpan maupun dieksekusi.
+ *
+ * Workflow sengaja dibuat sederhana untuk customer service:
+ * Trigger → AI Agent → Send Message / Condition / Go To / Relocate.
  */
 class WorkflowGraphValidator
 {
@@ -15,6 +18,8 @@ class WorkflowGraphValidator
         'AI Agent' => 'ai_agent',
         'Send Message' => 'output',
         'Condition' => 'if_else',
+        'Relocate' => 'relocate',
+        'Go To' => 'go_to',
         'Stopper' => 'stopper',
 
         // Kompatibilitas dengan format lama.
@@ -22,13 +27,29 @@ class WorkflowGraphValidator
         'ai_agent' => 'ai_agent',
         'output' => 'output',
         'if_else' => 'if_else',
+        'relocate' => 'relocate',
+        'go_to' => 'go_to',
         'stopper' => 'stopper',
     ];
 
-    public function __construct(private readonly ConditionRule $conditionRule) {}
+    /**
+     * Node yang tidak boleh memiliki koneksi keluar.
+     */
+    public const TERMINAL_TYPES = ['output', 'relocate', 'go_to'];
+
+    public function __construct(
+        private readonly ConditionRule $conditionRule,
+        private readonly AiAgentVariables $agentVariables
+    ) {}
 
     /**
-     * @return array{nodes: array<string, array>, next: array<string, string>, trigger_id: string}
+     * @return array{
+     *     nodes: array<string, array>,
+     *     next: array<string, string>,
+     *     trigger_id: string,
+     *     entry_id: string,
+     *     starting_point_id: ?string
+     * }
      */
     public function validateDefinition(
         array $definition,
@@ -48,7 +69,13 @@ class WorkflowGraphValidator
     }
 
     /**
-     * @return array{nodes: array<string, array>, next: array<string, string>, trigger_id: string}
+     * @return array{
+     *     nodes: array<string, array>,
+     *     next: array<string, string>,
+     *     trigger_id: string,
+     *     entry_id: string,
+     *     starting_point_id: ?string
+     * }
      */
     public function validate(
         array $nodes,
@@ -99,6 +126,11 @@ class WorkflowGraphValidator
             }
 
             $node['type'] = $type;
+
+            if ($type === 'ai_agent') {
+                $this->agentVariables->normalize($node['data'] ?? []);
+            }
+
             $nodeMap[$node['id']] = $node;
         }
 
@@ -113,9 +145,13 @@ class WorkflowGraphValidator
             fn (array $node) => $node['type'] === 'trigger'
         );
 
-        $outputs = array_filter(
+        $terminals = array_filter(
             $nodeMap,
-            fn (array $node) => $node['type'] === 'output'
+            fn (array $node) => in_array(
+                $node['type'],
+                ['output', 'relocate'],
+                true
+            )
         );
 
         if ($requireRunnable) {
@@ -125,9 +161,9 @@ class WorkflowGraphValidator
                 );
             }
 
-            if (count($outputs) < 1) {
+            if (count($terminals) < 1) {
                 throw new RuntimeException(
-                    'Workflow harus memiliki minimal satu Send Message.'
+                    'Workflow harus memiliki minimal satu Send Message atau Relocate.'
                 );
             }
         }
@@ -136,7 +172,6 @@ class WorkflowGraphValidator
          * Validasi koneksi antarnode.
          */
         $next = [];
-        $incoming = [];
         $adjacency = [];
 
         foreach ($edges as $edge) {
@@ -166,21 +201,23 @@ class WorkflowGraphValidator
 
             $sourceType = $nodeMap[$source]['type'];
 
-            if ($sourceType === 'output') {
+            if (in_array($sourceType, self::TERMINAL_TYPES, true)) {
                 throw new RuntimeException(
-                    'Node Send Message tidak boleh memiliki koneksi keluar.'
+                    'Node '
+                    .$this->labelOf($sourceType)
+                    .' tidak boleh memiliki koneksi keluar.'
                 );
             }
 
             if ($sourceType === 'if_else') {
                 if (! in_array($handle, ['true', 'false'], true)) {
                     throw new RuntimeException(
-                        'Koneksi Condition harus memiliki sourceHandle true atau false.'
+                        'Koneksi Condition harus memiliki cabang If match atau Else.'
                     );
                 }
             } elseif ($handle !== null) {
                 throw new RuntimeException(
-                    'sourceHandle hanya didukung pada node Condition.'
+                    'Cabang If match/Else hanya didukung pada node Condition.'
                 );
             }
 
@@ -192,26 +229,69 @@ class WorkflowGraphValidator
                 );
             }
 
-            if (isset($incoming[$target])) {
-                throw new RuntimeException(
-                    'Beberapa koneksi menuju satu node belum didukung.'
-                );
-            }
-
             $next[$key] = $target;
-            $incoming[$target] = true;
             $adjacency[$source][] = $target;
         }
 
         $triggerId = '';
 
         if ($triggers !== []) {
-            $triggerId = array_key_first($triggers);
+            $triggerId = (string) array_key_first($triggers);
 
-            if (isset($incoming[$triggerId])) {
+            foreach ($edges as $edge) {
+                if (($edge['target'] ?? null) === $triggerId) {
+                    throw new RuntimeException(
+                        'Trigger tidak boleh memiliki koneksi masuk.'
+                    );
+                }
+            }
+        }
+
+        $startingPointId = null;
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if ($node['type'] !== 'go_to') {
+                continue;
+            }
+
+            $data = $node['data'] ?? [];
+            $target = $data['targetNodeId'] ?? null;
+            $isStartingPoint = (bool) ($data['setStartingPoint'] ?? false);
+
+            if ($target === null || $target === '') {
+                if ($requireRunnable) {
+                    throw new RuntimeException(
+                        'Node Go To harus memilih node tujuan.'
+                    );
+                }
+
+                continue;
+            }
+
+            if (! is_string($target) || ! isset($nodeMap[$target])) {
                 throw new RuntimeException(
-                    'Trigger tidak boleh memiliki koneksi masuk.'
+                    'Node tujuan Go To tidak ditemukan.'
                 );
+            }
+
+            if ($target === $nodeId) {
+                throw new RuntimeException(
+                    'Node Go To tidak boleh mengarah ke dirinya sendiri.'
+                );
+            }
+
+            // Go To melompat langsung ke target, jadi ikut dihitung
+            // sebagai koneksi saat memeriksa keterhubungan.
+            $adjacency[$nodeId][] = $target;
+
+            if ($isStartingPoint) {
+                if ($startingPointId !== null) {
+                    throw new RuntimeException(
+                        'Hanya boleh ada satu Go To dengan Set starting point.'
+                    );
+                }
+
+                $startingPointId = $target;
             }
         }
 
@@ -220,10 +300,12 @@ class WorkflowGraphValidator
                 $type = $node['type'];
                 $data = $node['data'] ?? [];
 
-                if ($type === 'trigger' && ! isset($next[$nodeId.':default'])) {
-                    throw new RuntimeException(
-                        'Trigger harus memiliki koneksi keluar.'
-                    );
+                if ($type === 'trigger' && $startingPointId === null) {
+                    if (! isset($next[$nodeId.':default'])) {
+                        throw new RuntimeException(
+                            'Trigger harus memiliki koneksi keluar.'
+                        );
+                    }
                 }
 
                 if ($type === 'if_else') {
@@ -232,95 +314,58 @@ class WorkflowGraphValidator
                         || ! isset($next[$nodeId.':false'])
                     ) {
                         throw new RuntimeException(
-                            'Condition harus memiliki koneksi true dan false.'
+                            'Condition harus memiliki cabang If match dan Else.'
                         );
                     }
 
-                    if ($this->conditionRule->fromData($data) === null) {
+                    if ($this->conditionRule->field($data) === null) {
                         throw new RuntimeException(
-                            'Konfigurasi Condition tidak valid.'
+                            'Condition belum memilih variabel boolean.'
                         );
                     }
-                }
-
-                if ($type === 'ai_agent' && ! isset($next[$nodeId.':default'])) {
-                    throw new RuntimeException(
-                        'AI Agent harus memiliki koneksi keluar.'
-                    );
                 }
 
                 if (
-                    $type === 'stopper'
+                    in_array($type, ['ai_agent', 'stopper'], true)
                     && ! isset($next[$nodeId.':default'])
                 ) {
                     throw new RuntimeException(
-                        'Stopper harus terhubung ke node yang akan dijalankan setelah pesan berikutnya.'
+                        $this->labelOf($type).' harus memiliki koneksi keluar.'
                     );
                 }
             }
 
-            if ($triggerId !== '') {
-                $reachable = [];
+            $entryId = $startingPointId ?? $triggerId;
 
-                foreach (
-                    $this->findReachableNodes($triggerId, $next) as $nodeId
-                ) {
-                    $reachable[$nodeId] = true;
-                }
+            $roots = array_values(array_unique(array_filter([
+                $entryId,
+                $triggerId,
+            ])));
 
-                foreach (array_keys($nodeMap) as $nodeId) {
-                    if (! isset($reachable[$nodeId])) {
-                        throw new RuntimeException(
-                            'Workflow memiliki node yang tidak terhubung ke Trigger: '
-                            .$nodeId
-                        );
-                    }
+            $reachable = [];
+
+            foreach ($roots as $root) {
+                foreach ($this->findReachableNodes($root, $adjacency) as $id) {
+                    $reachable[$id] = true;
                 }
             }
-        }
 
-        /*
-         * Deteksi siklus sebelum workflow dijalankan.
-         */
-        $indegree = array_fill_keys(array_keys($nodeMap), 0);
-
-        foreach ($adjacency as $targets) {
-            foreach ($targets as $target) {
-                $indegree[$target]++;
-            }
-        }
-
-        $queue = [];
-
-        foreach ($indegree as $nodeId => $degree) {
-            if ($degree === 0) {
-                $queue[] = $nodeId;
-            }
-        }
-
-        $processed = 0;
-
-        while ($queue !== []) {
-            $current = array_shift($queue);
-            $processed++;
-
-            foreach ($adjacency[$current] ?? [] as $target) {
-                $indegree[$target]--;
-
-                if ($indegree[$target] === 0) {
-                    $queue[] = $target;
+            foreach (array_keys($nodeMap) as $nodeId) {
+                if (! isset($reachable[$nodeId])) {
+                    throw new RuntimeException(
+                        'Workflow memiliki node yang tidak terhubung ke alur: '
+                        .$nodeId
+                    );
                 }
             }
-        }
-
-        if ($processed !== count($nodeMap)) {
-            throw new RuntimeException('Siklus terdeteksi pada workflow.');
         }
 
         return [
             'nodes' => $nodeMap,
             'next' => $next,
             'trigger_id' => $triggerId,
+            'entry_id' => $startingPointId ?? $triggerId,
+            'starting_point_id' => $startingPointId,
         ];
     }
 
@@ -329,7 +374,7 @@ class WorkflowGraphValidator
      *
      * @return array<int, string>
      */
-    private function findReachableNodes(string $start, array $next): array
+    private function findReachableNodes(string $start, array $adjacency): array
     {
         $visited = [];
         $stack = [$start];
@@ -343,15 +388,24 @@ class WorkflowGraphValidator
 
             $visited[$current] = true;
 
-            foreach (['default', 'true', 'false'] as $handle) {
-                $key = $current.':'.$handle;
-
-                if (isset($next[$key])) {
-                    $stack[] = $next[$key];
-                }
+            foreach ($adjacency[$current] ?? [] as $target) {
+                $stack[] = $target;
             }
         }
 
         return array_keys($visited);
+    }
+
+    private function labelOf(string $type): string
+    {
+        return match ($type) {
+            'output' => 'Send Message',
+            'ai_agent' => 'AI Agent',
+            'if_else' => 'Condition',
+            'relocate' => 'Relocate',
+            'go_to' => 'Go To',
+            'stopper' => 'Stopper',
+            default => 'Node',
+        };
     }
 }

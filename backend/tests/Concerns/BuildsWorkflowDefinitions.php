@@ -7,8 +7,11 @@ namespace Tests\Concerns;
  */
 trait BuildsWorkflowDefinitions
 {
-    protected function aiNode(string $id, string $name = 'AI response'): array
-    {
+    protected function aiNode(
+        string $id,
+        string $name = 'AI response',
+        array $outputVariables = []
+    ): array {
         return [
             'id' => $id,
             'type' => 'AI Agent',
@@ -17,6 +20,7 @@ trait BuildsWorkflowDefinitions
                 'label' => 'AI Agent',
                 'nodeName' => $name,
                 'systemMessage' => 'You are a helpful assistant.',
+                'outputVariables' => $outputVariables,
                 'variableDefinitions' => [
                     [
                         'name' => 'customer_message',
@@ -25,6 +29,53 @@ trait BuildsWorkflowDefinitions
                         'sourceValue' => 'input.message',
                     ],
                 ],
+            ],
+        ];
+    }
+
+    protected function conditionNode(
+        string $id = 'condition-1',
+        ?string $variable = 'beli'
+    ): array {
+        return [
+            'id' => $id,
+            'type' => 'Condition',
+            'position' => ['x' => 0, 'y' => 0],
+            'data' => [
+                'label' => 'Condition',
+                'conditionVariable' => $variable,
+            ],
+        ];
+    }
+
+    protected function relocateNode(string $id = 'relocate-1'): array
+    {
+        return [
+            'id' => $id,
+            'type' => 'Relocate',
+            'position' => ['x' => 0, 'y' => 0],
+            'data' => [
+                'label' => 'Relocate',
+                'nodeName' => 'Handoff to admin',
+            ],
+        ];
+    }
+
+    protected function goToNode(
+        string $id,
+        string $target,
+        bool $endFlow = false,
+        bool $setStartingPoint = false
+    ): array {
+        return [
+            'id' => $id,
+            'type' => 'Go To',
+            'position' => ['x' => 0, 'y' => 0],
+            'data' => [
+                'label' => 'Go To',
+                'targetNodeId' => $target,
+                'endFlow' => $endFlow,
+                'setStartingPoint' => $setStartingPoint,
             ],
         ];
     }

@@ -14,7 +14,8 @@ class GeminiService
         string $systemMessage,
         string $userMessage,
         float $temperature = 0.7,
-        ?string $modelOverride = null
+        ?string $modelOverride = null,
+        ?array $responseSchema = null
     ): array {
         $apiKey = config('services.gemini.api_key');
         $model = $modelOverride ?: config('services.gemini.model', 'gemini-2.5-flash');
@@ -24,6 +25,18 @@ class GeminiService
             throw new RuntimeException(
                 'GEMINI_API_KEY belum dikonfigurasi.'
             );
+        }
+
+        $generationConfig = [
+            'temperature' => max(
+                0,
+                min(1, $temperature)
+            ),
+        ];
+
+        if ($responseSchema !== null) {
+            $generationConfig['responseMimeType'] = 'application/json';
+            $generationConfig['responseSchema'] = $responseSchema;
         }
 
         $response = Http::timeout($timeout)
@@ -46,21 +59,16 @@ class GeminiService
                             ],
                         ],
                     ],
-                    'generationConfig' => [
-                        'temperature' => max(
-                            0,
-                            min(1, $temperature)
-                        ),
-                    ],
+                    'generationConfig' => $generationConfig,
                 ]
             );
 
         if ($response->failed()) {
             throw new RuntimeException(
                 'Gemini API gagal (HTTP '
-                . $response->status()
-                . '): '
-                . (string) $response->json('error.message', 'Unknown error')
+                .$response->status()
+                .'): '
+                .(string) $response->json('error.message', 'Unknown error')
             );
         }
 

@@ -90,7 +90,7 @@ class WorkflowApiTest extends TestCase
         ]);
     }
 
-    public function test_store_rejects_definition_with_cycle(): void
+    public function test_store_rejects_terminal_outgoing_edge(): void
     {
         $definition = $this->singleAgentDefinition();
         $definition['edges'][] = [
