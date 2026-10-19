@@ -280,6 +280,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
     failed: 0,
     waiting: 0,
     running: 0,
+    escalated: 0,
   };
 
   const successRate =
@@ -1151,6 +1152,7 @@ function StatusDonut({
       { key: "failed", value: summary.failed, className: "text-destructive" },
       { key: "waiting", value: summary.waiting, className: "text-amber-400" },
       { key: "running", value: summary.running, className: "text-primary" },
+      { key: "escalated", value: summary.escalated, className: "text-teal-400" },
     ] as const
   ).filter((segment) => segment.value > 0);
 
@@ -1204,7 +1206,9 @@ function StatusDonut({
       </div>
 
       <ul className="w-full space-y-2">
-        {(["success", "failed", "waiting", "running"] as const).map((key) => {
+        {(
+          ["success", "failed", "waiting", "running", "escalated"] as const
+        ).map((key) => {
           const meta = STATUS_META[key];
           return (
             <li key={key} className="flex items-center gap-3 text-sm">

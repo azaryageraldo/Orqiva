@@ -1,20 +1,18 @@
 import { useEffect, useState } from "react";
 import {
   Activity as ActivityIcon,
-  CheckCircle2,
-  CircleDashed,
-  Handshake,
+  ChevronRight,
   LoaderCircle,
   RefreshCw,
-  XCircle,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
 import {
   getActivity,
   type ActivityExecution,
+  type ActivityFilters,
   type ActivityStats,
   type ExecutionStatus,
 } from "../services/stats";
@@ -22,38 +20,11 @@ import { getErrorMessage } from "../services/api";
 
 interface ActivityProps {
   onOpenWorkflow: (workflowId: string) => void;
+  onOpenExecution: (execution: ActivityExecution) => void;
 }
 
-const STATUS_STYLES: Record<
-  ExecutionStatus,
-  { label: string; className: string; icon: typeof CheckCircle2 }
-> = {
-  success: {
-    label: "Sukses",
-    className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
-    icon: CheckCircle2,
-  },
-  failed: {
-    label: "Gagal",
-    className: "border-destructive/30 bg-destructive/10 text-destructive",
-    icon: XCircle,
-  },
-  waiting: {
-    label: "Menunggu",
-    className: "border-amber-400/30 bg-amber-400/10 text-amber-300",
-    icon: CircleDashed,
-  },
-  running: {
-    label: "Berjalan",
-    className: "border-primary/30 bg-primary/10 text-primary",
-    icon: LoaderCircle,
-  },
-  escalated: {
-    label: "Ke admin",
-    className: "border-teal-400/30 bg-teal-400/10 text-teal-300",
-    icon: Handshake,
-  },
-};
+const SELECT_CLASS =
+  "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "medium",
@@ -66,17 +37,22 @@ function formatDate(value: string | null): string {
   return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
 }
 
-export default function Activity({ onOpenWorkflow }: ActivityProps) {
+export default function Activity({
+  onOpenWorkflow,
+  onOpenExecution,
+}: ActivityProps) {
   const [stats, setStats] = useState<ActivityStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filters, setFilters] = useState<ActivityFilters>({});
+  const [draft, setDraft] = useState<ActivityFilters>({});
 
-  async function refresh() {
+  async function refresh(next: ActivityFilters = filters) {
     setLoading(true);
     setError("");
 
     try {
-      setStats(await getActivity());
+      setStats(await getActivity(20, next));
     } catch (caught) {
       setError(
         getErrorMessage(caught, "Riwayat eksekusi gagal dimuat. Periksa koneksi backend."),
@@ -85,6 +61,19 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
       setLoading(false);
     }
   }
+
+  function applyFilters() {
+    setFilters(draft);
+    void refresh(draft);
+  }
+
+  function resetFilters() {
+    setDraft({});
+    setFilters({});
+    void refresh({});
+  }
+
+  const hasFilters = Boolean(filters.status || filters.from || filters.to);
 
   useEffect(() => {
     let active = true;
@@ -156,13 +145,14 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
           </div>
         )}
 
-        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-5">
           {(
             [
               ["Total", stats?.summary.total],
               ["Sukses", stats?.summary.success],
               ["Gagal", stats?.summary.failed],
               ["Menunggu", stats?.summary.waiting],
+              ["Ke admin", stats?.summary.escalated],
             ] as const
           ).map(([label, value]) => (
             <div key={label} className="bg-card p-5">
@@ -179,10 +169,91 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
         </div>
 
         <Card className="gap-0 py-0">
-          <div className="border-b border-border px-5 py-4">
-            <h2 className="text-base font-semibold text-foreground">
-              Eksekusi terbaru
-            </h2>
+          <div className="flex flex-col gap-4 border-b border-border px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                Eksekusi terbaru
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Filter berdasarkan status dan tanggal, lalu buka detail untuk
+                audit per langkah.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label className="space-y-1 text-xs text-muted-foreground">
+                <span>Status</span>
+                <select
+                  value={draft.status ?? ""}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      status: event.target.value as ExecutionStatus | "",
+                    }))
+                  }
+                  className={`${SELECT_CLASS} sm:w-36`}
+                >
+                  <option value="">Semua status</option>
+                  <option value="success">Sukses</option>
+                  <option value="failed">Gagal</option>
+                  <option value="waiting">Menunggu</option>
+                  <option value="running">Berjalan</option>
+                  <option value="escalated">Ke admin</option>
+                </select>
+              </label>
+
+              <label className="space-y-1 text-xs text-muted-foreground">
+                <span>Dari tanggal</span>
+                <input
+                  type="date"
+                  value={draft.from ?? ""}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      from: event.target.value,
+                    }))
+                  }
+                  className={`${SELECT_CLASS} sm:w-40`}
+                />
+              </label>
+
+              <label className="space-y-1 text-xs text-muted-foreground">
+                <span>Sampai tanggal</span>
+                <input
+                  type="date"
+                  value={draft.to ?? ""}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      to: event.target.value,
+                    }))
+                  }
+                  className={`${SELECT_CLASS} sm:w-40`}
+                />
+              </label>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={applyFilters}
+                disabled={loading}
+                className="h-9 px-3"
+              >
+                Terapkan
+              </Button>
+
+              {hasFilters && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={resetFilters}
+                  disabled={loading}
+                  className="h-9 px-3 text-muted-foreground"
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -195,10 +266,12 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
                 <ActivityIcon className="size-5" />
               </span>
               <p className="text-sm font-medium text-foreground">
-                Belum ada eksekusi
+                {hasFilters ? "Tidak ada eksekusi yang cocok" : "Belum ada eksekusi"}
               </p>
-              <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                Jalankan workflow dari Chat Widget untuk melihat riwayat di sini.
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                {hasFilters
+                  ? "Ubah status atau rentang tanggal, lalu terapkan kembali."
+                  : "Jalankan workflow dari Chat Widget untuk melihat riwayat di sini."}
               </p>
             </div>
           ) : (
@@ -208,6 +281,7 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
                   key={execution.id}
                   execution={execution}
                   onOpenWorkflow={onOpenWorkflow}
+                  onOpenExecution={onOpenExecution}
                 />
               ))}
             </ul>
@@ -221,19 +295,15 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
 function ActivityRow({
   execution,
   onOpenWorkflow,
+  onOpenExecution,
 }: {
   execution: ActivityExecution;
   onOpenWorkflow: (workflowId: string) => void;
+  onOpenExecution: (execution: ActivityExecution) => void;
 }) {
-  const status = STATUS_STYLES[execution.status];
-  const StatusIcon = status.icon;
-
   return (
     <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
-      <Badge variant="outline" className={`h-6 shrink-0 px-2.5 ${status.className}`}>
-        <StatusIcon className="size-3" />
-        {status.label}
-      </Badge>
+      <ExecutionStatusBadge status={execution.status} />
 
       <div className="min-w-0 flex-1">
         <button
@@ -245,6 +315,9 @@ function ActivityRow({
         </button>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           Eksekusi #{execution.id} · {formatDate(execution.started_at)}
+          {execution.steps_count > 0
+            ? ` · ${execution.steps_count} langkah`
+            : ""}
         </p>
         {execution.error && (
           <p className="mt-1 line-clamp-2 text-xs text-destructive">
@@ -258,6 +331,17 @@ function ActivityRow({
           ? `${execution.total_tokens.toLocaleString("id-ID")} token`
           : "Tanpa token"}
       </span>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onOpenExecution(execution)}
+        className="shrink-0 text-muted-foreground hover:text-foreground"
+      >
+        Lihat detail
+        <ChevronRight className="size-4" />
+      </Button>
     </li>
   );
 }

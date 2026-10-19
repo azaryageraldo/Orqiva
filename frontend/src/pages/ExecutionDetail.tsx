@@ -1,0 +1,585 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Clock,
+  Coins,
+  Layers,
+  LoaderCircle,
+  RefreshCw,
+  Timer,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
+import { getErrorMessage } from "../services/api";
+import {
+  getExecution,
+  type ExecutionDetail as ExecutionDetailData,
+  type ExecutionStep,
+} from "../services/stats";
+
+interface ExecutionDetailProps {
+  workflowId: string;
+  executionId: number;
+  onBack: () => void;
+}
+
+const dateFormat = new Intl.DateTimeFormat("id-ID", {
+  dateStyle: "medium",
+  timeStyle: "medium",
+});
+
+const NODE_TYPE_LABELS: Record<string, string> = {
+  trigger: "Trigger",
+  ai_agent: "AI Agent",
+  output: "Send Message",
+  if_else: "Condition",
+  relocate: "Relocate",
+  go_to: "Go To",
+  stopper: "Stopper",
+};
+
+const SELECT_CLASS =
+  "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+
+function formatDate(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} dtk`;
+}
+
+function stepNodeLabel(step: ExecutionStep): string {
+  const name = step.node_name?.trim();
+
+  if (
+    !name ||
+    name.toLowerCase().replaceAll(" ", "_") === step.node_type.toLowerCase()
+  ) {
+    return NODE_TYPE_LABELS[step.node_type] ?? step.node_type;
+  }
+
+  return name;
+}
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Ya" : "Tidak";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return JSON.stringify(value, null, 2);
+}
+
+function JsonBlock({ value }: { value: unknown }) {
+  if (value === null || value === undefined) return null;
+
+  return (
+    <pre className="max-h-72 overflow-auto rounded-lg border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
+      {JSON.stringify(value, null, 2)}
+    </pre>
+  );
+}
+
+function StepCard({ step }: { step: ExecutionStep }) {
+  const variables = step.variables ? Object.entries(step.variables) : [];
+  const typeLabel = NODE_TYPE_LABELS[step.node_type] ?? step.node_type;
+
+  return (
+    <li className="relative pl-8">
+      <span
+        className={`absolute top-4 left-0 flex size-6 -translate-x-1/2 items-center justify-center rounded-full border text-[11px] font-semibold ${
+          step.status === "error"
+            ? "border-destructive/40 bg-destructive/15 text-destructive"
+            : "border-emerald-400/40 bg-emerald-400/15 text-emerald-300"
+        }`}
+      >
+        {step.step}
+      </span>
+
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-sm font-medium text-foreground">
+                {stepNodeLabel(step)}
+              </p>
+              {typeLabel !== stepNodeLabel(step) && (
+                <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                  {typeLabel}
+                </span>
+              )}
+              {step.status === "error" && (
+                <span className="rounded-md border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                  Gagal
+                </span>
+              )}
+              {step.branch && (
+                <span className="rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                  {step.branch === "true" ? "If match" : "Else"}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatDate(step.executed_at)}
+              {step.node_id ? ` · ${step.node_id}` : ""}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Timer className="size-3.5" />
+              {formatDuration(step.duration_ms)}
+            </span>
+            {step.total_tokens > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <Coins className="size-3.5" />
+                {step.total_tokens.toLocaleString("id-ID")} token
+              </span>
+            )}
+          </div>
+        </div>
+
+        {step.error && (
+          <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-5 text-destructive">
+            {step.error}
+          </p>
+        )}
+
+        {step.messages && step.messages.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+              Pesan terkirim
+            </p>
+            {step.messages.map((message, index) => (
+              <p
+                key={`${step.id}-message-${index}`}
+                className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm leading-6 whitespace-pre-wrap text-foreground"
+              >
+                {message}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {variables.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+              Variabel
+            </p>
+            <dl className="grid gap-2 sm:grid-cols-2">
+              {variables.map(([name, value]) => (
+                <div
+                  key={`${step.id}-${name}`}
+                  className="rounded-lg border border-border bg-background px-3 py-2"
+                >
+                  <dt className="text-[11px] font-medium text-muted-foreground">
+                    {name}
+                  </dt>
+                  <dd className="mt-0.5 text-xs leading-5 whitespace-pre-wrap text-foreground">
+                    {formatValue(value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        <div className="mt-4 space-y-2">
+          {step.input && (
+            <details className="group">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground select-none hover:text-foreground">
+                Input langkah
+              </summary>
+              <div className="mt-2">
+                <JsonBlock value={step.input} />
+              </div>
+            </details>
+          )}
+          {step.output && (
+            <details className="group">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground select-none hover:text-foreground">
+                Output langkah
+              </summary>
+              <div className="mt-2">
+                <JsonBlock value={step.output} />
+              </div>
+            </details>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+export default function ExecutionDetail({
+  workflowId,
+  executionId,
+  onBack,
+}: ExecutionDetailProps) {
+  const [detail, setDetail] = useState<ExecutionDetailData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [nodeFilter, setNodeFilter] = useState("all");
+  const [stepStatus, setStepStatus] = useState<"all" | "success" | "error">(
+    "all",
+  );
+
+  async function refresh() {
+    setLoading(true);
+    setError("");
+
+    try {
+      setDetail(await getExecution(workflowId, executionId));
+    } catch (caught) {
+      setError(
+        getErrorMessage(
+          caught,
+          "Detail eksekusi gagal dimuat. Periksa koneksi backend.",
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    let active = true;
+
+    getExecution(workflowId, executionId)
+      .then((result) => {
+        if (active) setDetail(result);
+      })
+      .catch((caught: unknown) => {
+        if (active) {
+          setError(
+            getErrorMessage(
+              caught,
+              "Detail eksekusi gagal dimuat. Periksa koneksi backend.",
+            ),
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [workflowId, executionId]);
+
+  const nodes = useMemo(() => {
+    const unique = new Map<string, string>();
+
+    for (const step of detail?.steps ?? []) {
+      if (!unique.has(step.node_id)) {
+        unique.set(step.node_id, stepNodeLabel(step));
+      }
+    }
+
+    return Array.from(unique, ([id, name]) => ({ id, name }));
+  }, [detail]);
+
+  const steps = useMemo(
+    () =>
+      (detail?.steps ?? []).filter(
+        (step) =>
+          (nodeFilter === "all" || step.node_id === nodeFilter) &&
+          (stepStatus === "all" || step.status === stepStatus),
+      ),
+    [detail, nodeFilter, stepStatus],
+  );
+
+  const totalDuration = useMemo(() => {
+    if (!detail) return 0;
+
+    if (detail.started_at && detail.finished_at) {
+      const start = new Date(detail.started_at).getTime();
+      const finish = new Date(detail.finished_at).getTime();
+
+      if (!Number.isNaN(start) && !Number.isNaN(finish)) {
+        return Math.max(0, finish - start);
+      }
+    }
+
+    return detail.steps.reduce((total, step) => total + step.duration_ms, 0);
+  }, [detail]);
+
+  const hasFilters = nodeFilter !== "all" || stepStatus !== "all";
+
+  return (
+    <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onBack}
+              className="mb-4 -ml-2 text-muted-foreground"
+            >
+              <ArrowLeft />
+              Kembali ke Activity
+            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                Eksekusi #{executionId}
+              </h1>
+              {detail && <ExecutionStatusBadge status={detail.status} />}
+            </div>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {detail?.workflow_name || "Memuat workflow…"} · Audit setiap
+              langkah, input, output, dan konsumsi token.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void refresh()}
+            disabled={loading}
+            className="h-10 px-4"
+          >
+            <RefreshCw className={loading ? "animate-spin" : undefined} />
+            Segarkan
+          </Button>
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            <span>{error}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void refresh()}
+            >
+              Coba lagi
+            </Button>
+          </div>
+        )}
+
+        {loading && !detail ? (
+          <div className="flex min-h-72 items-center justify-center">
+            <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !detail ? (
+          <Card className="p-8 text-center text-sm text-muted-foreground">
+            Detail eksekusi tidak tersedia.
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+              <div className="bg-card p-5">
+                <p className="text-sm text-muted-foreground">Durasi</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                  {formatDuration(totalDuration)}
+                </p>
+              </div>
+              <div className="bg-card p-5">
+                <p className="text-sm text-muted-foreground">Total token</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                  {detail.total_tokens.toLocaleString("id-ID")}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {detail.prompt_tokens.toLocaleString("id-ID")} prompt ·{" "}
+                  {detail.completion_tokens.toLocaleString("id-ID")} completion
+                </p>
+              </div>
+              <div className="bg-card p-5">
+                <p className="text-sm text-muted-foreground">Langkah</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                  {detail.steps.length}
+                </p>
+                <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Layers className="size-3" />
+                  {detail.steps.filter((step) => step.status === "error").length}{" "}
+                  gagal
+                </p>
+              </div>
+              <div className="bg-card p-5">
+                <p className="text-sm text-muted-foreground">Waktu</p>
+                <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Clock className="size-4 text-muted-foreground" />
+                  {formatDate(detail.started_at)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Selesai {formatDate(detail.finished_at)}
+                </p>
+              </div>
+            </div>
+
+            {detail.error && (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm leading-6 text-destructive"
+              >
+                {detail.error}
+              </div>
+            )}
+
+            <Card className="gap-0 py-0">
+              <div className="flex flex-col gap-3 border-b border-border px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">
+                    Timeline langkah
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {steps.length} dari {detail.steps.length} langkah
+                    ditampilkan.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <label className="space-y-1 text-xs text-muted-foreground">
+                    <span>Node</span>
+                    <select
+                      value={nodeFilter}
+                      onChange={(event) => setNodeFilter(event.target.value)}
+                      className={`${SELECT_CLASS} sm:w-44`}
+                    >
+                      <option value="all">Semua node</option>
+                      {nodes.map((node) => (
+                        <option key={node.id} value={node.id}>
+                          {node.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1 text-xs text-muted-foreground">
+                    <span>Status langkah</span>
+                    <select
+                      value={stepStatus}
+                      onChange={(event) =>
+                        setStepStatus(
+                          event.target.value as "all" | "success" | "error",
+                        )
+                      }
+                      className={`${SELECT_CLASS} sm:w-40`}
+                    >
+                      <option value="all">Semua</option>
+                      <option value="success">Sukses</option>
+                      <option value="error">Gagal</option>
+                    </select>
+                  </label>
+
+                  {hasFilters && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 text-muted-foreground"
+                      onClick={() => {
+                        setNodeFilter("all");
+                        setStepStatus("all");
+                      }}
+                    >
+                      Reset filter
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {detail.steps.length === 0 ? (
+                <div className="p-6">
+                  <p className="text-sm font-medium text-foreground">
+                    Audit langkah belum tersedia
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Eksekusi ini dibuat sebelum audit per langkah aktif. Log
+                    ringkas di bawah tetap dapat dilihat.
+                  </p>
+
+                  {detail.logs && detail.logs.length > 0 ? (
+                    <ul className="mt-4 divide-y divide-border rounded-xl border border-border">
+                      {detail.logs.map((log, index) => (
+                        <li
+                          key={`${log.timestamp ?? "log"}-${index}`}
+                          className="px-4 py-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">
+                              {log.name || log.node || "Langkah"}
+                            </span>
+                            <span>{formatDate(log.timestamp ?? null)}</span>
+                            {typeof log.duration_ms === "number" && (
+                              <span>{formatDuration(log.duration_ms)}</span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm text-foreground">
+                            {log.message}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      Tidak ada log ringkas untuk eksekusi ini.
+                    </p>
+                  )}
+                </div>
+              ) : steps.length === 0 ? (
+                <p className="p-6 text-sm text-muted-foreground">
+                  Tidak ada langkah yang cocok dengan filter.
+                </p>
+              ) : (
+                <ol className="space-y-4 p-5">
+                  {steps.map((step) => (
+                    <StepCard key={step.id} step={step} />
+                  ))}
+                </ol>
+              )}
+            </Card>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="p-5">
+                <h2 className="text-sm font-semibold text-foreground">Input</h2>
+                <div className="mt-3">
+                  <JsonBlock value={detail.input} />
+                </div>
+              </Card>
+              <Card className="p-5">
+                <h2 className="text-sm font-semibold text-foreground">
+                  Output akhir
+                </h2>
+                <div className="mt-3">
+                  {detail.output ? (
+                    Array.isArray(detail.output.messages) &&
+                    detail.output.messages.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {detail.status === "escalated"
+                          ? "Percakapan dialihkan ke admin; AI tidak membalas."
+                          : "Workflow selesai tanpa pesan."}
+                      </p>
+                    ) : (
+                      <JsonBlock
+                        value={
+                          detail.output.messages ??
+                          detail.output.output ??
+                          detail.output
+                        }
+                      />
+                    )
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Tidak ada output.
+                    </p>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}

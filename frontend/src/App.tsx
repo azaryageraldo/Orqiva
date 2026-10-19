@@ -11,6 +11,7 @@ import Workflows from "./pages/Workflows";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import WorkflowChat from "./pages/WorkflowChat";
 import Activity from "./pages/Activity";
+import ExecutionDetail from "./pages/ExecutionDetail";
 import Settings from "./pages/Settings";
 import "./App.css";
 
@@ -59,6 +60,11 @@ export default function App() {
     () => new URLSearchParams(window.location.search).get("testWorkflow"),
   );
 
+  const [viewingExecution, setViewingExecution] = useState<{
+    workflowId: string;
+    executionId: number;
+  } | null>(null);
+
   useEffect(() => {
     let active = true;
 
@@ -83,6 +89,7 @@ export default function App() {
       setAuthenticated(false);
       setEditingWorkflowId(null);
       setTestingWorkflowId(null);
+      setViewingExecution(null);
       setView("dashboard");
     };
 
@@ -122,6 +129,7 @@ export default function App() {
       setAuthenticated(false);
       setEditingWorkflowId(null);
       setTestingWorkflowId(null);
+      setViewingExecution(null);
       setView("dashboard");
     } catch {
       setError("Logout gagal. Silakan coba lagi.");
@@ -140,6 +148,7 @@ export default function App() {
     setError("");
     setEditingWorkflowId(null);
     setTestingWorkflowId(null);
+    setViewingExecution(null);
     clearWorkflowUrls();
     setView(next);
 
@@ -157,6 +166,7 @@ export default function App() {
   const openWorkflow = (workflowId: string) => {
     setError("");
     setTestingWorkflowId(null);
+    setViewingExecution(null);
     setEditingWorkflowId(workflowId);
   };
 
@@ -228,6 +238,26 @@ export default function App() {
     );
   }
 
+  // Halaman detail eksekusi (audit per langkah)
+  if (viewingExecution !== null) {
+    return (
+      <DashboardLayout
+        title="Execution detail"
+        icon="activity"
+        activeNav="activity"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <ExecutionDetail
+          workflowId={viewingExecution.workflowId}
+          executionId={viewingExecution.executionId}
+          onBack={() => goTo("activity")}
+        />
+      </DashboardLayout>
+    );
+  }
+
   if (view === "dashboard") {
     return (
       <DashboardLayout
@@ -253,7 +283,18 @@ export default function App() {
       >
         {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
-        <Activity onOpenWorkflow={openWorkflow} />
+        <Activity
+          onOpenWorkflow={openWorkflow}
+          onOpenExecution={(execution) => {
+            setError("");
+            setEditingWorkflowId(null);
+            setTestingWorkflowId(null);
+            setViewingExecution({
+              workflowId: String(execution.workflow_id),
+              executionId: execution.id,
+            });
+          }}
+        />
       </DashboardLayout>
     );
   }
