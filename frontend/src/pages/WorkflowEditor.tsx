@@ -34,7 +34,9 @@ import {
   Bot,
   CircleStop,
   Check,
+  CornerUpRight,
   GitBranch,
+  Handshake,
   ListPlus,
   MessageSquare,
   MousePointer2,
@@ -57,8 +59,18 @@ type NodeKind =
   | "AI Agent"
   | "Send Message"
   | "Condition"
+  | "Go To"
+  | "Relocate"
   | "Stopper";
 type MessageMode = "template" | "smart_value";
+type VariableType = "string" | "boolean" | "array";
+
+type OutputVariable = {
+  name: string;
+  type: VariableType;
+  description: string;
+  itemField?: string;
+};
 
 type AutomationNodeData = {
   label: NodeKind;
@@ -72,6 +84,7 @@ type AutomationNodeData = {
     description: string;
     sourceValue: string;
   }>;
+  outputVariables?: OutputVariable[];
   provider?: string;
   model?: string;
   temperature?: number;
@@ -80,6 +93,9 @@ type AutomationNodeData = {
   conditionVariable?: string;
   conditionOperator?: string;
   conditionValue?: string;
+  targetNodeId?: string;
+  endFlow?: boolean;
+  setStartingPoint?: boolean;
   triggerType?: string;
   [key: string]: unknown;
 };
@@ -114,21 +130,26 @@ const nodeOptions: {
   icon: typeof Zap;
 }[] = [
   { label: "Trigger", description: "Start from a chat message", icon: Zap },
-  { label: "AI Agent", description: "Generate an AI response", icon: Bot },
+  { label: "AI Agent", description: "Generate replies and decisions", icon: Bot },
   {
     label: "Send Message",
-    description: "Reply to the visitor",
+    description: "Reply with one or more bubbles",
     icon: MessageSquare,
   },
   {
     label: "Condition",
-    description: "Branch using a rule",
+    description: "Branch on a yes/no variable",
     icon: GitBranch,
   },
   {
-    label: "Stopper",
-    description: "Wait for the next customer message",
-    icon: CircleStop,
+    label: "Go To",
+    description: "Jump to another step",
+    icon: CornerUpRight,
+  },
+  {
+    label: "Relocate",
+    description: "Hand the chat to a human admin",
+    icon: Handshake,
   },
 ];
 
@@ -163,6 +184,13 @@ const initialNodes: FlowNode[] = [
       systemMessage:
         "You are a helpful assistant. Answer the visitor clearly and politely.",
       variables: "customer_message\ncustomer_name",
+      outputVariables: [
+        {
+          name: "respond",
+          type: "string",
+          description: "Jawaban AI yang dikirim ke pelanggan",
+        },
+      ],
       variableDefinitions: [
         {
           name: "customer_message",
@@ -191,7 +219,7 @@ const initialNodes: FlowNode[] = [
       nodeName: "Send AI reply",
       description: "Send the AI response to the visitor",
       messageMode: "smart_value",
-      messageTemplate: "{{ai_response}}",
+      messageTemplate: "{{respond}}",
     },
   },
 ];
@@ -216,6 +244,8 @@ const NODE_ICONS: Record<NodeKind, typeof Zap> = {
   "AI Agent": Bot,
   "Send Message": MessageSquare,
   Condition: GitBranch,
+  "Go To": CornerUpRight,
+  Relocate: Handshake,
   Stopper: CircleStop,
 };
 
@@ -224,6 +254,8 @@ const NODE_TONES: Record<NodeKind, { tile: string }> = {
   "AI Agent": { tile: "bg-violet-400/15 text-violet-300" },
   "Send Message": { tile: "bg-primary/15 text-primary" },
   Condition: { tile: "bg-orange-400/15 text-orange-300" },
+  "Go To": { tile: "bg-sky-400/15 text-sky-300" },
+  Relocate: { tile: "bg-teal-400/15 text-teal-300" },
   Stopper: { tile: "bg-rose-400/15 text-rose-300" },
 };
 
@@ -231,24 +263,24 @@ function nodeSubtitle(data: AutomationNodeData): string {
   switch (data.label) {
     case "Trigger":
       return "Starts from an incoming message";
-    case "AI Agent":
-      return [data.provider ? "Gemini" : null, data.model]
+    case "AI Agent": {
+      const count = (data.outputVariables ?? []).filter(
+        (item) => item.name.trim() !== "",
+      ).length;
+      return [data.model, count ? `${count} variables` : null]
         .filter(Boolean)
-        .join(" · ");
-    case "Send Message":
-      return data.messageMode === "smart_value"
-        ? "Smart value reply"
-        : "Template reply";
-    case "Condition": {
-      const rule = [
-        data.conditionVariable,
-        data.conditionOperator,
-        data.conditionValue,
-      ]
-        .filter(Boolean)
-        .join(" ");
-      return rule || "No rule configured";
+        .join(" · ") || "Gemini";
     }
+    case "Send Message":
+      return String(data.messageTemplate ?? "").trim() || "No message yet";
+    case "Condition":
+      return data.conditionVariable
+        ? `{{${data.conditionVariable}}} · If match / Else`
+        : "Pilih variabel boolean";
+    case "Go To":
+      return data.endFlow ? "Jump · end flow" : "Jump to a step";
+    case "Relocate":
+      return "Handoff to a human admin";
     case "Stopper":
       return "Waits for the next message";
     default:
@@ -261,7 +293,9 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
   const Icon = NODE_ICONS[data.label] ?? WorkflowIcon;
   const tone = NODE_TONES[data.label] ?? NODE_TONES["Send Message"];
   const isCondition = data.label === "Condition";
-  const isStopper = data.label === "Stopper";
+  const hasSourceHandle = !["Send Message", "Relocate", "Go To"].includes(
+    data.label,
+  );
 
   return (
     <div
@@ -318,6 +352,13 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
         </p>
       </div>
 
+      {isCondition && (
+        <div className="flex items-center justify-between border-t border-border/70 px-3.5 py-1.5 text-[10px] font-semibold">
+          <span className="text-rose-300">↓ Else</span>
+          <span className="text-emerald-300">If match →</span>
+        </div>
+      )}
+
       {isCondition ? (
         <>
           <Handle
@@ -335,19 +376,13 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
             className="!size-3 !rounded-full !border-2 !border-background"
           />
         </>
-      ) : isStopper ? (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="!size-3 !rounded-full !border-2 !border-background !bg-rose-400"
-        />
-      ) : (
+      ) : hasSourceHandle ? (
         <Handle
           type="source"
           position={Position.Bottom}
           className="!size-3 !rounded-full !border-2 !border-background !bg-primary"
         />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -358,8 +393,8 @@ const EDGE_CHIPS: Record<string, string> = {
 };
 
 const EDGE_LABELS: Record<string, string> = {
-  true: "True",
-  false: "False",
+  true: "If match",
+  false: "Else",
 };
 
 function FlowEdge({
@@ -430,8 +465,10 @@ const edgeTypes = { flow: FlowEdge };
 
 type AgentVariable = {
   name: string;
+  token: string;
   type: string;
   description: string;
+  itemField?: string;
 };
 
 function getUpstreamAgentVariables(
@@ -457,21 +494,38 @@ function getUpstreamAgentVariables(
     if (!upstream.has(node.id) || node.data.label !== "AI Agent") continue;
     result.push({
       name: "ai_response",
+      token: "ai_response",
       type: "string",
-      description: "The response generated by this AI Agent",
+      description: "Jawaban teks AI (format lama)",
     });
-    const definitions = node.data.variableDefinitions ?? [];
-    const vars = definitions.length
-      ? definitions
-      : String(node.data.variables ?? "")
-          .split("\n")
-          .filter(Boolean)
-          .map((name) => ({ name, type: "string", description: "" }));
 
-    for (const variable of vars) {
-      if (variable.name.trim()) {
-        result.push({ ...variable, name: variable.name.trim() });
+    for (const variable of node.data.outputVariables ?? []) {
+      const name = variable.name.trim();
+
+      if (!name) continue;
+
+      if (variable.type === "array") {
+        const field = variable.itemField?.trim() || "replies";
+
+        result.push({
+          name,
+          token: `${name}.${field}`,
+          type: "array",
+          description:
+            variable.description ||
+            `List — setiap item menjadi satu bubble (${field})`,
+          itemField: field,
+        });
+
+        continue;
       }
+
+      result.push({
+        name,
+        token: name,
+        type: variable.type,
+        description: variable.description,
+      });
     }
   }
 
@@ -564,13 +618,13 @@ function SmartValueTextarea({
           <div className="mt-2 flex flex-wrap gap-2">
             {variables.map((variable) => (
               <button
-                key={variable.name}
+                key={variable.token}
                 type="button"
-                onClick={() => insertVariable(variable.name)}
+                onClick={() => insertVariable(variable.token)}
                 title={variable.description || variable.type}
                 className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-xs text-primary transition hover:border-primary/40 hover:bg-primary/15"
               >
-                {`{{${variable.name}}}`}
+                {`{{${variable.token}}}`}
               </button>
             ))}
           </div>
@@ -648,9 +702,41 @@ export default function WorkflowEditor({
           animated: false,
         }));
 
-        setNodes(loadedNodes);
-        setEdges(loadedEdges);
-        setSavedSnapshot(makeSnapshot(loadedNodes, loadedEdges));
+        // Node Stopper lama diganti Go To dengan End flow aktif,
+        // sehingga alurnya tetap sama tetapi tipe node lebih sederhana.
+        const convertedStopperIds = new Set(
+          loadedNodes
+            .filter((node) => node.data.label === "Stopper")
+            .map((node) => node.id),
+        );
+
+        const migratedNodes = loadedNodes.map((node) => {
+          if (node.data.label !== "Stopper") return node;
+
+          const outgoing = loadedEdges.find(
+            (edge) => edge.source === node.id,
+          );
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              label: "Go To" as NodeKind,
+              nodeName: node.data.nodeName || "Continue from here",
+              targetNodeId: outgoing?.target ?? "",
+              endFlow: true,
+              setStartingPoint: false,
+            },
+          };
+        });
+
+        const migratedEdges = loadedEdges.filter(
+          (edge) => !convertedStopperIds.has(edge.source),
+        );
+
+        setNodes(migratedNodes);
+        setEdges(migratedEdges);
+        setSavedSnapshot(makeSnapshot(migratedNodes, migratedEdges));
 
         changeSelection(null);
       } catch (error) {
@@ -698,6 +784,12 @@ export default function WorkflowEditor({
   );
   const booleanVariables = upstreamVariables.filter(
     (variable) => variable.type === "boolean",
+  );
+  const messageTemplate = String(inspectorData?.messageTemplate ?? "");
+  const arrayBubbleVariable = upstreamVariables.find(
+    (variable) =>
+      variable.type === "array" &&
+      messageTemplate.trim() === `{{${variable.token}}}`,
   );
 
   useEffect(() => {
@@ -769,6 +861,13 @@ export default function WorkflowEditor({
             sourceValue: "input.message",
           },
         ],
+        outputVariables: [
+          {
+            name: "respond",
+            type: "string",
+            description: "Jawaban AI yang dikirim ke pelanggan",
+          },
+        ],
         provider: "gemini",
         model: "gemini-3.8-flash",
         temperature: 0.7,
@@ -778,15 +877,26 @@ export default function WorkflowEditor({
         nodeName: "Send message",
         description: "Send a message to the visitor",
         messageMode: "template",
-        messageTemplate: "Hello! How can I help you?",
+        messageTemplate: "{{respond}}",
       },
       Condition: {
         label,
         nodeName: "Check condition",
-        description: "Evaluate a condition",
+        description: "Branch on a yes/no variable",
         conditionVariable: "",
-        conditionOperator: "equals",
-        conditionValue: "true",
+      },
+      "Go To": {
+        label,
+        nodeName: "Go to step",
+        description: "Jump to another step",
+        targetNodeId: "",
+        endFlow: false,
+        setStartingPoint: false,
+      },
+      Relocate: {
+        label,
+        nodeName: "Handoff to admin",
+        description: "Escalate the conversation to a human",
       },
       Stopper: {
         label,
@@ -814,6 +924,36 @@ export default function WorkflowEditor({
 
   function updateNode(patch: Partial<AutomationNodeData>) {
     setDraftData((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  function updateOutputVariable(
+    index: number,
+    patch: Partial<OutputVariable>,
+  ) {
+    const current = inspectorData?.outputVariables ?? [];
+
+    updateNode({
+      outputVariables: current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item,
+      ),
+    });
+  }
+
+  function addOutputVariable() {
+    updateNode({
+      outputVariables: [
+        ...(inspectorData?.outputVariables ?? []),
+        { name: "", type: "string", description: "" },
+      ],
+    });
+  }
+
+  function removeOutputVariable(index: number) {
+    updateNode({
+      outputVariables: (inspectorData?.outputVariables ?? []).filter(
+        (_, itemIndex) => itemIndex !== index,
+      ),
+    });
   }
 
   function selectNode(node: FlowNode) {
@@ -1140,44 +1280,36 @@ export default function WorkflowEditor({
                 <div className="space-y-5">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Trigger configuration
+                      Incoming chat message
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Define what starts this workflow.
+                      Workflow dimulai saat pelanggan mengirim pesan.
                     </p>
                   </div>
-
-                  <label className="block">
-                    <span className={labelClass}>Trigger event</span>
-                    <select
-                      className={inputClass}
-                      value={String(
-                        inspectorData?.triggerType ?? "chat_message",
-                      )}
-                      onChange={(event) =>
-                        updateNode({ triggerType: event.target.value })
-                      }
-                    >
-                      <option value="chat_message">
-                        Incoming chat message
-                      </option>
-                      <option value="conversation_started">
-                        Conversation started
-                      </option>
-                    </select>
-                  </label>
 
                   <div className={`${panelClass} p-3.5`}>
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <MessageSquare size={16} className="text-primary" />
-                      Website Chat Widget
+                      Customer message
                     </div>
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      Incoming visitor messages will be passed to the workflow
-                      runtime after the chat widget and backend integration are
-                      connected.
+                      Pesan pelanggan otomatis tersedia di AI Agent sebagai{" "}
+                      <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
+                        {"{{customer_message}}"}
+                      </code>{" "}
+                      dan nama pengunjung sebagai{" "}
+                      <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
+                        {"{{customer_name}}"}
+                      </code>
+                      .
                     </p>
                   </div>
+
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Jika ada node Go To dengan &ldquo;Set starting point&rdquo;,
+                    percakapan baru dimulai dari node tujuan tersebut, bukan
+                    dari Trigger.
+                  </p>
                 </div>
               )}
               {inspectorData?.label === "AI Agent" && (
@@ -1225,75 +1357,31 @@ export default function WorkflowEditor({
                   </label>
                   )}
 
-                  {agentTab === "variables" && <div className="space-y-3">
+                  {agentTab === "variables" && (
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Variable size={15} className="text-primary" />{" "}
-                        Variables
+                        <Variable size={15} className="text-primary" /> Output
+                        variables
                       </span>
                       <button
                         type="button"
                         className="rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/60"
-                        onClick={() =>
-                          updateNode({
-                            variableDefinitions: [
-                              ...(inspectorData?.variableDefinitions ?? []),
-                              {
-                                name: "",
-                                type: "string",
-                                description: "",
-                                sourceValue: "",
-                              },
-                            ],
-                          })
-                        }
+                        onClick={addOutputVariable}
                       >
                         <Plus size={13} className="mr-1 inline" /> Add variable
                       </button>
                     </div>
-                    {(
-                      inspectorData?.variableDefinitions ??
-                      String(inspectorData?.variables ?? "")
-                        .split("\n")
-                        .filter(Boolean)
-                        .map((name) => ({
-                          name,
-                          type: "string",
-                          description: "",
-                          sourceValue: "",
-                        }))
-                    ).map((variable, index) => {
-                      const vars = inspectorData?.variableDefinitions ?? [];
-                      const updateVariable = (
-                        patch: Partial<typeof variable>,
-                      ) => {
-                        const current = vars.length
-                          ? vars
-                          : String(inspectorData?.variables ?? "")
-                              .split("\n")
-                              .filter(Boolean)
-                              .map((name) => ({
-                                name,
-                                type: "string",
-                                description: "",
-                                sourceValue: "",
-                              }));
-                        updateNode({
-                          variableDefinitions: current.map((item, i) =>
-                            i === index ? { ...item, ...patch } : item,
-                          ),
-                          variables: current
-                            .map((item, i) =>
-                              i === index
-                                ? String(patch.name ?? item.name)
-                                : item.name,
-                            )
-                            .join("\n"),
-                        });
-                      };
-                      return (
+
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      AI mengisi variabel ini otomatis. Text untuk Send Message,
+                      Yes-No untuk Condition, dan List untuk beberapa bubble.
+                    </p>
+
+                    {(inspectorData?.outputVariables ?? []).map(
+                      (variable, index) => (
                         <div
-                          key={`variable-${index}`}
+                          key={`output-variable-${index}`}
                           className={`${panelClass} space-y-3 p-3`}
                         >
                           <div className="flex items-center justify-between">
@@ -1303,85 +1391,124 @@ export default function WorkflowEditor({
                             <button
                               type="button"
                               aria-label="Remove variable"
-                              onClick={() =>
-                                updateNode({
-                                  variableDefinitions: (
-                                    inspectorData?.variableDefinitions ?? []
-                                  ).filter((_, i) => i !== index),
-                                  variables: (
-                                    inspectorData?.variableDefinitions ?? []
-                                  )
-                                    .filter((_, i) => i !== index)
-                                    .map((item) => item.name)
-                                    .join("\n"),
-                                })
-                              }
+                              onClick={() => removeOutputVariable(index)}
                               className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             >
                               <Trash2 size={13} />
                             </button>
                           </div>
+
                           <label className="block">
                             <span className={labelClass}>Name</span>
                             <input
                               className={inputClass}
                               value={variable.name}
                               onChange={(event) =>
-                                updateVariable({ name: event.target.value })
+                                updateOutputVariable(index, {
+                                  name: event.target.value,
+                                })
                               }
-                              placeholder="customer_name"
+                              placeholder="respond"
                             />
                           </label>
+
                           <label className="block">
-                            <span className={labelClass}>Data type</span>
+                            <span className={labelClass}>Type</span>
                             <select
                               className={inputClass}
                               value={variable.type}
-                              onChange={(event) =>
-                                updateVariable({ type: event.target.value })
-                              }
+                              onChange={(event) => {
+                                const type = event.target.value as VariableType;
+
+                                updateOutputVariable(index, {
+                                  type,
+                                  itemField:
+                                    type === "array"
+                                      ? variable.itemField || "replies"
+                                      : variable.itemField,
+                                });
+                              }}
                             >
-                              <option value="string">String</option>
-                              <option value="number">Number</option>
-                              <option value="boolean">Boolean</option>
-                              <option value="object">Object</option>
-                              <option value="array">Array</option>
+                              <option value="string">Text</option>
+                              <option value="boolean">
+                                Yes-No (Condition)
+                              </option>
+                              <option value="array">
+                                List (multiple bubbles)
+                              </option>
                             </select>
                           </label>
+
+                          {variable.type === "array" && (
+                            <label className="block">
+                              <span className={labelClass}>
+                                Nama sub-variabel
+                              </span>
+                              <input
+                                className={inputClass}
+                                value={variable.itemField ?? "replies"}
+                                onChange={(event) =>
+                                  updateOutputVariable(index, {
+                                    itemField: event.target.value,
+                                  })
+                                }
+                                placeholder="replies"
+                              />
+                              <span className="mt-2 block text-xs leading-5 text-muted-foreground">
+                                Dipanggil di Send Message sebagai{" "}
+                                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
+                                  {`{{${variable.name || "respond"}.${variable.itemField || "replies"}}}`}
+                                </code>
+                                . Setiap item menjadi satu bubble.
+                              </span>
+                            </label>
+                          )}
+
                           <label className="block">
                             <span className={labelClass}>Description</span>
                             <input
                               className={inputClass}
                               value={variable.description}
                               onChange={(event) =>
-                                updateVariable({
+                                updateOutputVariable(index, {
                                   description: event.target.value,
                                 })
                               }
-                              placeholder="What this variable contains"
+                              placeholder="Jawaban AI untuk pelanggan"
                             />
-                          </label>
-                          <label className="block">
-                            <span className={labelClass}>Source value</span>
-                            <input
-                              className={inputClass}
-                              value={variable.sourceValue}
-                              onChange={(event) =>
-                                updateVariable({
-                                  sourceValue: event.target.value,
-                                })
-                              }
-                              placeholder="input.customer_name"
-                            />
+                            <span className="mt-2 block text-xs leading-5 text-muted-foreground">
+                              Deskripsi ini membantu AI memahami isi variabel.
+                            </span>
                           </label>
                         </div>
-                      );
-                    })}
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      Give each variable a clear name and type. Connected Send
-                      Message and Condition nodes can use these values.
-                    </p>
-                  </div>}
+                      ),
+                    )}
+
+                    <div className={`${panelClass} p-3.5`}>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Contoh
+                      </p>
+                      <div className="mt-2 space-y-1.5 text-xs leading-5 text-muted-foreground">
+                        <p>
+                          <code className="font-mono text-foreground">respond</code>{" "}
+                          (Text) → dikirim lewat Send Message.
+                        </p>
+                        <p>
+                          <code className="font-mono text-foreground">beli</code>{" "}
+                          (Yes-No) → dipakai di Condition.
+                        </p>
+                        <p>
+                          <code className="font-mono text-foreground">
+                            respond
+                          </code>{" "}
+                          (List, sub-variabel{" "}
+                          <code className="font-mono text-foreground">replies</code>
+                          ) → beberapa bubble chat.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
 
                   {agentTab === "node" && <div className="space-y-5">
                     <label className="block">
@@ -1483,6 +1610,13 @@ export default function WorkflowEditor({
                     </p>
                   </div>
 
+                  {arrayBubbleVariable && (
+                    <p className="text-xs leading-5 text-primary">
+                      List terdeteksi: setiap item akan dikirim sebagai bubble
+                      chat terpisah.
+                    </p>
+                  )}
+
                   <p className="text-xs leading-5 text-muted-foreground">
                     Blue tokens are dynamic values provided by connected AI Agent nodes.
                   </p>
@@ -1492,70 +1626,51 @@ export default function WorkflowEditor({
                 <div className="space-y-5">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Condition rule
+                      Condition
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Choose what value should be checked before branching.
+                      Pilih variabel Yes-No dari AI Agent. Jika nilainya true,
+                      alur masuk ke If match. Jika false, masuk ke Else.
                     </p>
                   </div>
 
-                  <label className="block">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className={labelClass}>Boolean smart value</span>
-                      <span className="rounded-md bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary">SMART VALUE</span>
-                    </span>
-                    <select
-                      className={inputClass}
-                      value={String(inspectorData?.conditionVariable ?? booleanVariables[0]?.name ?? "")}
-                      onChange={(event) =>
-                        updateNode({ conditionVariable: event.target.value })
-                      }
-                      disabled={booleanVariables.length === 0}
-                    >
-                      {booleanVariables.length === 0 ? (
-                        <option value="">No connected boolean variables</option>
-                      ) : booleanVariables.map((variable) => (
-                        <option key={variable.name} value={variable.name}>{`{{${variable.name}}}`}</option>
-                      ))}
-                    </select>
-                    {String(inspectorData?.conditionVariable ?? booleanVariables[0]?.name ?? "") && (
-                      <span className="mt-2 inline-flex rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-xs text-primary">
-                        {`{{${String(inspectorData?.conditionVariable ?? booleanVariables[0]?.name)}}}`}
-                      </span>
-                    )}
-                    <span className="mt-2 block text-xs leading-5 text-muted-foreground">Select a boolean variable from a connected AI Agent.</span>
-                  </label>
-
-                  <label className="block">
-                    <span className={labelClass}>Operator</span>
-                    <select
-                      className={inputClass}
-                      value={String(inspectorData?.conditionOperator) === "not_equals" ? "not_equals" : "equals"}
-                      onChange={(event) =>
-                        updateNode({ conditionOperator: event.target.value })
-                      }
-                    >
-                      <option value="equals">Equals</option>
-                      <option value="not_equals">Does not equal</option>
-                    </select>
-                  </label>
-
-                  {!["is_empty", "is_not_empty"].includes(
-                    String(inspectorData?.conditionOperator),
-                  ) && (
+                  {booleanVariables.length === 0 ? (
+                    <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3.5 text-xs leading-5 text-amber-200">
+                      Belum ada variabel boolean. Tambahkan variabel bertipe
+                      Yes-No di AI Agent yang terhubung sebelum node ini.
+                    </div>
+                  ) : (
                     <label className="block">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className={labelClass}>Compare value</span>
-                        <span className="rounded-md bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary">BOOLEAN</span>
-                      </span>
+                      <span className={labelClass}>Boolean variable</span>
                       <select
                         className={inputClass}
-                        value={String(inspectorData?.conditionValue ?? "true")}
-                        onChange={(event) => updateNode({ conditionValue: event.target.value })}
+                        value={String(
+                          inspectorData?.conditionVariable ?? "",
+                        )}
+                        onChange={(event) =>
+                          updateNode({
+                            conditionVariable: event.target.value,
+                          })
+                        }
                       >
-                        <option value="true">True</option>
-                        <option value="false">False</option>
+                        <option value="">Pilih variabel…</option>
+                        {booleanVariables.map((variable) => (
+                          <option key={variable.name} value={variable.name}>
+                            {`{{${variable.name}}}`}
+                            {variable.description
+                              ? ` — ${variable.description}`
+                              : ""}
+                          </option>
+                        ))}
                       </select>
+                      <span className="mt-2 block text-xs leading-5 text-muted-foreground">
+                        Contoh: prompt AI menulis &ldquo;set beli=true jika
+                        pelanggan ingin membeli&rdquo;, lalu variabel{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
+                          beli
+                        </code>{" "}
+                        dipakai di sini.
+                      </span>
                     </label>
                   )}
 
@@ -1564,10 +1679,10 @@ export default function WorkflowEditor({
                       <Check size={15} className="text-emerald-300" />
                       <div>
                         <p className="text-sm font-medium text-emerald-300">
-                          True
+                          If match
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Rule matches.
+                          Variabel bernilai true.
                         </p>
                       </div>
                     </div>
@@ -1575,17 +1690,115 @@ export default function WorkflowEditor({
                       <X size={15} className="text-destructive" />
                       <div>
                         <p className="text-sm font-medium text-destructive">
-                          False
+                          Else
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Rule does not match.
+                          Variabel bernilai false.
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Connect the True and False outputs to the steps for each result.
+                    Hubungkan port hijau (If match) dan port merah (Else) ke
+                    langkah berikutnya.
+                  </p>
+                </div>
+              )}
+              {inspectorData?.label === "Go To" && (
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      Go To
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Lompat ke node lain tanpa menggambar koneksi tambahan.
+                    </p>
+                  </div>
+
+                  <label className="block">
+                    <span className={labelClass}>Node tujuan</span>
+                    <select
+                      className={inputClass}
+                      value={String(inspectorData?.targetNodeId ?? "")}
+                      onChange={(event) =>
+                        updateNode({ targetNodeId: event.target.value })
+                      }
+                    >
+                      <option value="">Pilih node tujuan…</option>
+                      {nodes
+                        .filter((node) => node.id !== selectedNodeId)
+                        .map((node) => (
+                          <option key={node.id} value={node.id}>
+                            {node.data.nodeName || node.data.label}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-primary"
+                      checked={Boolean(inspectorData?.endFlow)}
+                      onChange={(event) =>
+                        updateNode({ endFlow: event.target.checked })
+                      }
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">
+                        End flow
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                        Berhenti dulu di node tujuan. Alur lanjut saat pelanggan
+                        mengirim pesan lagi.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-primary"
+                      checked={Boolean(inspectorData?.setStartingPoint)}
+                      onChange={(event) =>
+                        updateNode({
+                          setStartingPoint: event.target.checked,
+                        })
+                      }
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">
+                        Set starting point
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                        Percakapan baru dimulai dari node tujuan ini, bukan dari
+                        Trigger.
+                      </span>
+                    </span>
+                  </label>
+
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Hanya satu Go To yang boleh memakai Set starting point, dan
+                    node tujuan tidak boleh dirinya sendiri.
+                  </p>
+                </div>
+              )}
+              {inspectorData?.label === "Relocate" && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-teal-400/20 bg-teal-400/[0.06] p-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-teal-200">
+                      <Handshake size={17} /> Handoff to admin
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      Saat alur masuk ke node ini, AI berhenti membalas.
+                      Percakapan ditandai sudah ditangani admin manusia, dan
+                      pesan pelanggan berikutnya tidak dijawab AI.
+                    </p>
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Tempatkan Relocate di akhir alur, misalnya setelah Condition
+                    mendeteksi pelanggan minta bantuan manusia.
                   </p>
                 </div>
               )}
