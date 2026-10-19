@@ -1,23 +1,66 @@
-
 import { useEffect, useMemo, useState } from "react";
 import {
+  Activity as ActivityIcon,
   ArrowUpRight,
   Bot,
   BookOpen,
+  CheckCircle2,
+  CircleAlert,
+  CircleDashed,
+  Clock,
+  Coins,
+  Layers,
   LoaderCircle,
+  Percent,
   RefreshCw,
   Send,
+  Sparkles,
+  TrendingUp,
+  Workflow as WorkflowIcon,
+  XCircle,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { getWorkflows } from "../services/workflow";
 import {
+  getActivity,
   getTokenUsage,
+  type ActivityStats,
+  type ExecutionStatus,
   type TokenUsageBucket,
   type TokenUsagePeriod,
   type TokenUsageStats,
 } from "../services/stats";
 import type { Workflow as WorkflowItem } from "../types/workflow";
+
+type Health = "checking" | "online" | "offline";
+
+interface DashboardProps {
+  health: Health;
+  onViewActivity?: () => void;
+}
+
+const HEALTH_STYLES: Record<Health, { label: string; dot: string; text: string }> = {
+  online: {
+    label: "Operational",
+    dot: "bg-emerald-400",
+    text: "text-emerald-400",
+  },
+  offline: {
+    label: "Offline",
+    dot: "bg-destructive",
+    text: "text-destructive",
+  },
+  checking: {
+    label: "Memeriksa",
+    dot: "bg-amber-400 animate-pulse",
+    text: "text-amber-400",
+  },
+};
+
+const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const PERIODS: Array<{ key: TokenUsagePeriod; label: string }> = [
   { key: "daily", label: "Harian" },
@@ -45,7 +88,37 @@ const FREE_MODELS: Array<{
   { name: "North Mini Code", author: "Cohere", context: "256K", tag: "Coding" },
 ];
 
+const STATUS_META: Record<
+  ExecutionStatus,
+  { label: string; dot: string; badge: string }
+> = {
+  success: {
+    label: "Sukses",
+    dot: "bg-emerald-400",
+    badge: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
+  },
+  failed: {
+    label: "Gagal",
+    dot: "bg-destructive",
+    badge: "border-destructive/30 bg-destructive/10 text-destructive",
+  },
+  waiting: {
+    label: "Menunggu",
+    dot: "bg-amber-400",
+    badge: "border-amber-400/30 bg-amber-400/10 text-amber-300",
+  },
+  running: {
+    label: "Berjalan",
+    dot: "bg-primary",
+    badge: "border-primary/30 bg-primary/10 text-primary",
+  },
+};
+
 const numberFormat = new Intl.NumberFormat("id-ID");
+const dateFormat = new Intl.DateTimeFormat("id-ID", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 function compactNumber(value: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -54,30 +127,37 @@ function compactNumber(value: number): string {
   }).format(value);
 }
 
-export default function Dashboard() {
-  const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
+function formatDate(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
+}
 
-  const [period, setPeriod] = useState<TokenUsagePeriod>("daily");
+export default function Dashboard({ health, onViewActivity }: DashboardProps) {
+  const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
+  const [activity, setActivity] = useState<ActivityStats | null>(null);
   const [usage, setUsage] = useState<TokenUsageStats | null>(null);
+  const [period, setPeriod] = useState<TokenUsagePeriod>("daily");
+
+  const [loading, setLoading] = useState(true);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
 
-    getWorkflows()
-      .then((result) => {
+    Promise.allSettled([getWorkflows(), getActivity(8)])
+      .then(([workflowsResult, activityResult]) => {
         if (!active) return;
-        setWorkflows(result.data);
-        setError("");
-      })
-      .catch(() => {
-        if (active) {
-          setError(
-            "Data dashboard gagal dimuat. Periksa koneksi dan autentikasi API.",
-          );
+
+        if (workflowsResult.status === "fulfilled") {
+          setWorkflows(workflowsResult.value.data);
+        } else {
+          setError("Sebagian data dashboard gagal dimuat. Periksa koneksi API.");
+        }
+
+        if (activityResult.status === "fulfilled") {
+          setActivity(activityResult.value);
         }
       })
       .finally(() => {
@@ -87,7 +167,7 @@ export default function Dashboard() {
     return () => {
       active = false;
     };
-  }, [reloadKey]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -97,7 +177,9 @@ export default function Dashboard() {
         if (active) setUsage(result);
       })
       .catch(() => {
-        if (active) setUsage(null);
+        if (active) {
+          setError("Statistik token gagal dimuat. Periksa koneksi backend.");
+        }
       })
       .finally(() => {
         if (active) setUsageLoading(false);
@@ -108,17 +190,36 @@ export default function Dashboard() {
     };
   }, [period]);
 
-  const reload = () => {
-    setLoading(true);
-    setError("");
-    setReloadKey((key) => key + 1);
-  };
-
-  const changePeriod = (next: TokenUsagePeriod) => {
-    if (next === period) return;
+  function changePeriod(next: TokenUsagePeriod) {
     setUsageLoading(true);
     setPeriod(next);
-  };
+  }
+
+  async function reload() {
+    setError("");
+    setLoading(true);
+    setUsageLoading(true);
+
+    const [workflowsResult, activityResult, usageResult] =
+      await Promise.allSettled([getWorkflows(), getActivity(8), getTokenUsage(period)]);
+
+    if (workflowsResult.status === "fulfilled") {
+      setWorkflows(workflowsResult.value.data);
+    } else {
+      setError("Sebagian data dashboard gagal dimuat. Periksa koneksi API.");
+    }
+
+    if (activityResult.status === "fulfilled") {
+      setActivity(activityResult.value);
+    }
+
+    if (usageResult.status === "fulfilled") {
+      setUsage(usageResult.value);
+    }
+
+    setLoading(false);
+    setUsageLoading(false);
+  }
 
   const stats = useMemo(() => {
     const active = workflows.filter((item) => item.status === "active").length;
@@ -129,29 +230,58 @@ export default function Dashboard() {
     };
   }, [workflows]);
 
+  const summary = activity?.summary ?? {
+    total: 0,
+    success: 0,
+    failed: 0,
+    waiting: 0,
+    running: 0,
+  };
+
+  const successRate =
+    summary.total > 0 ? Math.round((summary.success / summary.total) * 100) : 0;
+
+  const tokensPerRun =
+    usage && usage.totals.executions > 0
+      ? Math.round(usage.totals.total_tokens / usage.totals.executions)
+      : 0;
+
   return (
     <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="w-full space-y-8">
-        {/* Heading + automation motif */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="w-full space-y-6">
+        {/* Heading */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+              <ActivityIcon className="size-4" />
+              Ringkasan workspace
+            </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Dashboard
             </h1>
             <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              Pantau otomatisasi, konsumsi token AI, dan model gratis yang siap
-              dipakai.
+              Pantau otomatisasi, konsumsi token AI, dan kesehatan eksekusi dalam
+              satu layar.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 md:flex">
-              <FlowNode icon={Zap} label="Trigger" />
-              <span className="h-px w-5 bg-border" />
-              <FlowNode icon={Bot} label="AI Agent" accent />
-              <span className="h-px w-5 bg-border" />
-              <FlowNode icon={Send} label="Send" />
-            </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void reload()}
+              disabled={loading || usageLoading}
+              className="h-10 px-4"
+            >
+              <RefreshCw className={loading ? "animate-spin" : undefined} />
+              Segarkan
+            </Button>
+            {onViewActivity && (
+              <Button type="button" onClick={onViewActivity} className="h-10 px-4">
+                <ActivityIcon />
+                Lihat aktivitas
+              </Button>
+            )}
           </div>
         </div>
 
@@ -160,116 +290,331 @@ export default function Dashboard() {
             role="alert"
             className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           >
-            <span>{error}</span>
-            <button
+            <span className="flex items-center gap-2">
+              <CircleAlert className="size-4 shrink-0" />
+              {error}
+            </span>
+            <Button
               type="button"
-              onClick={reload}
-              className="inline-flex items-center gap-1.5 font-medium hover:opacity-80"
+              variant="ghost"
+              size="sm"
+              onClick={() => void reload()}
+              className="text-destructive hover:text-destructive"
             >
-              <RefreshCw size={14} />
               Coba lagi
-            </button>
+            </Button>
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
-          <StatTile
+        <AutomationPipeline />
+
+        {/* Stat cards (terpisah) */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard
+            icon={WorkflowIcon}
             label="Total workflow"
             value={stats.total}
+            caption="Seluruh alur di workspace"
+            tone="primary"
             loading={loading}
+            delay={0}
           />
-          <StatTile
+          <StatCard
+            icon={CheckCircle2}
             label="Aktif"
             value={stats.active}
+            caption={
+              stats.total > 0
+                ? `${Math.round((stats.active / stats.total) * 100)}% siap dijalankan`
+                : "Belum ada workflow"
+            }
+            tone="emerald"
             loading={loading}
-            tone="active"
+            delay={0.05}
           />
-          <StatTile
+          <StatCard
+            icon={CircleDashed}
             label="Draft"
             value={stats.draft}
+            caption="Perlu ditinjau sebelum aktif"
+            tone="amber"
             loading={loading}
-            tone="draft"
+            delay={0.1}
           />
         </div>
 
-        {/* Token usage */}
-        <div className="rounded-xl border border-border bg-card">
-          <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                Penggunaan token
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Total token yang diproses AI Agent.
-              </p>
+        {/* KPI strip */}
+        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+          <MetricTile
+            icon={Coins}
+            label="Total token"
+            value={compactNumber(usage?.totals.total_tokens ?? 0)}
+            hint={`${PERIODS.find((p) => p.key === period)?.label ?? ""} ini`}
+            loading={usageLoading}
+          />
+          <MetricTile
+            icon={ActivityIcon}
+            label="Eksekusi"
+            value={compactNumber(usage?.totals.executions ?? 0)}
+            hint="Dijalankan pada periode"
+            loading={usageLoading}
+          />
+          <MetricTile
+            icon={TrendingUp}
+            label="Rata-rata token"
+            value={compactNumber(tokensPerRun)}
+            hint="Per eksekusi"
+            loading={usageLoading}
+          />
+          <MetricTile
+            icon={Percent}
+            label="Tingkat keberhasilan"
+            value={`${successRate}%`}
+            hint={`${summary.success} sukses dari ${summary.total}`}
+            loading={loading}
+          />
+        </div>
+
+        {/* Charts */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-xl border border-border bg-card lg:col-span-2">
+            <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">
+                  Penggunaan token
+                </h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Distribusi token input dan output AI Agent.
+                </p>
+              </div>
+
+              <div className="inline-flex rounded-lg border border-border bg-background p-1">
+                {PERIODS.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => changePeriod(item.key)}
+                    aria-pressed={period === item.key}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                      period === item.key
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="inline-flex rounded-lg border border-border bg-background p-1">
-              {PERIODS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => changePeriod(item.key)}
-                  aria-pressed={period === item.key}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                    period === item.key
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="p-5">
+              <div className="mb-5 flex flex-wrap items-end gap-x-8 gap-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total token</p>
+                  <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
+                    {usageLoading
+                      ? "—"
+                      : compactNumber(usage?.totals.total_tokens ?? 0)}
+                  </p>
+                </div>
+
+                <Legend color="bg-primary" label="Input" value={usage?.totals.prompt_tokens ?? 0} />
+                <Legend color="bg-primary/40" label="Output" value={usage?.totals.completion_tokens ?? 0} />
+                <Legend
+                  color="bg-muted-foreground/40"
+                  label="Eksekusi"
+                  value={usage?.totals.executions ?? 0}
+                  raw
+                />
+              </div>
+
+              {usageLoading ? (
+                <div className="flex h-52 items-center justify-center">
+                  <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : !usage || usage.totals.total_tokens === 0 ? (
+                <EmptyChart />
+              ) : (
+                <TokenAreaChart series={usage.series} />
+              )}
             </div>
           </div>
 
-          <div className="p-5">
-            <div className="mb-6 flex flex-wrap items-end gap-x-8 gap-y-4">
+          <div className="rounded-xl border border-border bg-card">
+            <div className="border-b border-border p-5">
+              <h2 className="text-base font-semibold text-foreground">
+                Hasil eksekusi
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Komposisi status dari seluruh riwayat.
+              </p>
+            </div>
+            <div className="p-5">
+              {loading ? (
+                <div className="flex h-56 items-center justify-center">
+                  <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <StatusDonut summary={summary} rate={successRate} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Activity + needs attention */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-xl border border-border bg-card lg:col-span-2">
+            <div className="flex items-center justify-between gap-4 border-b border-border p-5">
               <div>
-                <p className="text-sm text-muted-foreground">Total token</p>
-                <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
-                  {usageLoading ? "—" : compactNumber(usage?.totals.total_tokens ?? 0)}
+                <h2 className="text-base font-semibold text-foreground">
+                  Eksekusi terbaru
+                </h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Delapan aktivitas terakhir dari seluruh workflow.
                 </p>
               </div>
-
-              <TokenLegend
-                color="bg-primary"
-                label="Input"
-                value={usage?.totals.prompt_tokens ?? 0}
-              />
-              <TokenLegend
-                color="bg-primary/40"
-                label="Output"
-                value={usage?.totals.completion_tokens ?? 0}
-              />
-              <TokenLegend
-                color="bg-muted-foreground/40"
-                label="Eksekusi"
-                value={usage?.totals.executions ?? 0}
-                raw
-              />
+              {onViewActivity && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onViewActivity}
+                  className="shrink-0 text-muted-foreground"
+                >
+                  Semua
+                  <ArrowUpRight />
+                </Button>
+              )}
             </div>
 
-            {usageLoading ? (
+            {loading ? (
               <div className="flex h-56 items-center justify-center">
-                <LoaderCircle
-                  size={24}
-                  className="animate-spin text-muted-foreground"
-                />
+                <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
               </div>
-            ) : !usage || usage.totals.total_tokens === 0 ? (
-              <div className="flex h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
+            ) : !activity || activity.executions.length === 0 ? (
+              <div className="flex h-56 flex-col items-center justify-center p-6 text-center">
+                <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
+                  <ActivityIcon className="size-5" />
+                </span>
                 <p className="text-sm font-medium text-foreground">
-                  Belum ada token tercatat
+                  Belum ada eksekusi
                 </p>
                 <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                  Token akan terhitung otomatis setiap kali AI Agent dijalankan.
+                  Jalankan workflow dari Chat Widget untuk melihat riwayat di sini.
                 </p>
               </div>
             ) : (
-              <TokenChart series={usage.series} />
+              <ul className="divide-y divide-border">
+                {activity.executions.map((execution) => {
+                  const meta = STATUS_META[execution.status];
+                  return (
+                    <li
+                      key={execution.id}
+                      className="flex items-center gap-4 px-5 py-3"
+                    >
+                      <span className={`size-2 shrink-0 rounded-full ${meta.dot}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {execution.workflow_name ||
+                            `Workflow #${execution.workflow_id}`}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          Eksekusi #{execution.id} · {formatDate(execution.started_at)}
+                        </p>
+                      </div>
+                      <span
+                        className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${meta.badge}`}
+                      >
+                        {meta.label}
+                      </span>
+                      <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground md:block">
+                        {execution.total_tokens > 0
+                          ? `${numberFormat.format(execution.total_tokens)} token`
+                          : "—"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
+          </div>
+
+          <div className="rounded-xl border border-border bg-card">
+            <div className="border-b border-border p-5">
+              <h2 className="text-base font-semibold text-foreground">
+                Perlu perhatian
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Sinyal yang bisa ditindaklanjuti.
+              </p>
+            </div>
+            <div className="space-y-3 p-5">
+              <AttentionRow
+                icon={XCircle}
+                tone="destructive"
+                label="Eksekusi gagal"
+                value={summary.failed}
+                hint="Periksa log dan konfigurasi node"
+              />
+              <AttentionRow
+                icon={Clock}
+                tone="amber"
+                label="Menunggu pesan"
+                value={summary.waiting}
+                hint="Workflow tertahan di node Stopper"
+              />
+              <AttentionRow
+                icon={CircleDashed}
+                tone="muted"
+                label="Workflow draft"
+                value={stats.draft}
+                hint="Belum diaktifkan untuk otomasi"
+              />
+              <AttentionRow
+                icon={Layers}
+                tone="primary"
+                label="Rata-rata node"
+                value={
+                  stats.total > 0
+                    ? Math.round(
+                        workflows.reduce(
+                          (total, item) =>
+                            total + (item.definition?.nodes?.length ?? 0),
+                          0,
+                        ) / stats.total,
+                      )
+                    : 0
+                }
+                hint="Per workflow"
+              />
+            </div>
+
+            <div className="border-t border-border p-5">
+              <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                Status sistem
+              </p>
+
+              <div className="mt-3 space-y-2">
+                <SystemRow
+                  label="Backend API"
+                  value={HEALTH_STYLES[health].label}
+                  dot={HEALTH_STYLES[health].dot}
+                  text={HEALTH_STYLES[health].text}
+                />
+                <SystemRow
+                  label="Pencatatan token"
+                  value={summary.total > 0 ? "Aktif" : "Menunggu data"}
+                  dot={summary.total > 0 ? "bg-emerald-400" : "bg-muted-foreground/40"}
+                  text={summary.total > 0 ? "text-emerald-400" : "text-muted-foreground"}
+                />
+                <SystemRow
+                  label="Zona waktu"
+                  value={TIME_ZONE}
+                  dot="bg-muted-foreground/40"
+                  text="text-muted-foreground"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -287,24 +632,36 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-2">
-              <a
-                href={OPENROUTER_DOCS}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-muted-foreground transition hover:border-ring/50 hover:text-foreground"
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={
+                  <a
+                    href={OPENROUTER_DOCS}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
               >
-                <BookOpen size={15} />
+                <BookOpen />
                 Dokumentasi
-              </a>
-              <a
-                href={OPENROUTER_FREE_COLLECTION}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-muted-foreground transition hover:border-ring/50 hover:text-foreground"
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={
+                  <a
+                    href={OPENROUTER_FREE_COLLECTION}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
               >
                 Koleksi gratis
-                <ArrowUpRight size={15} />
-              </a>
+                <ArrowUpRight />
+              </Button>
             </div>
           </div>
 
@@ -342,39 +699,230 @@ export default function Dashboard() {
   );
 }
 
-function StatTile({
+const TONE_STYLES = {
+  primary: { icon: "bg-primary/10 text-primary", bar: "bg-primary" },
+  emerald: { icon: "bg-emerald-400/10 text-emerald-400", bar: "bg-emerald-400" },
+  amber: { icon: "bg-amber-400/10 text-amber-400", bar: "bg-amber-400" },
+} as const;
+
+function StatCard({
+  icon: Icon,
   label,
   value,
-  loading,
+  caption,
   tone,
+  loading,
+  delay = 0,
 }: {
+  icon: LucideIcon;
   label: string;
   value: number;
+  caption: string;
+  tone: keyof typeof TONE_STYLES;
   loading: boolean;
-  tone?: "active" | "draft";
+  delay?: number;
 }) {
-  const valueTone =
-    tone === "active"
-      ? "text-emerald-400"
-      : tone === "draft"
-        ? "text-amber-400"
-        : "text-foreground";
+  const styles = TONE_STYLES[tone];
 
   return (
-    <div className="bg-card p-5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={`mt-2 text-3xl font-semibold tracking-tight ${valueTone}`}>
-        {loading ? (
-          <LoaderCircle size={24} className="animate-spin text-muted-foreground" />
-        ) : (
-          value
-        )}
-      </p>
+    <div
+      className="animate-rise relative overflow-hidden rounded-xl border border-border bg-card p-5"
+      style={{ animationDelay: `${delay}s` }}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+            {loading ? (
+              <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+            ) : (
+              value
+            )}
+          </p>
+        </div>
+        <span
+          className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${styles.icon}`}
+        >
+          <Icon className="size-5" />
+        </span>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">{caption}</p>
+      <span
+        className={`absolute inset-x-0 bottom-0 h-0.5 ${styles.bar} animate-sheen`}
+      />
     </div>
   );
 }
 
-function TokenLegend({
+function MetricTile({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  loading,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  hint: string;
+  loading: boolean;
+}) {
+  return (
+    <div className="bg-card p-5">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="size-4" />
+        <span className="text-sm">{label}</span>
+      </div>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+        {loading ? (
+          <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+        ) : (
+          value
+        )}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+function AttentionRow({
+  icon: Icon,
+  tone,
+  label,
+  value,
+  hint,
+}: {
+  icon: LucideIcon;
+  tone: "destructive" | "amber" | "muted" | "primary";
+  label: string;
+  value: number;
+  hint: string;
+}) {
+  const toneClass = {
+    destructive: "bg-destructive/10 text-destructive",
+    amber: "bg-amber-400/10 text-amber-400",
+    muted: "bg-muted text-muted-foreground",
+    primary: "bg-primary/10 text-primary",
+  }[tone];
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-background/40 p-3">
+      <span
+        className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
+      >
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="truncate text-xs text-muted-foreground">{hint}</p>
+      </div>
+      <span className="text-lg font-semibold text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function SystemRow({
+  label,
+  value,
+  dot,
+  text,
+}: {
+  label: string;
+  value: string;
+  dot: string;
+  text: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5">
+      <span className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span className={`size-2 shrink-0 rounded-full ${dot}`} />
+        {label}
+      </span>
+      <span className={`truncate text-sm font-medium ${text}`}>{value}</span>
+    </div>
+  );
+}
+
+function AutomationPipeline() {
+  return (
+    <div className="animate-rise relative overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8">
+      <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-[30rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
+
+      <div className="relative">
+        <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+          <Sparkles className="size-4 text-primary" />
+          Alur otomasi
+        </div>
+
+        <div className="mt-6 overflow-x-auto pb-1">
+          <div className="flex min-w-[520px] items-center gap-4">
+            <PipelineNode icon={Zap} label="Trigger" hint="Pesan masuk" />
+            <PipelineConnector delay="0s" />
+            <PipelineNode icon={Bot} label="AI Agent" hint="Gemini" active />
+            <PipelineConnector delay="0.7s" />
+            <PipelineNode icon={Send} label="Send Message" hint="Balasan" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PipelineNode({
+  icon: Icon,
+  label,
+  hint,
+  active,
+}: {
+  icon: LucideIcon;
+  label: string;
+  hint: string;
+  active?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+        active
+          ? "animate-float border-primary/40 bg-primary/[0.06] shadow-[0_0_35px_-12px_var(--primary)]"
+          : "border-border bg-background/60"
+      }`}
+    >
+      <span className="relative flex size-10 shrink-0 items-center justify-center">
+        {active && (
+          <span className="absolute inset-0 rounded-lg bg-primary/40 animate-pulse-ring" />
+        )}
+        <span
+          className={`relative flex size-10 items-center justify-center rounded-lg ${
+            active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+          }`}
+        >
+          <Icon className="size-[18px]" />
+        </span>
+      </span>
+      <span className="pr-1">
+        <span className="block text-sm font-semibold text-foreground">{label}</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>
+      </span>
+    </div>
+  );
+}
+
+function PipelineConnector({ delay }: { delay: string }) {
+  return (
+    <div className="relative h-0.5 min-w-10 flex-1 overflow-hidden rounded-full bg-border">
+      <span
+        className="animate-flow-x absolute inset-y-0 w-10 rounded-full bg-linear-to-r from-transparent via-primary to-transparent"
+        style={{ animationDelay: delay }}
+      />
+      <span
+        className="animate-flow-x-slow absolute inset-y-0 w-6 rounded-full bg-linear-to-r from-transparent via-primary/60 to-transparent"
+        style={{ animationDelay: `calc(${delay} + 1.1s)` }}
+      />
+    </div>
+  );
+}
+
+function Legend({
   color,
   label,
   value,
@@ -398,40 +946,119 @@ function TokenLegend({
   );
 }
 
-function TokenChart({ series }: { series: TokenUsageBucket[] }) {
+function EmptyChart() {
+  return (
+    <div className="flex h-52 flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
+      <p className="text-sm font-medium text-foreground">Belum ada token tercatat</p>
+      <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+        Token akan terhitung otomatis setiap kali AI Agent dijalankan.
+      </p>
+    </div>
+  );
+}
+
+function TokenAreaChart({ series }: { series: TokenUsageBucket[] }) {
+  const count = series.length;
   const max = Math.max(1, ...series.map((bucket) => bucket.total_tokens));
+  const width = Math.max(560, count * 46);
+  const height = 200;
+  const padX = 6;
+  const top = 14;
+  const step = count > 1 ? (width - padX * 2) / (count - 1) : 0;
+
+  const x = (index: number) => padX + index * step;
+  const y = (value: number) => height - (value / max) * (height - top) - 4;
+
+  const line = (getter: (bucket: TokenUsageBucket) => number) =>
+    series
+      .map((bucket, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(getter(bucket)).toFixed(1)}`)
+      .join(" ");
+
+  const completionLine = line((bucket) => bucket.completion_tokens);
+  const totalLine = line((bucket) => bucket.total_tokens);
+
+  const baseline = `L${x(count - 1).toFixed(1)},${height} L${x(0).toFixed(1)},${height} Z`;
+  const completionArea = `${completionLine} ${baseline}`;
+
+  const backAlongCompletion = series
+    .map((_, index) => count - 1 - index)
+    .map((index) => `L${x(index).toFixed(1)},${y(series[index].completion_tokens).toFixed(1)}`)
+    .join(" ");
+
+  const promptArea = `${totalLine} ${backAlongCompletion} Z`;
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[560px]">
-        <div className="flex h-48 items-end gap-1.5 border-b border-border">
-          {series.map((bucket) => {
-            const height = (bucket.total_tokens / max) * 100;
-            return (
-              <div
-                key={bucket.key}
-                className="group flex h-full flex-1 flex-col justify-end"
-                title={`${bucket.label} · ${numberFormat.format(bucket.total_tokens)} token · ${bucket.executions} eksekusi`}
-              >
-                <div
-                  className="flex w-full flex-col justify-end overflow-hidden rounded-t-md transition group-hover:opacity-80"
-                  style={{ height: `${height}%` }}
-                >
-                  <div
-                    className="w-full bg-primary/40"
-                    style={{ flexGrow: bucket.completion_tokens }}
-                  />
-                  <div
-                    className="w-full bg-primary"
-                    style={{ flexGrow: bucket.prompt_tokens }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div style={{ minWidth: `${width}px` }}>
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          className="h-52 w-full"
+          role="img"
+          aria-label="Grafik penggunaan token"
+        >
+          <defs>
+            <linearGradient id="token-prompt" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.05" />
+            </linearGradient>
+          </defs>
 
-        <div className="mt-2 flex gap-1.5">
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1={0}
+              x2={width}
+              y1={top + ratio * (height - top)}
+              y2={top + ratio * (height - top)}
+              stroke="var(--border)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+
+          <path d={completionArea} fill="var(--primary)" fillOpacity="0.18" />
+          <path d={promptArea} fill="url(#token-prompt)" />
+          <path
+            d={totalLine}
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+          />
+
+          {series.map((bucket, index) =>
+            bucket.total_tokens > 0 ? (
+              <circle
+                key={`dot-${bucket.key}`}
+                cx={x(index)}
+                cy={y(bucket.total_tokens)}
+                r={4}
+                fill="var(--card)"
+                stroke="var(--primary)"
+                strokeWidth={2}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null,
+          )}
+
+          {series.map((bucket, index) => (
+            <rect
+              key={bucket.key}
+              x={x(index) - step / 2}
+              y={0}
+              width={Math.max(step, 1)}
+              height={height}
+              fill="transparent"
+            >
+              <title>
+                {`${bucket.label} · ${numberFormat.format(bucket.total_tokens)} token · ${bucket.executions} eksekusi`}
+              </title>
+            </rect>
+          ))}
+        </svg>
+
+        <div className="mt-2 flex">
           {series.map((bucket) => (
             <div
               key={bucket.key}
@@ -446,27 +1073,85 @@ function TokenChart({ series }: { series: TokenUsageBucket[] }) {
   );
 }
 
-function FlowNode({
-  icon: Icon,
-  label,
-  accent,
+function StatusDonut({
+  summary,
+  rate,
 }: {
-  icon: typeof Zap;
-  label: string;
-  accent?: boolean;
+  summary: ActivityStats["summary"];
+  rate: number;
 }) {
+  const segments = (
+    [
+      { key: "success", value: summary.success, className: "text-emerald-400" },
+      { key: "failed", value: summary.failed, className: "text-destructive" },
+      { key: "waiting", value: summary.waiting, className: "text-amber-400" },
+      { key: "running", value: summary.running, className: "text-primary" },
+    ] as const
+  ).filter((segment) => segment.value > 0);
+
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
   return (
-    <span className="flex items-center gap-1.5">
-      <span
-        className={`flex size-7 items-center justify-center rounded-md border ${
-          accent
-            ? "border-primary/30 bg-primary/10 text-primary"
-            : "border-border bg-background text-muted-foreground"
-        }`}
-      >
-        <Icon size={14} />
-      </span>
-      <span className="text-xs font-medium text-muted-foreground">{label}      </span>
-    </span>
+    <div className="flex flex-col items-center gap-6">
+      <div className="relative size-40">
+        <svg viewBox="0 0 140 140" className="size-full -rotate-90">
+          <circle
+            cx="70"
+            cy="70"
+            r={radius}
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth="14"
+          />
+
+          {summary.total > 0 &&
+            segments.map((segment) => {
+              const length = (segment.value / summary.total) * circumference;
+              const dash = `${length} ${circumference - length}`;
+              const element = (
+                <circle
+                  key={segment.key}
+                  cx="70"
+                  cy="70"
+                  r={radius}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="14"
+                  strokeDasharray={dash}
+                  strokeDashoffset={-offset}
+                  className={segment.className}
+                />
+              );
+
+              offset += length;
+              return element;
+            })}
+        </svg>
+
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl font-semibold tracking-tight text-foreground">
+            {rate}%
+          </span>
+          <span className="text-xs text-muted-foreground">berhasil</span>
+        </div>
+      </div>
+
+      <ul className="w-full space-y-2">
+        {(["success", "failed", "waiting", "running"] as const).map((key) => {
+          const meta = STATUS_META[key];
+          return (
+            <li key={key} className="flex items-center gap-3 text-sm">
+              <span className={`size-2.5 rounded-full ${meta.dot}`} />
+              <span className="flex-1 text-muted-foreground">{meta.label}</span>
+              <span className="font-medium text-foreground">
+                {summary[key]}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

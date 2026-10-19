@@ -222,7 +222,7 @@ export default function App() {
       >
         {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
-        <Dashboard />
+        <Dashboard health={health} onViewActivity={() => goTo("activity")} />
       </DashboardLayout>
     );
   }
