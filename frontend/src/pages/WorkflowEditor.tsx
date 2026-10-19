@@ -13,14 +13,15 @@ import {
   applyNodeChanges,
   Background,
   Controls,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   Handle,
   MiniMap,
-  MarkerType,
-  NodeToolbar,
   Position,
   ReactFlow,
   type Connection,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeChange,
   type NodeProps,
@@ -199,134 +200,232 @@ const initialEdges: Edge[] = [
     id: "edge-1",
     source: "trigger-1",
     target: "ai-1",
-    animated: true,
+    type: "flow",
   },
   {
     id: "edge-2",
     source: "ai-1",
     target: "message-1",
-    animated: true,
+    type: "flow",
   },
 ];
 
+const NODE_ICONS: Record<NodeKind, typeof Zap> = {
+  Trigger: Zap,
+  "AI Agent": Bot,
+  "Send Message": MessageSquare,
+  Condition: GitBranch,
+  Stopper: CircleStop,
+};
+
+const NODE_TONES: Record<NodeKind, { tile: string }> = {
+  Trigger: { tile: "bg-amber-400/15 text-amber-300" },
+  "AI Agent": { tile: "bg-violet-400/15 text-violet-300" },
+  "Send Message": { tile: "bg-primary/15 text-primary" },
+  Condition: { tile: "bg-orange-400/15 text-orange-300" },
+  Stopper: { tile: "bg-rose-400/15 text-rose-300" },
+};
+
+function nodeSubtitle(data: AutomationNodeData): string {
+  switch (data.label) {
+    case "Trigger":
+      return "Starts from an incoming message";
+    case "AI Agent":
+      return [data.provider ? "Gemini" : null, data.model]
+        .filter(Boolean)
+        .join(" · ");
+    case "Send Message":
+      return data.messageMode === "smart_value"
+        ? "Smart value reply"
+        : "Template reply";
+    case "Condition": {
+      const rule = [
+        data.conditionVariable,
+        data.conditionOperator,
+        data.conditionValue,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return rule || "No rule configured";
+    }
+    case "Stopper":
+      return "Waits for the next message";
+    default:
+      return "";
+  }
+}
+
 function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
   const deleteNode = useContext(NodeActionsContext);
-  const iconMap = {
-    Trigger: Zap,
-    "AI Agent": Bot,
-    "Send Message": MessageSquare,
-    Condition: GitBranch,
-    Stopper: CircleStop,
-  };
-
-  const Icon = iconMap[data.label] ?? WorkflowIcon;
+  const Icon = NODE_ICONS[data.label] ?? WorkflowIcon;
+  const tone = NODE_TONES[data.label] ?? NODE_TONES["Send Message"];
   const isCondition = data.label === "Condition";
   const isStopper = data.label === "Stopper";
 
   return (
     <div
-      title={data.description}
-      className={`relative min-w-[248px] rounded-xl border bg-border shadow-xl shadow-black/25 transition ${
+      className={`group relative w-[252px] rounded-2xl border bg-card shadow-lg shadow-black/20 transition ${
         selected
-          ? "border-primary/80 ring-2 ring-primary/20 shadow-primary/20"
-          : "border-input hover:border-ring/40"
+          ? "border-primary/70 ring-2 ring-primary/20"
+          : "border-border hover:border-ring/40"
       }`}
     >
-      <NodeToolbar isVisible={selected} position={Position.Top} className="!flex !items-center !rounded-lg !border !border-border !bg-[#17191f] !p-1 !shadow-xl">
-        <button
-          type="button"
-          aria-label={`Delete ${data.nodeName || data.label}`}
-          title="Delete node"
-          onClick={(event) => {
-            event.stopPropagation();
-            deleteNode?.(id);
-          }}
-          className="flex size-8 items-center justify-center rounded-md text-destructive transition hover:bg-destructive/15 hover:text-destructive"
-        >
-          <Trash2 size={15} />
-        </button>
-      </NodeToolbar>
+      <button
+        type="button"
+        aria-label={`Delete ${data.nodeName || data.label}`}
+        title="Delete node"
+        onClick={(event) => {
+          event.stopPropagation();
+          deleteNode?.(id);
+        }}
+        className={`nodrag absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive ${
+          selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        }`}
+      >
+        <Trash2 size={14} />
+      </button>
+
       <Handle
         type="target"
         position={Position.Top}
-        className="!size-3.5 !border-2 !border-background !bg-primary"
+        className="!size-3 !rounded-full !border-2 !border-background !bg-muted-foreground/70"
       />
 
-      <div className="flex items-center gap-3 p-3.5">
+      <div className="flex items-center gap-3 p-3.5 pr-9">
         <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
-            data.label === "Trigger"
-              ? "bg-amber-400/10 text-amber-300"
-              : data.label === "AI Agent"
-                ? "bg-violet-400/10 text-violet-300"
-                : data.label === "Condition"
-                  ? "bg-orange-400/10 text-orange-300"
-                  : data.label === "Stopper"
-                    ? "bg-rose-400/10 text-rose-300"
-                    : "bg-primary/10 text-primary"
-          }`}
+          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${tone.tile}`}
         >
           <Icon size={19} />
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{data.label}</p>
-          <p className="mt-1 max-w-[180px] truncate text-sm font-semibold text-foreground" title={data.nodeName || data.label}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {data.label}
+          </p>
+          <p
+            className="mt-1 truncate text-sm font-semibold text-foreground"
+            title={data.nodeName || data.label}
+          >
             {data.nodeName || data.label}
           </p>
         </div>
       </div>
 
+      <div className="border-t border-border/70 px-3.5 py-2">
+        <p className="truncate text-[11px] text-muted-foreground" title={nodeSubtitle(data)}>
+          {nodeSubtitle(data)}
+        </p>
+      </div>
+
       {isCondition ? (
         <>
-          <div className="border-t border-border px-3.5 py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Condition branches
-            </p>
-          </div>
-
-          <div className="relative flex justify-between border-t border-border px-3.5 py-2.5">
-            <span className="text-xs font-medium text-emerald-300">True →</span>
-            <span className="text-xs font-medium text-destructive">False ↓</span>
-            <Handle
-              id="true"
-              type="source"
-              position={Position.Right}
-              style={{ top: "35%", background: "#34d399" }}
-              className="!size-3 !border-2 !border-background"
-            />
-            <Handle
-              id="false"
-              type="source"
-              position={Position.Bottom}
-              style={{ left: "50%", background: "#f87171" }}
-              className="!size-3 !border-2 !border-background"
-            />
-          </div>
-        </>
-      ) : isStopper ? (
-        <>
-          <div className="border-t border-border px-3.5 py-2.5">
-            <span className="text-xs font-medium text-rose-300">Waits for next message</span>
-          </div>
           <Handle
+            id="true"
+            type="source"
+            position={Position.Right}
+            style={{ top: "50%", background: "#34d399" }}
+            className="!size-3 !rounded-full !border-2 !border-background"
+          />
+          <Handle
+            id="false"
             type="source"
             position={Position.Bottom}
-            className="!size-3 !border-2 !border-background !bg-rose-400"
+            style={{ left: "50%", background: "#fb7185" }}
+            className="!size-3 !rounded-full !border-2 !border-background"
           />
         </>
+      ) : isStopper ? (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!size-3 !rounded-full !border-2 !border-background !bg-rose-400"
+        />
       ) : (
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!size-3 !border-2 !border-background !bg-primary"
+          className="!size-3 !rounded-full !border-2 !border-background !bg-primary"
         />
       )}
     </div>
   );
 }
 
+const EDGE_CHIPS: Record<string, string> = {
+  true: "border-emerald-400/40 bg-card text-emerald-300",
+  false: "border-rose-400/40 bg-card text-rose-300",
+};
+
+const EDGE_LABELS: Record<string, string> = {
+  true: "True",
+  false: "False",
+};
+
+function FlowEdge({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  sourceHandleId,
+}: EdgeProps) {
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 18,
+  });
+
+  const branch = sourceHandleId ?? "";
+  const stroke =
+    branch === "true"
+      ? "#34d399"
+      : branch === "false"
+        ? "#fb7185"
+        : "var(--primary)";
+  const label = EDGE_LABELS[branch];
+
+  return (
+    <>
+      <path
+        d={path}
+        fill="none"
+        style={{ stroke }}
+        strokeWidth={6}
+        strokeLinecap="round"
+        opacity={0.12}
+      />
+      <path
+        d={path}
+        fill="none"
+        style={{ stroke }}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeDasharray="7 9"
+        className="flow-edge-dash"
+      />
+      {label && (
+        <EdgeLabelRenderer>
+          <span
+            className={`absolute rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur ${EDGE_CHIPS[branch]}`}
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 13}px)`,
+            }}
+          >
+            {label}
+          </span>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
 const nodeTypes = { automation: AutomationNode };
+const edgeTypes = { flow: FlowEdge };
 
 type AgentVariable = {
   name: string;
@@ -540,9 +639,13 @@ export default function WorkflowEditor({
             })) as FlowNode[]
           : initialNodes;
         const loadedEdges = (definition?.edges ?? initialEdges).map((edge, index) => ({
-            ...edge,
-            id: edge.id ?? `edge-${index}`,
-          }));
+          id: edge.id ?? `edge-${index}`,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle ?? null,
+          type: "flow",
+          animated: false,
+        }));
 
         setNodes(loadedNodes);
         setEdges(loadedEdges);
@@ -633,10 +736,8 @@ export default function WorkflowEditor({
       addEdge(
         {
           ...connection,
-          animated: true,
-          type: "smoothstep",
-          markerEnd: { type: MarkerType.ArrowClosed, color: "#8794a8" },
-          style: { stroke: "#8794a8", strokeWidth: 2 },
+          type: "flow",
+          animated: false,
         },
         current,
       ),
@@ -886,10 +987,10 @@ export default function WorkflowEditor({
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             defaultEdgeOptions={{
-              type: "step",
+              type: "flow",
               animated: false,
-              style: { stroke: "#38bdf8", strokeWidth: 1.8 },
             }}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}

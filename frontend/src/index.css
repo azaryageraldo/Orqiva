@@ -128,3 +128,13 @@
     @apply font-sans;
     }
 }
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
+.flow-edge-dash {
+  animation: flow-dash 1.15s linear infinite;
+}
