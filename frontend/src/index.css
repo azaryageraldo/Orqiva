@@ -109,17 +109,6 @@
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .animate-flow-x,
-    .animate-flow-x-slow,
-    .animate-float,
-    .animate-pulse-ring,
-    .animate-rise,
-    .animate-sheen {
-        animation: none;
-    }
-}
-
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
