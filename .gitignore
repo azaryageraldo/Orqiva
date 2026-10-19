@@ -15,6 +15,12 @@
 /backend/storage/*.key
 /backend/storage/logs/*.log
 /backend/bootstrap/cache/*.php
+/backend/storage/framework/cache/data/*
+!/backend/storage/framework/cache/data/.gitkeep
+/backend/storage/framework/sessions/*
+!/backend/storage/framework/sessions/.gitkeep
+/backend/storage/framework/testing/*
+/backend/.phpunit.result.cache
 
 # Local tooling
 .DS_Store

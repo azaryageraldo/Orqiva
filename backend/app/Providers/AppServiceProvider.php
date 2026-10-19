@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Workflow;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,6 +15,19 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Configure application behavior here.
+        /*
+         * Batasi resolusi route model workflow pada pemiliknya agar
+         * workflow milik pengguna lain menghasilkan 404.
+         */
+        Route::bind('workflow', function (string $value) {
+            $user = auth()->user();
+
+            return Workflow::query()
+                ->when(
+                    $user !== null,
+                    fn ($query) => $query->where('user_id', $user->id)
+                )
+                ->findOrFail($value);
+        });
     }
 }

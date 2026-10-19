@@ -26,6 +26,10 @@ class UsageStatsController extends Controller
         $start = $this->bucketStart($period, $series[0]['key'] ?? null);
 
         $rows = WorkflowExecution::query()
+            ->whereHas(
+                'workflow',
+                fn ($query) => $query->where('user_id', $request->user()->id)
+            )
             ->where('created_at', '>=', $start)
             ->get(['created_at', 'prompt_tokens', 'completion_tokens', 'total_tokens']);
 
@@ -72,12 +76,18 @@ class UsageStatsController extends Controller
         $limit = (int) $request->query('limit', 20);
         $limit = max(1, min($limit, 50));
 
+        $userId = $request->user()->id;
+
+        $owned = fn ($query) => $query->where('user_id', $userId);
+
         $summary = WorkflowExecution::query()
+            ->whereHas('workflow', $owned)
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
 
         $executions = WorkflowExecution::query()
+            ->whereHas('workflow', $owned)
             ->with('workflow:id,name')
             ->latest()
             ->limit($limit)
@@ -96,7 +106,9 @@ class UsageStatsController extends Controller
         return response()->json([
             'data' => [
                 'summary' => [
-                    'total' => WorkflowExecution::count(),
+                    'total' => WorkflowExecution::query()
+                        ->whereHas('workflow', $owned)
+                        ->count(),
                     'success' => (int) ($summary['success'] ?? 0),
                     'failed' => (int) ($summary['failed'] ?? 0),
                     'waiting' => (int) ($summary['waiting'] ?? 0),

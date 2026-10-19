@@ -5,14 +5,24 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Workflow;
 use App\Models\WorkflowExecution;
+use App\Services\GeminiService;
+use App\Services\Workflows\ConditionRule;
+use App\Services\Workflows\WorkflowContext;
+use App\Services\Workflows\WorkflowGraphValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Services\GeminiService;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
 
 class WorkflowExecutionController extends Controller
 {
+    public function __construct(
+        private readonly WorkflowGraphValidator $graphValidator,
+        private readonly ConditionRule $conditionRule,
+        private readonly WorkflowContext $context
+    ) {}
+
     public function index(Workflow $workflow): JsonResponse
     {
         return response()->json([
@@ -32,31 +42,76 @@ class WorkflowExecutionController extends Controller
 
         $input = $validated['input'] ?? [];
         $conversationId = $input['conversation_id'] ?? null;
-        $execution = null;
 
-        if (is_string($conversationId) && $conversationId !== '') {
-            $execution = $workflow->executions()
-                ->where('status', 'waiting')
-                ->latest()
-                ->get()
-                ->first(fn (WorkflowExecution $candidate) =>
-                    data_get($candidate->input, 'conversation_id') === $conversationId
-                );
-        }
+        $tokens = [
+            'prompt_tokens' => 0,
+            'completion_tokens' => 0,
+            'total_tokens' => 0,
+        ];
 
         $resumeNodeId = null;
         $resumeContext = null;
+        $claimed = null;
 
-        if ($execution) {
-            $resumeNodeId = $execution->current_node_id;
-            $resumeContext = array_replace($execution->context ?? [], $input);
-            $input = array_replace($execution->input ?? [], $input);
-            $logs = $execution->logs ?? [];
-            $execution->update([
-                'status' => 'running',
-                'input' => $input,
-                'waiting_since' => null,
-            ]);
+        /*
+         * Klaim eksekusi yang menunggu pesan berikutnya di dalam
+         * transaksi agar dua pesan bersamaan tidak menjalankan node
+         * yang sama dua kali.
+         */
+        if (is_string($conversationId) && $conversationId !== '') {
+            $claimed = DB::transaction(function () use (
+                $workflow,
+                $conversationId,
+                $input,
+                &$tokens
+            ): ?array {
+                $execution = $workflow->executions()
+                    ->where('status', 'waiting')
+                    ->latest()
+                    ->lockForUpdate()
+                    ->get()
+                    ->first(fn (WorkflowExecution $candidate) => data_get($candidate->input, 'conversation_id')
+                            === $conversationId
+                    );
+
+                if ($execution === null) {
+                    return null;
+                }
+
+                $tokens = [
+                    'prompt_tokens' => (int) ($execution->prompt_tokens ?? 0),
+                    'completion_tokens' => (int) ($execution->completion_tokens ?? 0),
+                    'total_tokens' => (int) ($execution->total_tokens ?? 0),
+                ];
+
+                $input = array_replace($execution->input ?? [], $input);
+                $logs = $execution->logs ?? [];
+
+                $execution->update([
+                    'status' => 'running',
+                    'input' => $input,
+                    'waiting_since' => null,
+                ]);
+
+                return [
+                    'execution' => $execution,
+                    'input' => $input,
+                    'logs' => $logs,
+                    'resume_node_id' => $execution->current_node_id,
+                    'resume_context' => array_replace(
+                        $execution->context ?? [],
+                        $input
+                    ),
+                ];
+            });
+        }
+
+        if ($claimed !== null) {
+            $execution = $claimed['execution'];
+            $input = $claimed['input'];
+            $logs = $claimed['logs'];
+            $resumeNodeId = $claimed['resume_node_id'];
+            $resumeContext = $claimed['resume_context'];
         } else {
             $logs = [];
             $execution = WorkflowExecution::create([
@@ -84,11 +139,10 @@ class WorkflowExecutionController extends Controller
                 $edges,
                 $input,
                 $logs,
+                $tokens,
                 $resumeNodeId,
                 $resumeContext
             );
-
-            $tokens = $result['tokens'] ?? [];
 
             if ($result['paused'] ?? false) {
                 $execution->update([
@@ -99,9 +153,9 @@ class WorkflowExecutionController extends Controller
                     'current_node_id' => $result['resume_node_id'],
                     'waiting_since' => now(),
                     'finished_at' => null,
-                    'prompt_tokens' => $tokens['prompt_tokens'] ?? null,
-                    'completion_tokens' => $tokens['completion_tokens'] ?? null,
-                    'total_tokens' => $tokens['total_tokens'] ?? null,
+                    'prompt_tokens' => $tokens['prompt_tokens'],
+                    'completion_tokens' => $tokens['completion_tokens'],
+                    'total_tokens' => $tokens['total_tokens'],
                 ]);
             } else {
                 $execution->update([
@@ -112,9 +166,9 @@ class WorkflowExecutionController extends Controller
                     'current_node_id' => null,
                     'waiting_since' => null,
                     'finished_at' => now(),
-                    'prompt_tokens' => $tokens['prompt_tokens'] ?? null,
-                    'completion_tokens' => $tokens['completion_tokens'] ?? null,
-                    'total_tokens' => $tokens['total_tokens'] ?? null,
+                    'prompt_tokens' => $tokens['prompt_tokens'],
+                    'completion_tokens' => $tokens['completion_tokens'],
+                    'total_tokens' => $tokens['total_tokens'],
                 ]);
             }
 
@@ -136,6 +190,9 @@ class WorkflowExecutionController extends Controller
                 'error' => $exception->getMessage(),
                 'logs' => $logs,
                 'finished_at' => now(),
+                'prompt_tokens' => $tokens['prompt_tokens'],
+                'completion_tokens' => $tokens['completion_tokens'],
+                'total_tokens' => $tokens['total_tokens'],
             ]);
 
             return response()->json([
@@ -145,376 +202,89 @@ class WorkflowExecutionController extends Controller
         }
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $logs
+     * @param  array{prompt_tokens: int, completion_tokens: int, total_tokens: int}  $tokens
+     * @return array<string, mixed>
+     */
     private function runWorkflow(
         array $nodes,
         array $edges,
         array $input,
         array &$logs,
+        array &$tokens,
         ?string $resumeNodeId = null,
         ?array $resumeContext = null
     ): array {
-        if (count($nodes) < 2) {
-            throw new RuntimeException(
-                'Workflow minimal memiliki Trigger dan node tujuan.'
-            );
-        }
-
-        /*
-         * 1. Normalisasi tipe node dari frontend.
-         */
-        $typeMap = [
-            'Trigger' => 'trigger',
-            'AI Agent' => 'ai_agent',
-            'Send Message' => 'output',
-            'Condition' => 'if_else',
-            'Stopper' => 'stopper',
-
-            // Kompatibilitas dengan format lama.
-            'trigger' => 'trigger',
-            'ai_agent' => 'ai_agent',
-            'output' => 'output',
-            'if_else' => 'if_else',
-            'stopper' => 'stopper',
-        ];
-
-        $nodeMap = [];
-
-        foreach ($nodes as $node) {
-            if (
-                ! is_array($node)
-                || ! isset($node['id'], $node['type'])
-                || ! is_string($node['id'])
-                || $node['id'] === ''
-                || ! is_string($node['type'])
-                || $node['type'] === ''
-            ) {
-                throw new RuntimeException(
-                    'Node harus memiliki ID dan tipe yang valid.'
-                );
-            }
-
-            if (isset($nodeMap[$node['id']])) {
-                throw new RuntimeException(
-                    'ID node duplikat: ' . $node['id']
-                );
-            }
-
-            $rawType = $node['type'];
-            $type = $typeMap[$rawType] ?? null;
-
-            if ($type === null) {
-                throw new RuntimeException(
-                    'Tipe node belum didukung: ' . $rawType
-                );
-            }
-
-            $node['type'] = $type;
-
-            if (
-                isset($node['data'])
-                && ! is_array($node['data'])
-            ) {
-                throw new RuntimeException(
-                    'Data node harus berupa object atau array.'
-                );
-            }
-
-            $nodeMap[$node['id']] = $node;
-        }
-
-        if ($resumeNodeId !== null && ! isset($nodeMap[$resumeNodeId])) {
-            throw new RuntimeException(
-                'Node lanjutan tidak ditemukan. Workflow mungkin telah diubah saat menunggu pesan.'
-            );
-        }
-
-        $triggers = array_filter(
-            $nodeMap,
-            fn (array $node) => $node['type'] === 'trigger'
+        $graph = $this->graphValidator->validate(
+            $nodes,
+            $edges,
+            $resumeNodeId
         );
 
-        $outputs = array_filter(
-            $nodeMap,
-            fn (array $node) => $node['type'] === 'output'
-        );
-
-        $stoppers = array_filter(
-            $nodeMap,
-            fn (array $node) => $node['type'] === 'stopper'
-        );
-
-        if (count($triggers) !== 1) {
-            throw new RuntimeException(
-                'Workflow harus memiliki tepat satu Trigger.'
-            );
-        }
-
-        if (count($outputs) < 1) {
-            throw new RuntimeException(
-                'Workflow harus memiliki minimal satu Send Message.'
-            );
-        }
+        $nodeMap = $graph['nodes'];
+        $next = $graph['next'];
+        $triggerId = $graph['trigger_id'];
 
         /*
-         * 2. Validasi koneksi antarnode.
+         * Eksekusi satu jalur workflow.
+         *
+         * AI Agent menggunakan Gemini untuk menghasilkan jawaban.
+         * Send Message membentuk output lokal, bukan mengirim pesan
+         * ke layanan eksternal.
          */
-        $next = [];
-        $incoming = [];
-        $adjacency = [];
+        $currentId = $resumeNodeId ?? $triggerId;
+        $visited = [];
+        $context = $resumeContext ?? $input;
+        $context = array_replace($context, $input);
+        $messageOutput = null;
+        $stoppedAtStopper = false;
+        $resumeAtNodeId = null;
 
-        foreach ($edges as $edge) {
-            if (
-                ! is_array($edge)
-                || ! isset($edge['source'], $edge['target'])
-                || ! is_string($edge['source'])
-                || ! is_string($edge['target'])
-            ) {
-                throw new RuntimeException(
-                    'Koneksi harus memiliki source dan target.'
-                );
-            }
-
-            $source = $edge['source'];
-            $target = $edge['target'];
-            $handle = $edge['sourceHandle'] ?? null;
-
-            if (
-                ! isset($nodeMap[$source], $nodeMap[$target])
-                || $source === $target
-            ) {
-                throw new RuntimeException(
-                    'Koneksi mengarah ke node yang tidak valid.'
-                );
-            }
-
-            $sourceType = $nodeMap[$source]['type'];
-
-            if ($sourceType === 'output') {
-                throw new RuntimeException(
-                    'Node Send Message tidak boleh memiliki koneksi keluar.'
-                );
-            }
-
-            if ($sourceType === 'if_else') {
-                if (! in_array($handle, ['true', 'false'], true)) {
-                    throw new RuntimeException(
-                        'Koneksi Condition harus memiliki sourceHandle true atau false.'
-                    );
-                }
-            } elseif ($handle !== null) {
-                throw new RuntimeException(
-                    'sourceHandle hanya didukung pada node Condition.'
-                );
-            }
-
-            $key = $source . ':' . ($handle ?? 'default');
-
-            if (isset($next[$key])) {
-                throw new RuntimeException(
-                    'Terdapat beberapa koneksi pada jalur yang sama.'
-                );
-            }
-
-            if (isset($incoming[$target])) {
-                throw new RuntimeException(
-                    'Beberapa koneksi menuju satu node belum didukung.'
-                );
-            }
-
-            $next[$key] = $target;
-            $incoming[$target] = true;
-            $adjacency[$source][] = $target;
-        }
-
-        $triggerId = array_key_first($triggers);
-
-        if (isset($incoming[$triggerId])) {
-            throw new RuntimeException(
-                'Trigger tidak boleh memiliki koneksi masuk.'
-            );
-        }
-
-        /*
-         * 3. Validasi konfigurasi setiap node.
-         */
-        foreach ($nodeMap as $nodeId => $node) {
-            $type = $node['type'];
+        // Petakan variableDefinitions dari seluruh node ke context runtime.
+        foreach ($nodeMap as $node) {
             $data = $node['data'] ?? [];
+            $definitions = $data['variableDefinitions'] ?? [];
 
-            if ($type === 'trigger') {
-                if (! isset($next[$nodeId . ':default'])) {
-                    throw new RuntimeException(
-                        'Trigger harus memiliki koneksi keluar.'
-                    );
-                }
+            if (! is_array($definitions)) {
+                continue;
             }
 
-            if ($type === 'if_else') {
+            foreach ($definitions as $definition) {
+                if (! is_array($definition)) {
+                    continue;
+                }
+
+                $name = $definition['name'] ?? null;
+                $sourceValue = $definition['sourceValue'] ?? null;
+
                 if (
-                    ! isset($next[$nodeId . ':true'])
-                    || ! isset($next[$nodeId . ':false'])
+                    ! is_string($name)
+                    || trim($name) === ''
+                    || ! is_string($sourceValue)
+                    || trim($sourceValue) === ''
                 ) {
-                    throw new RuntimeException(
-                        'Condition harus memiliki koneksi true dan false.'
-                    );
+                    continue;
                 }
 
-                $condition = $this->getConditionConfig($data);
+                $name = trim($name);
+                $sourceValue = trim($sourceValue);
 
-                if ($condition === null) {
-                    throw new RuntimeException(
-                        'Konfigurasi Condition tidak valid.'
-                    );
+                // Input sudah berada langsung di dalam context.
+                if ($sourceValue === 'input') {
+                    $context[$name] = $context;
+
+                    continue;
                 }
-            }
 
-            if ($type === 'ai_agent') {
-                if (
-                    ! isset($next[$nodeId . ':default'])
-                ) {
-                    throw new RuntimeException(
-                        'AI Agent harus memiliki koneksi keluar.'
-                    );
+                // Ubah input.message menjadi message.
+                if (str_starts_with($sourceValue, 'input.')) {
+                    $sourceValue = substr($sourceValue, strlen('input.'));
                 }
-            }
 
-            if ($type === 'stopper' && ! isset($next[$nodeId . ':default'])) {
-                throw new RuntimeException(
-                    'Stopper harus terhubung ke node yang akan dijalankan setelah pesan berikutnya.'
-                );
+                $context[$name] = $this->context->value($context, $sourceValue);
             }
         }
-
-        /*
-         * 4. Pastikan semua node dapat dicapai dari Trigger.
-         */
-        $reachable = $this->findReachableNodes(
-            $triggerId,
-            $next
-        );
-
-        foreach (array_keys($nodeMap) as $nodeId) {
-            if (! in_array($nodeId, $reachable, true)) {
-                throw new RuntimeException(
-                    'Workflow memiliki node yang tidak terhubung ke Trigger: '
-                    . $nodeId
-                );
-            }
-        }
-
-        /*
-         * 5. Deteksi siklus sebelum menjalankan workflow.
-         */
-        $indegree = array_fill_keys(
-            array_keys($nodeMap),
-            0
-        );
-
-        foreach ($adjacency as $targets) {
-            foreach ($targets as $target) {
-                $indegree[$target]++;
-            }
-        }
-
-        $queue = [];
-
-        foreach ($indegree as $nodeId => $degree) {
-            if ($degree === 0) {
-                $queue[] = $nodeId;
-            }
-        }
-
-        $processed = 0;
-
-        while ($queue !== []) {
-            $current = array_shift($queue);
-            $processed++;
-
-            foreach ($adjacency[$current] ?? [] as $target) {
-                $indegree[$target]--;
-
-                if ($indegree[$target] === 0) {
-                    $queue[] = $target;
-                }
-            }
-        }
-
-        if ($processed !== count($nodeMap)) {
-            throw new RuntimeException(
-                'Siklus terdeteksi pada workflow.'
-            );
-        }
-
-        /*
- * 6. Eksekusi satu jalur workflow.
- *
- * AI Agent menggunakan Gemini untuk menghasilkan jawaban.
- * Send Message membentuk output lokal, bukan mengirim
- * pesan ke layanan eksternal.
- */
-$currentId = $resumeNodeId ?? $triggerId;
-$visited = [];
-$context = $resumeContext ?? $input;
-$context = array_replace($context, $input);
-$messageOutput = null;
-$stoppedAtStopper = false;
-$resumeAtNodeId = null;
-$promptTokens = 0;
-$completionTokens = 0;
-$totalTokens = 0;
-
-
-// Petakan variableDefinitions dari seluruh node ke runtime context.
-foreach ($nodeMap as $node) {
-    $data = $node['data'] ?? [];
-    $definitions = $data['variableDefinitions'] ?? [];
-
-    if (! is_array($definitions)) {
-        continue;
-    }
-
-    foreach ($definitions as $definition) {
-        if (! is_array($definition)) {
-            continue;
-        }
-
-        $name = $definition['name'] ?? null;
-        $sourceValue = $definition['sourceValue'] ?? null;
-
-        if (
-            ! is_string($name)
-            || trim($name) === ''
-            || ! is_string($sourceValue)
-            || trim($sourceValue) === ''
-        ) {
-            continue;
-        }
-
-        $name = trim($name);
-        $sourceValue = trim($sourceValue);
-
-        // Input sudah berada langsung di dalam context.
-        if ($sourceValue === 'input') {
-            $context[$name] = $context;
-            continue;
-        }
-
-        // Ubah input.message menjadi message.
-        if (str_starts_with($sourceValue, 'input.')) {
-            $sourceValue = substr(
-                $sourceValue,
-                strlen('input.')
-            );
-        }
-
-        $context[$name] = $this->getInputValue(
-            $context,
-            $sourceValue
-        );
-    }
-}
-
-
 
         while (true) {
             if (isset($visited[$currentId])) {
@@ -533,79 +303,78 @@ foreach ($nodeMap as $node) {
 
             if ($type === 'trigger') {
                 $message = 'Workflow berhasil dimulai.';
+            } elseif ($type === 'ai_agent') {
+                $systemMessage = (string) (
+                    $data['systemMessage'] ?? 'You are a helpful assistant.'
+                );
 
-} elseif ($type === 'ai_agent') {
-    $systemMessage = (string) (
-        $data['systemMessage'] ?? 'You are a helpful assistant.'
-    );
+                $model = $data['model'] ?? config(
+                    'services.gemini.model',
+                    'gemini-2.5-flash'
+                );
 
-    $provider = $data['provider'] ?? 'gemini';
-    $model = $data['model'] ?? config(
-        'services.gemini.model',
-        'gemini-2.5-flash'
-    );
+                // Bentuk pesan pengguna dari context workflow.
+                $userMessage = $context['customer_message']
+                    ?? $context['message']
+                    ?? $context['input']['message']
+                    ?? '';
 
-    // Bentuk pesan pengguna dari context workflow.
-    $userMessage = $context['customer_message']
-        ?? $context['message']
-        ?? $context['input']['message']
-        ?? '';
+                if (! is_string($userMessage)) {
+                    $userMessage = json_encode(
+                        $userMessage,
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    ) ?: '';
+                }
 
-    if (! is_string($userMessage)) {
-        $userMessage = json_encode(
-            $userMessage,
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-        ) ?: '';
-    }
+                // Sertakan nama pelanggan jika tersedia.
+                $customerName = $context['customer_name'] ?? null;
 
-    // Sertakan nama pelanggan jika tersedia.
-    $customerName = $context['customer_name'] ?? null;
+                if (is_string($customerName) && trim($customerName) !== '') {
+                    $userMessage = "Nama pelanggan: {$customerName}\n\n"
+                        ."Pesan pelanggan: {$userMessage}";
+                }
 
-    if (is_string($customerName) && trim($customerName) !== '') {
-        $userMessage = "Nama pelanggan: {$customerName}\n\n"
-            . "Pesan pelanggan: {$userMessage}";
-    }
+                if (trim($userMessage) === '') {
+                    throw new RuntimeException(
+                        'Pesan pengguna kosong. Periksa input Trigger dan variableDefinitions.'
+                    );
+                }
 
-    if (trim($userMessage) === '') {
-        throw new RuntimeException(
-            'Pesan pengguna kosong. Periksa input Trigger dan variableDefinitions.'
-        );
-    }
+                $aiResult = app(GeminiService::class)->generate(
+                    $systemMessage,
+                    $userMessage,
+                    (float) ($data['temperature'] ?? 0.7),
+                    is_string($data['model'] ?? null) ? $data['model'] : null
+                );
 
-    $aiResult = app(GeminiService::class)->generate(
-        $systemMessage,
-        $userMessage,
-        (float) ($data['temperature'] ?? 0.7),
-        is_string($data['model'] ?? null) ? $data['model'] : null
-    );
+                $messageOutput = $aiResult['text'];
 
-    $messageOutput = $aiResult['text'];
+                $tokens['prompt_tokens'] += $aiResult['usage']['prompt_tokens'];
+                $tokens['completion_tokens'] += $aiResult['usage']['completion_tokens'];
+                $tokens['total_tokens'] += $aiResult['usage']['total_tokens'];
 
-    $promptTokens += $aiResult['usage']['prompt_tokens'];
-    $completionTokens += $aiResult['usage']['completion_tokens'];
-    $totalTokens += $aiResult['usage']['total_tokens'];
+                $context['ai_response'] = $messageOutput;
 
-    $context['ai_response'] = $messageOutput;
+                $message = 'AI Agent berhasil menghasilkan jawaban menggunakan Gemini.';
 
-    $message = 'AI Agent berhasil menghasilkan jawaban menggunakan Gemini.';
+                $logs[] = [
+                    'node_id' => $currentId,
+                    'node' => $type,
+                    'status' => 'success',
+                    'message' => $message,
+                    'provider' => 'gemini',
+                    'model' => $model,
+                    'prompt_tokens' => $aiResult['usage']['prompt_tokens'],
+                    'completion_tokens' => $aiResult['usage']['completion_tokens'],
+                    'total_tokens' => $aiResult['usage']['total_tokens'],
+                    'timestamp' => now()->toISOString(),
+                ];
 
-    $logs[] = [
-        'node_id' => $currentId,
-        'node' => $type,
-        'status' => 'success',
-        'message' => $message,
-        'provider' => 'gemini',
-        'model' => $model,
-        'prompt_tokens' => $aiResult['usage']['prompt_tokens'],
-        'completion_tokens' => $aiResult['usage']['completion_tokens'],
-        'total_tokens' => $aiResult['usage']['total_tokens'],
-        'timestamp' => now()->toISOString(),
-    ];
+                $currentId = $next[$currentId.':default'];
 
-    $currentId = $next[$currentId . ':default'];
-    continue;
-} elseif ($type === 'if_else') {
-                $condition = $this->getConditionConfig($data);
+                continue;
+            } elseif ($type === 'if_else') {
+                $condition = $this->conditionRule->fromData($data);
 
                 if ($condition === null) {
                     throw new RuntimeException(
@@ -613,7 +382,7 @@ foreach ($nodeMap as $node) {
                     );
                 }
 
-                $actual = $this->getInputValue(
+                $actual = $this->context->value(
                     $context,
                     $condition['field']
                 );
@@ -627,7 +396,7 @@ foreach ($nodeMap as $node) {
                     $expected = $expected === 'true';
                 }
 
-                $matched = $this->evaluateCondition(
+                $matched = $this->conditionRule->matches(
                     $actual,
                     $condition['operator'],
                     $expected
@@ -636,11 +405,11 @@ foreach ($nodeMap as $node) {
                 $handle = $matched ? 'true' : 'false';
 
                 $message = 'Condition menghasilkan jalur '
-                    . strtoupper($handle) . '.';
+                    .strtoupper($handle).'.';
             } elseif ($type === 'output') {
                 $template = $data['messageTemplate'] ?? '';
 
-                $messageOutput = $this->resolveTemplate(
+                $messageOutput = $this->context->render(
                     (string) $template,
                     $context
                 );
@@ -648,10 +417,10 @@ foreach ($nodeMap as $node) {
                 $context['message'] = $messageOutput;
 
                 $message = 'Send Message menghasilkan output lokal. '
-                    . 'Pesan belum dikirim ke layanan eksternal.';
+                    .'Pesan belum dikirim ke layanan eksternal.';
             } elseif ($type === 'stopper') {
                 $stoppedAtStopper = true;
-                $resumeAtNodeId = $next[$currentId . ':default'] ?? null;
+                $resumeAtNodeId = $next[$currentId.':default'] ?? null;
                 $message = 'Workflow menunggu pesan pelanggan berikutnya.';
             }
 
@@ -667,12 +436,12 @@ foreach ($nodeMap as $node) {
                 break;
             }
 
-            $key = $currentId . ':' . $handle;
+            $key = $currentId.':'.$handle;
 
             if (! isset($next[$key])) {
                 throw new RuntimeException(
                     'Koneksi berikutnya tidak ditemukan untuk node: '
-                    . $currentId
+                    .$currentId
                 );
             }
 
@@ -687,183 +456,7 @@ foreach ($nodeMap as $node) {
             'paused' => $stoppedAtStopper,
             'resume_node_id' => $resumeAtNodeId,
             'executed_nodes' => count($visited),
-            'tokens' => [
-                'prompt_tokens' => $promptTokens,
-                'completion_tokens' => $completionTokens,
-                'total_tokens' => $totalTokens,
-            ],
+            'tokens' => $tokens,
         ];
-    }
-
-    /**
-     * Mendukung format Condition frontend dan format lama.
-     */
-    private function getConditionConfig(array $data): ?array
-    {
-        if (isset($data['condition']) && is_array($data['condition'])) {
-            $condition = $data['condition'];
-
-            $field = $condition['field'] ?? null;
-            $operator = $condition['operator'] ?? null;
-            $value = $condition['value'] ?? null;
-        } else {
-            $field = $data['conditionVariable'] ?? null;
-            $operator = $data['conditionOperator'] ?? null;
-            $value = $data['conditionValue'] ?? null;
-        }
-
-        $allowedOperators = [
-            'equals',
-            'not_equals',
-            'contains',
-            'not_contains',
-            'is_empty',
-            'is_not_empty',
-        ];
-
-        if (
-            ! is_string($field)
-            || $field === ''
-            || ! is_string($operator)
-            || ! in_array($operator, $allowedOperators, true)
-        ) {
-            return null;
-        }
-
-        if (
-            ! in_array($operator, ['is_empty', 'is_not_empty'], true)
-            && ! is_scalar($value)
-            && $value !== null
-        ) {
-            return null;
-        }
-
-        return [
-            'field' => $field,
-            'operator' => $operator,
-            'value' => $value,
-        ];
-    }
-
-    /**
-     * Evaluasi operator Condition.
-     */
-    private function evaluateCondition(
-        mixed $actual,
-        string $operator,
-        mixed $expected
-    ): bool {
-        return match ($operator) {
-            'equals' => $actual === $expected,
-            'not_equals' => $actual !== $expected,
-
-            'contains' => is_string($actual)
-                && is_string($expected)
-                && str_contains($actual, $expected),
-
-            'not_contains' => ! (
-                is_string($actual)
-                && is_string($expected)
-                && str_contains($actual, $expected)
-            ),
-
-            'is_empty' => $actual === null
-                || $actual === ''
-                || $actual === [],
-
-            'is_not_empty' => ! (
-                $actual === null
-                || $actual === ''
-                || $actual === []
-            ),
-
-            default => false,
-        };
-    }
-
-    /**
-     * Mengambil nilai dari input/context menggunakan dot notation.
-     */
-    private function getInputValue(
-        array $input,
-        string $field
-    ): mixed {
-        $value = $input;
-
-        foreach (explode('.', $field) as $segment) {
-            if (
-                ! is_array($value)
-                || ! array_key_exists($segment, $value)
-            ) {
-                return null;
-            }
-
-            $value = $value[$segment];
-        }
-
-        return $value;
-    }
-
-    /**
-     * Mengganti placeholder seperti {{name}} atau {{user.name}}.
-     */
-    private function resolveTemplate(
-        string $template,
-        array $context
-    ): string {
-        return preg_replace_callback(
-            '/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/',
-            function (array $matches) use ($context): string {
-                $value = $this->getInputValue(
-                    $context,
-                    $matches[1]
-                );
-
-                if (
-                    is_string($value)
-                    || is_int($value)
-                    || is_float($value)
-                    || is_bool($value)
-                ) {
-                    return is_bool($value)
-                        ? ($value ? 'true' : 'false')
-                        : (string) $value;
-                }
-
-                return '';
-            },
-            $template
-        ) ?? $template;
-    }
-
-    /**
-     * Mencari seluruh node yang dapat dicapai dari node awal.
-     */
-    private function findReachableNodes(
-        string $start,
-        array $next
-    ): array {
-        $visited = [];
-        $stack = [$start];
-
-        while ($stack !== []) {
-            $current = array_pop($stack);
-
-            if (isset($visited[$current])) {
-                continue;
-            }
-
-            $visited[$current] = true;
-
-            foreach (['default', 'true', 'false'] as $handle) {
-                $key = $current . ':' . $handle;
-
-                if (isset($next[$key])) {
-                    $stack[] = $next[$key];
-                }
-            }
-        }
-
-        return array_keys($visited);
     }
 }
