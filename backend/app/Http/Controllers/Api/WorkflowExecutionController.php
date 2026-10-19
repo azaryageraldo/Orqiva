@@ -41,6 +41,56 @@ class WorkflowExecutionController extends Controller
         ]);
     }
 
+    public function show(
+        Workflow $workflow,
+        WorkflowExecution $execution
+    ): JsonResponse {
+        abort_unless($execution->workflow_id === $workflow->id, 404);
+
+        $execution->load('steps');
+
+        return response()->json([
+            'data' => [
+                'id' => $execution->id,
+                'workflow_id' => $execution->workflow_id,
+                'workflow_name' => $workflow->name,
+                'status' => $execution->status,
+                'input' => $execution->input,
+                'output' => $execution->output,
+                'logs' => $execution->logs,
+                'error' => $execution->error,
+                'context' => $execution->context,
+                'prompt_tokens' => (int) $execution->prompt_tokens,
+                'completion_tokens' => (int) $execution->completion_tokens,
+                'total_tokens' => (int) $execution->total_tokens,
+                'started_at' => $execution->started_at?->toISOString(),
+                'finished_at' => $execution->finished_at?->toISOString(),
+                'waiting_since' => $execution->waiting_since?->toISOString(),
+                'steps' => $execution->steps
+                    ->map(fn ($step) => [
+                        'id' => $step->id,
+                        'step' => $step->step,
+                        'node_id' => $step->node_id,
+                        'node_type' => $step->node_type,
+                        'node_name' => $step->node_name,
+                        'status' => $step->status,
+                        'input' => $step->input,
+                        'output' => $step->output,
+                        'variables' => $step->variables,
+                        'branch' => $step->branch,
+                        'messages' => $step->messages,
+                        'duration_ms' => $step->duration_ms,
+                        'prompt_tokens' => $step->prompt_tokens,
+                        'completion_tokens' => $step->completion_tokens,
+                        'total_tokens' => $step->total_tokens,
+                        'error' => $step->error,
+                        'executed_at' => $step->executed_at?->toISOString(),
+                    ])
+                    ->values(),
+            ],
+        ]);
+    }
+
     public function execute(
         Request $request,
         Workflow $workflow
@@ -152,6 +202,19 @@ class WorkflowExecutionController extends Controller
             ]);
         }
 
+        /*
+         * Nomor langkah dilanjutkan dari eksekusi sebelumnya agar audit
+         * tetap berurutan saat percakapan dilanjutkan.
+         */
+        $stepStart = max(
+            (int) $execution->steps()->max('step'),
+            count($logs)
+        );
+
+        $auditSteps = [];
+        $currentStep = null;
+        $stepsPersisted = false;
+
         try {
             $definition = $workflow->definition ?? [];
             $nodes = $definition['nodes'] ?? [];
@@ -170,7 +233,10 @@ class WorkflowExecutionController extends Controller
                 $logs,
                 $tokens,
                 $resumeNodeId,
-                $resumeContext
+                $resumeContext,
+                $stepStart,
+                $auditSteps,
+                $currentStep
             );
 
             $common = [
@@ -181,6 +247,9 @@ class WorkflowExecutionController extends Controller
                 'completion_tokens' => $tokens['completion_tokens'],
                 'total_tokens' => $tokens['total_tokens'],
             ];
+
+            $this->persistSteps($execution, $auditSteps);
+            $stepsPersisted = true;
 
             if ($result['escalated']) {
                 $execution->update($common + [
@@ -216,6 +285,22 @@ class WorkflowExecutionController extends Controller
                 'data' => $execution->fresh(),
             ]);
         } catch (Throwable $exception) {
+            if ($currentStep !== null) {
+                $auditSteps[] = $this->errorStep(
+                    $currentStep,
+                    $exception->getMessage()
+                );
+            }
+
+            if (! $stepsPersisted) {
+                try {
+                    $this->persistSteps($execution, $auditSteps);
+                    $stepsPersisted = true;
+                } catch (Throwable) {
+                    // Jangan menutupi error utama jika audit gagal ditulis.
+                }
+            }
+
             $logs[] = [
                 'status' => 'error',
                 'message' => $exception->getMessage(),
@@ -251,7 +336,10 @@ class WorkflowExecutionController extends Controller
         array &$logs,
         array &$tokens,
         ?string $resumeNodeId = null,
-        ?array $resumeContext = null
+        ?array $resumeContext = null,
+        int $stepStart = 0,
+        array &$auditSteps = [],
+        ?array &$currentStep = null
     ): array {
         $graph = $this->graphValidator->validate(
             $nodes,
@@ -328,6 +416,7 @@ class WorkflowExecutionController extends Controller
             }
 
             $steps++;
+            $stepNumber = $stepStart + $steps;
 
             if (! isset($nodeMap[$currentId])) {
                 throw new RuntimeException(
@@ -343,8 +432,31 @@ class WorkflowExecutionController extends Controller
             $message = '';
             $jumpTo = null;
             $logContext = [];
+            $stepInput = null;
+            $stepOutput = null;
+            $stepVariables = null;
+            $stepBranch = null;
+            $stepMessages = null;
+            $stepPromptTokens = 0;
+            $stepCompletionTokens = 0;
+            $stepTotalTokens = 0;
+
+            $currentStep = [
+                'step' => $stepNumber,
+                'node_id' => $currentId,
+                'node_type' => $type,
+                'node_name' => $this->nodeName($node),
+                'started_hrtime' => $startedAt,
+            ];
 
             if ($type === 'trigger') {
+                $stepInput = [
+                    'conversation_id' => $context['conversation_id'] ?? null,
+                    'customer_message' => $context['customer_message']
+                        ?? $context['message']
+                        ?? null,
+                ];
+                $stepOutput = ['node_id' => $currentId];
                 $message = 'Workflow dimulai dari Trigger.';
             } elseif ($type === 'ai_agent') {
                 $outputVariables = $this->agentVariables->normalize($data);
@@ -392,6 +504,17 @@ class WorkflowExecutionController extends Controller
                     );
                 }
 
+                $stepInput = [
+                    'system_message' => $systemMessage,
+                    'user_message' => $userMessage,
+                    'model' => $model,
+                    'temperature' => (float) ($data['temperature'] ?? 0.7),
+                ];
+
+                if ($currentStep !== null) {
+                    $currentStep['input'] = $stepInput;
+                }
+
                 $aiResult = app(GeminiService::class)->generate(
                     $systemMessage,
                     $userMessage,
@@ -400,9 +523,13 @@ class WorkflowExecutionController extends Controller
                     $schema
                 );
 
-                $tokens['prompt_tokens'] += $aiResult['usage']['prompt_tokens'];
-                $tokens['completion_tokens'] += $aiResult['usage']['completion_tokens'];
-                $tokens['total_tokens'] += $aiResult['usage']['total_tokens'];
+                $stepPromptTokens = (int) $aiResult['usage']['prompt_tokens'];
+                $stepCompletionTokens = (int) $aiResult['usage']['completion_tokens'];
+                $stepTotalTokens = (int) $aiResult['usage']['total_tokens'];
+
+                $tokens['prompt_tokens'] += $stepPromptTokens;
+                $tokens['completion_tokens'] += $stepCompletionTokens;
+                $tokens['total_tokens'] += $stepTotalTokens;
 
                 if ($schema !== null) {
                     $json = trim($aiResult['text']);
@@ -457,8 +584,15 @@ class WorkflowExecutionController extends Controller
 
                     $context['ai_response'] = $aiText;
                     $logContext['variables'] = $values;
+                    $stepVariables = $values;
+                    $stepOutput = [
+                        'text' => $aiText,
+                        'raw_text' => $aiResult['text'],
+                        'ai_response' => $aiText,
+                    ];
                 } else {
                     $context['ai_response'] = $aiResult['text'];
+                    $stepOutput = ['text' => $aiResult['text']];
                 }
 
                 $message = 'AI Agent berhasil menghasilkan jawaban.';
@@ -481,6 +615,10 @@ class WorkflowExecutionController extends Controller
                     ? 'true'
                     : 'false';
 
+                $stepInput = ['variable' => $field, 'value' => $actual];
+                $stepOutput = ['branch' => $handle];
+                $stepBranch = $handle;
+
                 $message = 'Condition {{'.$field.'}} → '
                     .($handle === 'true' ? 'If match.' : 'Else.');
 
@@ -488,6 +626,14 @@ class WorkflowExecutionController extends Controller
                 $logContext['value'] = $actual;
                 $logContext['branch'] = $handle;
             } elseif ($type === 'output') {
+                $stepInput = [
+                    'template' => (string) ($data['messageTemplate'] ?? ''),
+                ];
+
+                if ($currentStep !== null) {
+                    $currentStep['input'] = $stepInput;
+                }
+
                 $messages = $this->messageRenderer->render(
                     (string) ($data['messageTemplate'] ?? ''),
                     $context
@@ -509,10 +655,13 @@ class WorkflowExecutionController extends Controller
                     : 'Send Message menghasilkan 1 bubble.';
 
                 $logContext['messages'] = $messages;
+                $stepOutput = ['messages' => $messages];
+                $stepMessages = $messages;
             } elseif ($type === 'relocate') {
                 $escalated = true;
                 $message = 'Percakapan dialihkan ke admin. AI tidak membalas.';
                 $logContext['escalated'] = true;
+                $stepOutput = ['escalated' => true];
             } elseif ($type === 'go_to') {
                 $jumpTo = (string) ($data['targetNodeId'] ?? '');
                 $endFlow = (bool) ($data['endFlow'] ?? false);
@@ -521,29 +670,62 @@ class WorkflowExecutionController extends Controller
 
                 $logContext['target_node_id'] = $jumpTo;
                 $logContext['end_flow'] = $endFlow;
+                $stepInput = [
+                    'target_node_id' => $jumpTo,
+                    'end_flow' => $endFlow,
+                ];
 
                 if ($endFlow) {
                     $paused = true;
                     $resumeAtNodeId = $jumpTo;
                     $message .= ' (End flow)';
                 }
+
+                $stepOutput = [
+                    'paused' => $paused && $endFlow,
+                    'resume_node_id' => $resumeAtNodeId,
+                ];
             } else {
                 $message = 'Workflow menunggu pesan pelanggan berikutnya.';
                 $paused = true;
                 $resumeAtNodeId = $next[$currentId.':default'] ?? null;
+                $stepOutput = ['resume_node_id' => $resumeAtNodeId];
             }
 
+            $durationMs = (int) round(
+                (hrtime(true) - $startedAt) / 1_000_000
+            );
+
+            $auditSteps[] = [
+                'step' => $stepNumber,
+                'node_id' => $currentId,
+                'node_type' => $type,
+                'node_name' => $this->nodeName($node),
+                'status' => 'success',
+                'input' => $stepInput,
+                'output' => $stepOutput,
+                'variables' => $stepVariables,
+                'branch' => $stepBranch,
+                'messages' => $stepMessages,
+                'duration_ms' => $durationMs,
+                'prompt_tokens' => $stepPromptTokens,
+                'completion_tokens' => $stepCompletionTokens,
+                'total_tokens' => $stepTotalTokens,
+                'error' => null,
+                'executed_at' => now(),
+            ];
+
+            $currentStep = null;
+
             $logs[] = [
-                'step' => $steps,
+                'step' => $stepNumber,
                 'node_id' => $currentId,
                 'node' => $type,
                 'name' => $this->nodeName($node),
                 'status' => 'success',
                 'message' => $message,
                 'timestamp' => now()->toISOString(),
-                'duration_ms' => (int) round(
-                    (hrtime(true) - $startedAt) / 1_000_000
-                ),
+                'duration_ms' => $durationMs,
             ] + $logContext;
 
             if ($escalated || $paused || $type === 'output') {
@@ -588,8 +770,57 @@ class WorkflowExecutionController extends Controller
     {
         $name = $node['data']['nodeName'] ?? null;
 
-        return is_string($name) && trim($name) !== ''
-            ? trim($name)
-            : (string) ($node['type'] ?? '');
+        if (is_string($name) && trim($name) !== '') {
+            return trim($name);
+        }
+
+        return match ($node['type'] ?? '') {
+            'trigger' => 'Trigger',
+            'ai_agent' => 'AI Agent',
+            'output' => 'Send Message',
+            'if_else' => 'Condition',
+            'relocate' => 'Relocate',
+            'go_to' => 'Go To',
+            'stopper' => 'Stopper',
+            default => 'Node',
+        };
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $steps
+     */
+    private function persistSteps(WorkflowExecution $execution, array $steps): void
+    {
+        foreach ($steps as $step) {
+            $execution->steps()->create($step);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentStep
+     * @return array<string, mixed>
+     */
+    private function errorStep(array $currentStep, string $error): array
+    {
+        return [
+            'step' => $currentStep['step'],
+            'node_id' => $currentStep['node_id'],
+            'node_type' => $currentStep['node_type'],
+            'node_name' => $currentStep['node_name'] ?? null,
+            'status' => 'error',
+            'input' => $currentStep['input'] ?? null,
+            'output' => null,
+            'variables' => null,
+            'branch' => null,
+            'messages' => null,
+            'duration_ms' => (int) round(
+                (hrtime(true) - $currentStep['started_hrtime']) / 1_000_000
+            ),
+            'prompt_tokens' => 0,
+            'completion_tokens' => 0,
+            'total_tokens' => 0,
+            'error' => $error,
+            'executed_at' => now(),
+        ];
     }
 }

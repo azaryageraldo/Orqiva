@@ -28,6 +28,11 @@ Route::prefix('v1')->group(function () {
             [WorkflowExecutionController::class, 'index']
         );
 
+        Route::get(
+            '/workflows/{workflow}/executions/{execution}',
+            [WorkflowExecutionController::class, 'show']
+        );
+
         Route::post(
             '/workflows/{workflow}/execute',
             [WorkflowExecutionController::class, 'execute']

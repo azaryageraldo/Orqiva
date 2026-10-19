@@ -76,6 +76,23 @@ class UsageStatsController extends Controller
         $limit = (int) $request->query('limit', 20);
         $limit = max(1, min($limit, 50));
 
+        $status = $request->query('status');
+        $status = is_string($status) && in_array(
+            $status,
+            ['running', 'waiting', 'success', 'failed', 'escalated'],
+            true
+        ) ? $status : null;
+
+        $from = $request->query('from');
+        $from = is_string($from) && strtotime($from) !== false
+            ? date('Y-m-d', strtotime($from))
+            : null;
+
+        $to = $request->query('to');
+        $to = is_string($to) && strtotime($to) !== false
+            ? date('Y-m-d', strtotime($to))
+            : null;
+
         $userId = $request->user()->id;
 
         $owned = fn ($query) => $query->where('user_id', $userId);
@@ -89,6 +106,19 @@ class UsageStatsController extends Controller
         $executions = WorkflowExecution::query()
             ->whereHas('workflow', $owned)
             ->with('workflow:id,name')
+            ->withCount('steps')
+            ->when(
+                $status !== null,
+                fn ($query) => $query->where('status', $status)
+            )
+            ->when(
+                $from !== null,
+                fn ($query) => $query->whereDate('created_at', '>=', $from)
+            )
+            ->when(
+                $to !== null,
+                fn ($query) => $query->whereDate('created_at', '<=', $to)
+            )
             ->latest()
             ->limit($limit)
             ->get()
@@ -98,6 +128,7 @@ class UsageStatsController extends Controller
                 'workflow_name' => $execution->workflow?->name,
                 'status' => $execution->status,
                 'total_tokens' => (int) $execution->total_tokens,
+                'steps_count' => (int) $execution->steps_count,
                 'error' => $execution->error,
                 'started_at' => $execution->started_at?->toISOString(),
                 'finished_at' => $execution->finished_at?->toISOString(),
@@ -113,6 +144,7 @@ class UsageStatsController extends Controller
                     'failed' => (int) ($summary['failed'] ?? 0),
                     'waiting' => (int) ($summary['waiting'] ?? 0),
                     'running' => (int) ($summary['running'] ?? 0),
+                    'escalated' => (int) ($summary['escalated'] ?? 0),
                 ],
                 'executions' => $executions,
             ],

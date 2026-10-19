@@ -420,6 +420,144 @@ class WorkflowExecutionTest extends TestCase
             ->assertJsonPath('data.output.executed_steps', 1);
     }
 
+    public function test_execution_records_audit_steps_with_details(): void
+    {
+        $this->fakeGeminiJson(['respond' => 'Halo!', 'beli' => true]);
+
+        $user = $this->user();
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->booleanAgent(),
+                $this->sendNode('send-1', '{{respond}}'),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'ai-1'],
+                ['source' => 'ai-1', 'target' => 'send-1'],
+            ],
+        ];
+        $workflow = $this->workflow($user, $definition);
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Saya mau beli', 'conversation_id' => 'conv-1'],
+            ])
+            ->assertOk();
+
+        $execution = WorkflowExecution::query()->firstOrFail();
+        $steps = $execution->steps()->get();
+
+        $this->assertSame([1, 2, 3], $steps->pluck('step')->all());
+        $this->assertSame(
+            ['trigger', 'ai_agent', 'output'],
+            $steps->pluck('node_type')->all()
+        );
+        $this->assertSame('conv-1', $steps[0]->input['conversation_id']);
+        $this->assertSame('Saya mau beli', $steps[0]->input['customer_message']);
+
+        $this->assertSame(['respond' => 'Halo!', 'beli' => true], $steps[1]->variables);
+        $this->assertSame('Halo!', $steps[1]->output['text']);
+        $this->assertSame(15, $steps[1]->total_tokens);
+        $this->assertSame('AI response', $steps[1]->node_name);
+
+        $this->assertSame(['Halo!'], $steps[2]->messages);
+        $this->assertSame(['Halo!'], $steps[2]->output['messages']);
+    }
+
+    public function test_audit_steps_continue_after_resume(): void
+    {
+        $this->fakeGemini('Halo!');
+
+        $user = $this->user();
+        $workflow = $this->workflow($user, $this->resumableDefinition());
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Halo', 'conversation_id' => 'conv-resume'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'waiting');
+
+        $execution = WorkflowExecution::query()->firstOrFail();
+        $this->assertSame([1, 2, 3], $execution->steps()->pluck('step')->all());
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Lanjut', 'conversation_id' => 'conv-resume'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'success')
+            ->assertJsonPath('data.id', $execution->id);
+
+        $this->assertSame(
+            [1, 2, 3, 4, 5],
+            $execution->steps()->pluck('step')->all()
+        );
+        $this->assertSame(
+            ['trigger', 'ai_agent', 'stopper', 'ai_agent', 'output'],
+            $execution->steps()->pluck('node_type')->all()
+        );
+    }
+
+    public function test_audit_step_records_error_when_node_fails(): void
+    {
+        $this->mock(GeminiService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('generate')->andThrow(
+                new RuntimeException('Gemini timeout')
+            );
+        });
+
+        $user = $this->user();
+        $workflow = $this->workflow($user, $this->singleAgentDefinition());
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Halo'],
+            ])
+            ->assertStatus(422);
+
+        $execution = WorkflowExecution::query()->firstOrFail();
+        $step = $execution->steps()->where('status', 'error')->firstOrFail();
+
+        $this->assertSame('ai_agent', $step->node_type);
+        $this->assertSame('Gemini timeout', $step->error);
+        $this->assertSame('Halo', $step->input['user_message'] ?? null);
+    }
+
+    public function test_execution_detail_returns_steps_for_owner_only(): void
+    {
+        $this->fakeGemini('Halo!');
+
+        $owner = $this->user();
+        $workflow = $this->workflow($owner, $this->singleAgentDefinition());
+
+        $this->actingAs($owner)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Halo'],
+            ])
+            ->assertOk();
+
+        $execution = WorkflowExecution::query()->firstOrFail();
+
+        $this->actingAs($owner)
+            ->getJson('/api/v1/workflows/'.$workflow->id.'/executions/'.$execution->id)
+            ->assertOk()
+            ->assertJsonPath('data.id', $execution->id)
+            ->assertJsonPath('data.workflow_name', 'Test workflow')
+            ->assertJsonCount(3, 'data.steps')
+            ->assertJsonPath('data.steps.1.node_type', 'ai_agent');
+
+        $this->actingAs($this->user('other@example.com'))
+            ->getJson('/api/v1/workflows/'.$workflow->id.'/executions/'.$execution->id)
+            ->assertNotFound();
+
+        $secondWorkflow = $this->workflow($owner, $this->singleAgentDefinition());
+
+        $this->actingAs($owner)
+            ->getJson('/api/v1/workflows/'.$secondWorkflow->id.'/executions/'.$execution->id)
+            ->assertNotFound();
+    }
+
     public function test_invalid_workflow_returns_error(): void
     {
         $user = $this->user();

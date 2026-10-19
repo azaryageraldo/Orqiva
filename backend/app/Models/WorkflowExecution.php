@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkflowExecution extends Model
 {
@@ -43,5 +44,10 @@ class WorkflowExecution extends Model
     public function workflow(): BelongsTo
     {
         return $this->belongsTo(Workflow::class);
+    }
+
+    public function steps(): HasMany
+    {
+        return $this->hasMany(WorkflowExecutionStep::class)->orderBy('step');
     }
 }

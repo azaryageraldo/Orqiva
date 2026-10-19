@@ -65,6 +65,33 @@ class UsageStatsTest extends TestCase
         $this->assertCount(1, $response->json('data.executions'));
     }
 
+    public function test_activity_filters_by_status_and_date(): void
+    {
+        $owner = $this->user('owner@example.com');
+
+        $success = $this->execution($owner, 15);
+        $escalated = $this->execution($owner, 20, 'escalated');
+        $old = $this->execution($owner, 30, 'failed');
+
+        $old->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $this->actingAs($owner)
+            ->getJson('/api/v1/stats/activity?status=escalated')
+            ->assertOk()
+            ->assertJsonPath('data.summary.escalated', 1)
+            ->assertJsonCount(1, 'data.executions')
+            ->assertJsonPath('data.executions.0.id', $escalated->id)
+            ->assertJsonPath('data.executions.0.steps_count', 0);
+
+        $this->actingAs($owner)
+            ->getJson('/api/v1/stats/activity?from='.now()->subDay()->toDateString())
+            ->assertOk()
+            ->assertJsonCount(2, 'data.executions')
+            ->assertJsonMissing(['id' => $old->id]);
+
+        $this->assertNotSame($success->id, $escalated->id);
+    }
+
     public function test_token_usage_only_counts_own_executions(): void
     {
         $owner = $this->user('owner@example.com');
