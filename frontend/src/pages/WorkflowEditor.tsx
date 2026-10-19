@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 
 import { getWorkflow, updateWorkflow } from "../services/workflow";
+import { getErrorMessage } from "../services/api";
 
 type NodeKind =
   | "Trigger"
@@ -656,7 +657,7 @@ export default function WorkflowEditor({
         if (cancelled) return;
 
         console.error("Failed to load workflow:", error);
-        setNotice("Workflow gagal dimuat. Periksa koneksi API dan coba lagi.");
+        setNotice(getErrorMessage(error, "Workflow gagal dimuat. Coba lagi."));
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -893,7 +894,7 @@ export default function WorkflowEditor({
       return true;
     } catch (error) {
       console.error("Failed to save workflow:", error);
-      setNotice("Workflow gagal disimpan. Periksa koneksi API dan coba lagi.");
+      setNotice(getErrorMessage(error, "Workflow gagal disimpan. Coba lagi."));
       return false;
     } finally {
       setIsSaving(false);

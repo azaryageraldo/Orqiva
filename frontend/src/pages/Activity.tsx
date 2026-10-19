@@ -17,6 +17,7 @@ import {
   type ActivityStats,
   type ExecutionStatus,
 } from "../services/stats";
+import { getErrorMessage } from "../services/api";
 
 interface ActivityProps {
   onOpenWorkflow: (workflowId: string) => void;
@@ -70,8 +71,10 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
 
     try {
       setStats(await getActivity());
-    } catch {
-      setError("Riwayat eksekusi gagal dimuat. Periksa koneksi backend.");
+    } catch (caught) {
+      setError(
+        getErrorMessage(caught, "Riwayat eksekusi gagal dimuat. Periksa koneksi backend."),
+      );
     } finally {
       setLoading(false);
     }
@@ -84,9 +87,11 @@ export default function Activity({ onOpenWorkflow }: ActivityProps) {
       .then((result) => {
         if (active) setStats(result);
       })
-      .catch(() => {
+      .catch((caught: unknown) => {
         if (active) {
-          setError("Riwayat eksekusi gagal dimuat. Periksa koneksi backend.");
+          setError(
+            getErrorMessage(caught, "Riwayat eksekusi gagal dimuat. Periksa koneksi backend."),
+          );
         }
       })
       .finally(() => {

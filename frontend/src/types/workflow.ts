@@ -31,3 +31,10 @@ export interface PaginatedResponse<T> {
         total: number;
     };
 }
+
+export interface WorkflowPage {
+    current_page: number;
+    last_page: number;
+    total: number;
+    data: Workflow[];
+}

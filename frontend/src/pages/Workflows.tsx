@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   Activity,
@@ -46,6 +46,7 @@ import {
   updateWorkflow,
 } from "../services/workflow";
 import type { Workflow as WorkflowItem } from "../types/workflow";
+import { getErrorMessage } from "../services/api";
 
 interface WorkflowsProps {
   onOpenWorkflow: (workflowId: string) => void;
@@ -61,6 +62,10 @@ export default function Workflows({
 }: WorkflowsProps) {
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -78,53 +83,72 @@ export default function Workflows({
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editStatus, setEditStatus] = useState<WorkflowItem["status"]>("draft");
+  const requestRef = useRef(0);
 
-  async function loadWorkflows() {
-    setLoading(true);
-    setError("");
+  const loadWorkflows = useCallback(
+    async (targetPage = 1, query = "") => {
+      const requestId = ++requestRef.current;
 
-    try {
-      const result = await getWorkflows();
-      setWorkflows(result.data);
-    } catch {
-      setError("Workflow gagal dimuat. Periksa koneksi dan autentikasi API.");
-    } finally {
-      setLoading(false);
-    }
-  }
+      setLoading(true);
+      setError("");
+
+      try {
+        const result = await getWorkflows({ page: targetPage, search: query });
+
+        if (requestId !== requestRef.current) return;
+
+        setWorkflows(result.data);
+        setPage(result.current_page);
+        setLastPage(result.last_page);
+        setTotal(result.total);
+      } catch (caught) {
+        if (requestId !== requestRef.current) return;
+
+        setError(
+          getErrorMessage(caught, "Workflow gagal dimuat. Periksa koneksi API."),
+        );
+      } finally {
+        if (requestId === requestRef.current) setLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchQuery(search), 300);
+
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     let active = true;
+    const requestId = ++requestRef.current;
 
-    getWorkflows()
+    getWorkflows({ page: 1, search: searchQuery })
       .then((result) => {
-        if (active) setWorkflows(result.data);
+        if (!active || requestId !== requestRef.current) return;
+
+        setWorkflows(result.data);
+        setPage(result.current_page);
+        setLastPage(result.last_page);
+        setTotal(result.total);
+        setError("");
       })
-      .catch(() => {
-        if (active) {
-          setError("Workflow gagal dimuat. Periksa koneksi dan autentikasi API.");
-        }
+      .catch((caught: unknown) => {
+        if (!active || requestId !== requestRef.current) return;
+
+        setError(
+          getErrorMessage(caught, "Workflow gagal dimuat. Periksa koneksi API."),
+        );
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && requestId === requestRef.current) setLoading(false);
       });
 
     return () => {
       active = false;
     };
-  }, []);
-
-  const filteredWorkflows = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) return workflows;
-
-    return workflows.filter(
-      (workflow) =>
-        workflow.name.toLowerCase().includes(query) ||
-        (workflow.description ?? "").toLowerCase().includes(query),
-    );
-  }, [workflows, search]);
+  }, [searchQuery]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,14 +159,18 @@ export default function Workflows({
     setError("");
 
     try {
-      const created = await createWorkflow(name.trim(), description.trim());
+      await createWorkflow(name.trim(), description.trim());
 
-      setWorkflows((current) => [created, ...current]);
       setShowCreate(false);
       setName("");
       setDescription("");
-    } catch {
-      setError("Workflow gagal dibuat. Periksa koneksi backend dan validasi API.");
+      setSearch("");
+      setSearchQuery("");
+      await loadWorkflows(1, "");
+    } catch (caught) {
+      setError(
+        getErrorMessage(caught, "Workflow gagal dibuat. Periksa koneksi API."),
+      );
     } finally {
       setCreating(false);
     }
@@ -156,12 +184,16 @@ export default function Workflows({
 
     try {
       await deleteWorkflow(String(workflowToDelete.id));
-      setWorkflows((current) =>
-        current.filter((item) => item.id !== workflowToDelete.id),
-      );
+
+      const remaining = workflows.length - 1;
+      const targetPage = remaining <= 0 && page > 1 ? page - 1 : page;
+
       setWorkflowToDelete(null);
-    } catch {
-      setError("Workflow gagal dihapus. Periksa koneksi API dan coba lagi.");
+      await loadWorkflows(targetPage, searchQuery);
+    } catch (caught) {
+      setError(
+        getErrorMessage(caught, "Workflow gagal dihapus. Coba lagi."),
+      );
     } finally {
       setDeleting(false);
     }
@@ -191,9 +223,9 @@ export default function Workflows({
       );
       setWorkflowToEdit(updated);
       if (openCanvas) onOpenWorkflow(String(updated.id));
-    } catch {
+    } catch (caught) {
       setError(
-        "Perubahan workflow gagal disimpan. Periksa koneksi API dan coba lagi.",
+        getErrorMessage(caught, "Perubahan workflow gagal disimpan. Coba lagi."),
       );
     } finally {
       setSavingEdit(false);
@@ -395,16 +427,16 @@ export default function Workflows({
                 <p className="text-xs text-muted-foreground">
                   Menampilkan{" "}
                   <span className="font-medium text-foreground">
-                    {filteredWorkflows.length}
+                    {workflows.length}
                   </span>{" "}
-                  dari {workflows.length} workflow
+                  dari {total} workflow
                 </p>
               </div>
 
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => void loadWorkflows()}
+                onClick={() => void loadWorkflows(page, searchQuery)}
                 disabled={loading}
                 className="h-10 px-4"
               >
@@ -444,7 +476,7 @@ export default function Workflows({
                   Mengambil data dari workspace Anda.
                 </p>
               </div>
-            ) : filteredWorkflows.length === 0 ? (
+            ) : workflows.length === 0 ? (
               <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/50 p-8 text-center">
                 <span className="mb-4 flex size-14 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
                   <WorkflowIcon className="size-6" />
@@ -476,7 +508,7 @@ export default function Workflows({
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredWorkflows.map((item) => {
+                {workflows.map((item) => {
                   const isActive = item.status === "active";
 
                   return (
@@ -575,6 +607,37 @@ export default function Workflows({
                     </article>
                   );
                 })}
+              </div>
+            )}
+
+            {lastPage > 1 && (
+              <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row">
+                <p className="text-xs text-muted-foreground">
+                  Halaman{" "}
+                  <span className="font-medium text-foreground">{page}</span>{" "}
+                  dari {lastPage}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 px-3"
+                    onClick={() => void loadWorkflows(page - 1, searchQuery)}
+                    disabled={loading || page <= 1}
+                  >
+                    Sebelumnya
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 px-3"
+                    onClick={() => void loadWorkflows(page + 1, searchQuery)}
+                    disabled={loading || page >= lastPage}
+                  >
+                    Berikutnya
+                  </Button>
+                </div>
               </div>
             )}
           </>

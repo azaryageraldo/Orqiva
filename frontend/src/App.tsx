@@ -3,6 +3,7 @@ import { LoaderCircle } from "lucide-react";
 
 import Login from "./Login";
 import { getCurrentUser, logout } from "./services/auth";
+import { UNAUTHORIZED_EVENT } from "./services/api";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import { Button } from "./components/ui/button";
 import Dashboard from "./pages/Dashboard";
@@ -74,6 +75,21 @@ export default function App() {
 
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setAuthenticated(false);
+      setEditingWorkflowId(null);
+      setTestingWorkflowId(null);
+      setView("dashboard");
+    };
+
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+
+    return () => {
+      window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
     };
   }, []);
 

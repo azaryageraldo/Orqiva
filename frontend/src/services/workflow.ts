@@ -1,10 +1,22 @@
 import api from "./api";
-import type { PaginatedResponse, Workflow } from "../types/workflow";
+import type { Workflow, WorkflowPage } from "../types/workflow";
 
-export async function getWorkflows(): Promise<
-  PaginatedResponse<Workflow>["data"]
-> {
-  const response = await api.get<PaginatedResponse<Workflow>>("/workflows");
+export type WorkflowQuery = {
+  page?: number;
+  search?: string;
+};
+
+export async function getWorkflows({
+  page = 1,
+  search = "",
+}: WorkflowQuery = {}): Promise<WorkflowPage> {
+  const response = await api.get<{ data: WorkflowPage }>("/workflows", {
+    params: {
+      page,
+      ...(search.trim() ? { search: search.trim() } : {}),
+    },
+  });
+
   return response.data.data;
 }
 
