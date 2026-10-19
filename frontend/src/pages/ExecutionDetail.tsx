@@ -11,6 +11,14 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
 import { getErrorMessage } from "../services/api";
 import {
@@ -40,8 +48,11 @@ const NODE_TYPE_LABELS: Record<string, string> = {
   stopper: "Stopper",
 };
 
-const SELECT_CLASS =
-  "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+const stepStatusLabel = (value: string | null) => {
+  if (value === "success") return "Sukses";
+  if (value === "error") return "Gagal";
+  return "Semua status";
+};
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -412,7 +423,9 @@ export default function ExecutionDetail({
                   {formatDate(detail.started_at)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Selesai {formatDate(detail.finished_at)}
+                  {detail.finished_at
+                    ? `Selesai ${formatDate(detail.finished_at)}`
+                    : "Belum selesai"}
                 </p>
               </div>
             </div>
@@ -438,54 +451,88 @@ export default function ExecutionDetail({
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <label className="space-y-1 text-xs text-muted-foreground">
-                    <span>Node</span>
-                    <select
-                      value={nodeFilter}
-                      onChange={(event) => setNodeFilter(event.target.value)}
-                      className={`${SELECT_CLASS} sm:w-44`}
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,11rem)_minmax(0,9rem)_auto] sm:items-end">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="step-node-filter"
+                      className="text-xs font-normal text-muted-foreground"
                     >
-                      <option value="all">Semua node</option>
-                      {nodes.map((node) => (
-                        <option key={node.id} value={node.id}>
-                          {node.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      Node
+                    </Label>
+                    <Select
+                      value={nodeFilter}
+                      onValueChange={(value) =>
+                        setNodeFilter(value ?? "all")
+                      }
+                    >
+                      <SelectTrigger
+                        id="step-node-filter"
+                        className="h-9 w-full dark:bg-input/30"
+                      >
+                        <SelectValue>
+                          {(value) =>
+                            !value || value === "all"
+                              ? "Semua node"
+                              : (nodes.find((node) => node.id === value)
+                                  ?.name ?? value)
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua node</SelectItem>
+                        {nodes.map((node) => (
+                          <SelectItem key={node.id} value={node.id}>
+                            {node.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  <label className="space-y-1 text-xs text-muted-foreground">
-                    <span>Status langkah</span>
-                    <select
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="step-status-filter"
+                      className="text-xs font-normal text-muted-foreground"
+                    >
+                      Status langkah
+                    </Label>
+                    <Select
                       value={stepStatus}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         setStepStatus(
-                          event.target.value as "all" | "success" | "error",
+                          (value ?? "all") as "all" | "success" | "error",
                         )
                       }
-                      className={`${SELECT_CLASS} sm:w-40`}
                     >
-                      <option value="all">Semua</option>
-                      <option value="success">Sukses</option>
-                      <option value="error">Gagal</option>
-                    </select>
-                  </label>
+                      <SelectTrigger
+                        id="step-status-filter"
+                        className="h-9 w-full dark:bg-input/30"
+                      >
+                        <SelectValue>
+                          {(value) => stepStatusLabel(value)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua status</SelectItem>
+                        <SelectItem value="success">Sukses</SelectItem>
+                        <SelectItem value="error">Gagal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  {hasFilters && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 text-muted-foreground"
-                      onClick={() => {
-                        setNodeFilter("all");
-                        setStepStatus("all");
-                      }}
-                    >
-                      Reset filter
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 sm:mb-0"
+                    disabled={!hasFilters}
+                    onClick={() => {
+                      setNodeFilter("all");
+                      setStepStatus("all");
+                    }}
+                  >
+                    Reset
+                  </Button>
                 </div>
               </div>
 
