@@ -18,15 +18,15 @@ class GeminiService
         float $temperature = 0.7,
         ?string $modelOverride = null,
         ?array $responseSchema = null,
-        ?int $maxOutputTokens = null
+        ?int $maxOutputTokens = null,
+        ?string $apiKey = null
     ): array {
-        $apiKey = config('services.gemini.api_key');
         $model = $modelOverride ?: config('services.gemini.model', 'gemini-2.5-flash');
         $timeout = (int) config('services.gemini.timeout', 30);
 
         if (! is_string($apiKey) || trim($apiKey) === '') {
             throw new RuntimeException(
-                'GEMINI_API_KEY belum dikonfigurasi.'
+                'API key Google Gemini belum tersedia. Simpan key di menu API Keys.'
             );
         }
 

@@ -16,6 +16,7 @@ interface DashboardLayoutProps {
   onInboxClick: () => void;
   onChannelClick: () => void;
   onActivityClick: () => void;
+  onAiProvidersClick: () => void;
   onHelpClick: () => void;
   onSettingsClick: () => void;
   children: ReactNode;
@@ -33,6 +34,7 @@ export default function DashboardLayout({
   onInboxClick,
   onChannelClick,
   onActivityClick,
+  onAiProvidersClick,
   onHelpClick,
   onSettingsClick,
   children,
@@ -49,6 +51,7 @@ export default function DashboardLayout({
         onInboxClick={onInboxClick}
         onChannelClick={onChannelClick}
         onActivityClick={onActivityClick}
+        onAiProvidersClick={onAiProvidersClick}
         onHelpClick={onHelpClick}
         onSettingsClick={onSettingsClick}
       />

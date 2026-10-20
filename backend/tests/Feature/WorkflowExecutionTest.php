@@ -2,28 +2,36 @@
 
 namespace Tests\Feature;
 
+use App\Models\AiProviderSetting;
 use App\Models\User;
 use App\Models\Workflow;
 use App\Models\WorkflowExecution;
 use App\Services\GeminiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\Concerns\BuildsWorkflowDefinitions;
+use Tests\Concerns\ConfiguresAiProvider;
 use Tests\TestCase;
 
 class WorkflowExecutionTest extends TestCase
 {
     use BuildsWorkflowDefinitions;
+    use ConfiguresAiProvider;
     use RefreshDatabase;
 
     private function user(string $email = 'owner@example.com'): User
     {
-        return User::create([
+        $user = User::create([
             'name' => 'Owner',
             'email' => $email,
             'password' => 'password',
         ]);
+
+        $this->configureAiProvider($user);
+
+        return $user;
     }
 
     private function workflow(User $user, array $definition): Workflow
@@ -265,6 +273,142 @@ class WorkflowExecutionTest extends TestCase
             ->assertJsonPath('data.total_tokens', 30);
 
         $this->assertSame(1, WorkflowExecution::query()->count());
+    }
+
+    public function test_failed_execution_resumes_from_failed_node_without_replaying_previous_steps(): void
+    {
+        $calls = 0;
+
+        $this->mock(GeminiService::class, function (MockInterface $mock) use (&$calls): void {
+            $mock->shouldReceive('generate')->andReturnUsing(function () use (&$calls) {
+                $calls++;
+
+                if ($calls === 2) {
+                    throw new RuntimeException('Provider sedang down.');
+                }
+
+                return [
+                    'text' => $calls === 1 ? 'Jawaban pertama' : 'Jawaban kedua',
+                    'finish_reason' => 'STOP',
+                    'usage' => [
+                        'prompt_tokens' => 10,
+                        'completion_tokens' => 5,
+                        'total_tokens' => 15,
+                    ],
+                ];
+            });
+        });
+
+        $user = $this->user();
+        $workflow = $this->workflow($user, $this->resumableDefinition());
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Halo', 'conversation_id' => 'conv-durable'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'waiting')
+            ->assertJsonPath('data.current_node_id', 'ai-2');
+
+        $execution = WorkflowExecution::query()->firstOrFail();
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Lanjut', 'conversation_id' => 'conv-durable'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('data.status', 'failed')
+            ->assertJsonPath('data.current_node_id', 'ai-2');
+
+        $execution->refresh();
+        $this->assertSame('ai-2', $execution->current_node_id);
+        $this->assertSame('Jawaban pertama', data_get($execution->context, 'ai_response'));
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Coba lagi', 'conversation_id' => 'conv-durable'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'success')
+            ->assertJsonPath('data.id', $execution->id);
+
+        $this->assertSame(3, $calls);
+        $this->assertSame(1, $execution->steps()->where('node_type', 'trigger')->count());
+        $this->assertSame('Jawaban kedua', data_get($execution->fresh()->context, 'ai_response'));
+    }
+
+    public function test_ai_agent_requires_a_key_saved_from_the_app_not_environment(): void
+    {
+        config(['services.gemini.api_key' => 'env-only-key']);
+
+        $this->mock(GeminiService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('generate');
+        });
+
+        $user = User::create([
+            'name' => 'Owner',
+            'email' => 'no-key@example.com',
+            'password' => 'password',
+        ]);
+        $workflow = $this->workflow($user, $this->singleAgentDefinition());
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Halo'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('data.status', 'failed');
+
+        $this->assertStringContainsString(
+            'API Keys',
+            (string) WorkflowExecution::query()->firstOrFail()->error
+        );
+    }
+
+    public function test_ai_agent_uses_user_provider_key_and_selected_model(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => 'Halo dari OpenAI'],
+                    'finish_reason' => 'stop',
+                ]],
+                'usage' => [
+                    'prompt_tokens' => 12,
+                    'completion_tokens' => 6,
+                    'total_tokens' => 18,
+                ],
+            ]),
+        ]);
+
+        $user = $this->user();
+
+        AiProviderSetting::create([
+            'user_id' => $user->id,
+            'provider' => 'openai',
+            'api_key' => 'sk-user-owned',
+            'models' => ['gpt-4o-mini'],
+            'default_model' => 'gpt-4o-mini',
+            'last_checked_at' => now(),
+        ]);
+
+        $definition = $this->singleAgentDefinition();
+        $definition['nodes'][1]['data']['provider'] = 'openai';
+        $definition['nodes'][1]['data']['model'] = 'gpt-4o-mini';
+        $workflow = $this->workflow($user, $definition);
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Halo'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.output.messages.0', 'Halo dari OpenAI');
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'https://api.openai.com/v1/chat/completions'
+                && $request->hasHeader('Authorization', 'Bearer sk-user-owned')
+                && $request['model'] === 'gpt-4o-mini';
+        });
     }
 
     public function test_failed_execution_keeps_tokens_already_spent(): void

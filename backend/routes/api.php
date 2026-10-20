@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AiSettingsController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChannelController;
 use App\Http\Controllers\Api\InboxController;
@@ -33,6 +34,11 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+
+        Route::get('/ai-settings', [AiSettingsController::class, 'show']);
+        Route::put('/ai-settings', [AiSettingsController::class, 'update']);
+        Route::post('/ai-settings/detect-models', [AiSettingsController::class, 'detectModels']);
+        Route::delete('/ai-settings/providers/{provider}', [AiSettingsController::class, 'destroy']);
 
         Route::get('/workflow-options', [WorkflowController::class, 'options']);
 

@@ -75,6 +75,11 @@ import {
 } from "../services/workflow";
 import type { WorkflowOption } from "../services/channel";
 import { getErrorMessage } from "../services/api";
+import {
+  getAiSettings,
+  type AiModelOption,
+  type AiProvider,
+} from "../services/aiSettings";
 
 type NodeKind =
   | "Trigger"
@@ -735,6 +740,8 @@ export default function WorkflowEditor({
   const [noticeTone, setNoticeTone] = useState<"success" | "error">("success");
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [workflowOptions, setWorkflowOptions] = useState<WorkflowOption[]>([]);
+  const [aiModels, setAiModels] = useState<AiModelOption[]>([]);
+  const [aiDefaultModel, setAiDefaultModel] = useState<AiModelOption | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
   const [draftData, setDraftData] = useState<AutomationNodeData | null>(null);
   const [agentTab, setAgentTab] = useState<"node" | "prompt" | "variables">("node");
@@ -750,6 +757,40 @@ export default function WorkflowEditor({
   const changeSelection = useCallback((id: string | null) => {
     setAgentTab("node");
     setSelectedNodeId(id);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    getAiSettings()
+      .then((result) => {
+        if (!active) return;
+
+        setAiModels(result.models);
+
+        const configured = result.providers.find(
+          (provider) => provider.configured && provider.default_model,
+        );
+        const preferred = configured?.default_model
+          ? result.models.find(
+              (model) =>
+                model.provider === configured.provider &&
+                model.id === configured.default_model,
+            )
+          : undefined;
+
+        setAiDefaultModel(preferred ?? result.models[0] ?? null);
+      })
+      .catch(() => {
+        if (!active) return;
+
+        setAiModels([]);
+        setAiDefaultModel(null);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -968,6 +1009,19 @@ export default function WorkflowEditor({
     );
   }, []);
 
+  const availableAiModels: AiModelOption[] = aiModels.length > 0
+    ? aiModels
+    : geminiModels.map((model) => ({
+        id: model.id,
+        provider: "gemini" as AiProvider,
+        provider_label: "Google Gemini",
+      }));
+  const defaultAiModel = aiDefaultModel ?? availableAiModels[0] ?? {
+    id: "gemini-3.8-flash",
+    provider: "gemini" as AiProvider,
+    provider_label: "Google Gemini",
+  };
+
   function addNode(label: NodeKind) {
     const id = `${label.toLowerCase().replaceAll(" ", "-")}-${crypto.randomUUID()}`;
 
@@ -1000,8 +1054,8 @@ export default function WorkflowEditor({
             description: "Balasan AI; setiap item dikirim sebagai bubble",
           },
         ],
-        provider: "gemini",
-        model: "gemini-3.8-flash",
+        provider: defaultAiModel.provider,
+        model: defaultAiModel.id,
         temperature: 0.7,
         verbosity: "concise",
         contextMessages: 10,
@@ -2049,20 +2103,52 @@ export default function WorkflowEditor({
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-foreground">AI model</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Gemini is the default provider.</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Model mengikuti API key yang tersimpan di menu API Keys.
+                          </p>
                         </div>
-                        <span className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 text-xs font-medium text-primary">Gemini</span>
+                        <span className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 text-xs font-medium text-primary">
+                          {availableAiModels.find(
+                            (model) =>
+                              model.id === String(inspectorData?.model ?? "") &&
+                              model.provider === String(inspectorData?.provider ?? "gemini"),
+                          )?.provider_label ?? "Gemini"}
+                        </span>
                       </div>
                       <select
                         className={inputClass}
-                        value={String(inspectorData?.model ?? "gemini-3.8-flash")}
-                        onChange={(event) => updateNode({ provider: "gemini", model: event.target.value })}
+                        value={`${String(inspectorData?.provider ?? "gemini")}::${String(inspectorData?.model ?? defaultAiModel.id)}`}
+                        onChange={(event) => {
+                          const [provider, model] = event.target.value.split("::");
+                          updateNode({ provider, model });
+                        }}
                       >
-                        {geminiModels.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
-                        {!geminiModels.some((model) => model.id === inspectorData?.model) && inspectorData?.model && (
-                          <option value={String(inspectorData.model)}>{String(inspectorData.model)}</option>
+                        {availableAiModels.map((model) => (
+                          <option
+                            key={`${model.provider}:${model.id}`}
+                            value={`${model.provider}::${model.id}`}
+                          >
+                            {model.provider_label} · {model.id}
+                          </option>
+                        ))}
+                        {!availableAiModels.some(
+                          (model) =>
+                            model.id === String(inspectorData?.model ?? "") &&
+                            model.provider === String(inspectorData?.provider ?? "gemini"),
+                        ) && inspectorData?.model && (
+                          <option
+                            value={`${String(inspectorData?.provider ?? "gemini")}::${String(inspectorData.model)}`}
+                          >
+                            {String(inspectorData?.provider ?? "gemini")} · {String(inspectorData.model)}
+                          </option>
                         )}
                       </select>
+                      {aiModels.length === 0 && (
+                        <p className="mt-2 text-xs leading-5 text-amber-300/90">
+                          Belum ada API key tersimpan. Daftar default Gemini
+                          masih bisa dipakai, atau atur provider di menu API Keys.
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">

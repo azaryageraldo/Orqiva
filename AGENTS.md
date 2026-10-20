@@ -25,7 +25,7 @@ Add Laravel unit tests for workflow validation, graph ordering, branching, and n
 
 ## Security & Configuration
 
-Keep real credentials in backend environment configuration only; commit placeholder values in `.env.example`. Never expose `GEMINI_API_KEY` to the frontend, store secrets in workflow definitions, execute user-provided code, or return internal traces. Validate workflow node types, configuration, edges, and cycles on the server.
+Keep server credentials in backend environment configuration and user BYOK keys encrypted at rest in the database; never commit real credentials. Never expose API keys to the frontend, store secrets in workflow definitions, execute user-provided code, or return internal traces. Validate workflow node types, configuration, edges, and cycles on the server.
 
 ## Commits & Pull Requests
 

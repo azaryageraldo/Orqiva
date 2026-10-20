@@ -61,10 +61,14 @@ export type SendPublicResult = {
 export async function sendPublicMessage(
   sessionToken: string,
   message: string,
+  clientMessageId?: string,
 ): Promise<SendPublicResult> {
   const response = await api.post<{ data: SendPublicResult }>(
     `/public/sessions/${sessionToken}/messages`,
-    { message },
+    {
+      message,
+      ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
+    },
   );
   return response.data.data;
 }

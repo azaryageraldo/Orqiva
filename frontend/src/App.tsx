@@ -12,6 +12,7 @@ import WorkflowEditor from "./pages/WorkflowEditor";
 import Activity from "./pages/Activity";
 import Inbox from "./pages/Inbox";
 import Channel from "./pages/Channel";
+import AiProviders from "./pages/AiProviders";
 import PublicChatWidget from "./pages/PublicChatWidget";
 import ExecutionDetail from "./pages/ExecutionDetail";
 import Settings from "./pages/Settings";
@@ -24,6 +25,7 @@ type View =
   | "inbox"
   | "channel"
   | "activity"
+  | "ai-providers"
   | "settings";
 
 function ErrorBanner({
@@ -198,6 +200,7 @@ export default function App() {
     onInboxClick: () => goTo("inbox"),
     onChannelClick: () => goTo("channel"),
     onActivityClick: () => goTo("activity"),
+    onAiProvidersClick: () => goTo("ai-providers"),
     onHelpClick: () => goTo("settings", "settings-support"),
     onSettingsClick: () => goTo("settings"),
   };
@@ -311,6 +314,21 @@ export default function App() {
     );
   }
 
+  if (view === "ai-providers") {
+    return (
+      <DashboardLayout
+        title="API Keys"
+        icon="keys"
+        activeNav="ai-providers"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <AiProviders />
+      </DashboardLayout>
+    );
+  }
+
   if (view === "settings") {
     return (
       <DashboardLayout
@@ -321,7 +339,10 @@ export default function App() {
       >
         {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
-        <Settings health={health} />
+        <Settings
+          health={health}
+          onOpenAiProviders={() => goTo("ai-providers")}
+        />
       </DashboardLayout>
     );
   }

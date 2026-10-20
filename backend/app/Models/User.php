@@ -15,6 +15,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'ai_reply_debounce_ms',
     ];
 
     protected $hidden = [
@@ -27,6 +28,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'ai_reply_debounce_ms' => 'integer',
         ];
     }
 
@@ -48,5 +50,10 @@ class User extends Authenticatable
     public function chatSessions(): HasMany
     {
         return $this->hasMany(ChatSession::class);
+    }
+
+    public function aiProviderSettings(): HasMany
+    {
+        return $this->hasMany(AiProviderSetting::class);
     }
 }

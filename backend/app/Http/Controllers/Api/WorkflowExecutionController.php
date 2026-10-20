@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ChatSession;
 use App\Models\Workflow;
 use App\Models\WorkflowExecution;
-use App\Services\GeminiService;
+use App\Services\AI\AiProviderManager;
 use App\Services\Workflows\AiAgentVariables;
 use App\Services\Workflows\ConditionRule;
 use App\Services\Workflows\MessageRenderer;
@@ -32,8 +32,14 @@ class WorkflowExecutionController extends Controller
         private readonly WorkflowContext $context,
         private readonly AiAgentVariables $agentVariables,
         private readonly MessageRenderer $messageRenderer,
-        private readonly WorkflowDiagnostics $diagnostics
+        private readonly WorkflowDiagnostics $diagnostics,
+        private readonly AiProviderManager $aiProviders
     ) {}
+
+    /**
+     * Snapshot konteks terakhir agar eksekusi yang gagal bisa dilanjutkan.
+     */
+    private ?array $liveContext = null;
 
     public function index(Workflow $workflow): JsonResponse
     {
@@ -118,6 +124,7 @@ class WorkflowExecutionController extends Controller
         ]);
 
         $input = $validated['input'] ?? [];
+        $this->liveContext = null;
 
         if ($chatSession !== null) {
             $input['conversation_id'] = $input['conversation_id']
@@ -193,7 +200,7 @@ class WorkflowExecutionController extends Controller
                 ];
 
                 $mergedInput = array_replace($execution->input ?? [], $input);
-                $isWaiting = $execution->status === 'waiting';
+                $isResumable = $this->isResumable($execution);
                 $logs = $execution->logs ?? [];
                 $context = array_replace(
                     $execution->context ?? [],
@@ -203,6 +210,7 @@ class WorkflowExecutionController extends Controller
                 $execution->update([
                     'status' => 'running',
                     'input' => $mergedInput,
+                    'error' => null,
                     'waiting_since' => null,
                     'finished_at' => null,
                 ]);
@@ -211,10 +219,10 @@ class WorkflowExecutionController extends Controller
                     'execution' => $execution,
                     'input' => $mergedInput,
                     'logs' => $logs,
-                    'resume_node_id' => $isWaiting
+                    'resume_node_id' => $isResumable
                         ? $execution->current_node_id
                         : null,
-                    'resume_workflow_id' => $isWaiting
+                    'resume_workflow_id' => $isResumable
                         ? ($execution->current_workflow_id ?? $execution->workflow_id)
                         : null,
                     'resume_context' => $context,
@@ -261,7 +269,8 @@ class WorkflowExecutionController extends Controller
                     &$tokens
                 ): ?array {
                     $execution = $workflow->executions()
-                        ->where('status', 'waiting')
+                        ->whereIn('status', ['waiting', 'failed'])
+                        ->whereNotNull('current_node_id')
                         ->latest()
                         ->lockForUpdate()
                         ->get()
@@ -286,6 +295,7 @@ class WorkflowExecutionController extends Controller
                     $execution->update([
                         'status' => 'running',
                         'input' => $input,
+                        'error' => null,
                         'waiting_since' => null,
                         'finished_at' => null,
                     ]);
@@ -467,10 +477,25 @@ class WorkflowExecutionController extends Controller
                 'timestamp' => now()->toISOString(),
             ];
 
+            $failedNodeId = is_array($currentStep)
+                ? ($currentStep['node_id'] ?? null)
+                : $execution->current_node_id;
+            $failedWorkflowId = is_array($currentStep)
+                ? ($currentStep['workflow_id'] ?? null)
+                : $execution->current_workflow_id;
+            $failedContext = $this->liveContext
+                ?? $execution->context
+                ?? $resumeContext
+                ?? $input;
+
             $execution->update([
                 'status' => 'failed',
                 'error' => $exception->getMessage(),
                 'logs' => $logs,
+                'context' => $failedContext,
+                'current_node_id' => $failedNodeId,
+                'current_workflow_id' => $failedWorkflowId,
+                'waiting_since' => null,
                 'finished_at' => now(),
                 'prompt_tokens' => $tokens['prompt_tokens'],
                 'completion_tokens' => $tokens['completion_tokens'],
@@ -479,6 +504,9 @@ class WorkflowExecutionController extends Controller
 
             if ($chatSession !== null) {
                 $chatSession->update([
+                    'context' => $failedContext,
+                    'current_node_id' => $failedNodeId,
+                    'current_workflow_id' => $failedWorkflowId,
                     'last_activity_at' => now(),
                 ]);
             }
@@ -530,6 +558,7 @@ class WorkflowExecutionController extends Controller
         }
 
         $context = array_replace($resumeContext ?? $input, $input);
+        $this->liveContext = $context;
 
         /*
          * Pemetaan variabel format lama (sourceValue → context).
@@ -669,9 +698,14 @@ class WorkflowExecutionController extends Controller
                     $systemMessage .= "\n\nRespond only with JSON matching the provided schema.";
                 }
 
-                $model = is_string($data['model'] ?? null)
-                    ? $data['model']
-                    : config('services.gemini.model', 'gemini-2.5-flash');
+                $provider = is_string($data['provider'] ?? null)
+                    ? $data['provider']
+                    : 'gemini';
+                $model = $this->aiProviders->resolveModel(
+                    $ownerId,
+                    $provider,
+                    is_string($data['model'] ?? null) ? $data['model'] : null
+                );
 
                 $userMessage = $context['customer_message']
                     ?? $context['message']
@@ -731,6 +765,7 @@ class WorkflowExecutionController extends Controller
                 }
 
                 $stepInput = [
+                    'provider' => $provider,
                     'system_message' => $systemMessage,
                     'user_message' => $userMessage,
                     'model' => $model,
@@ -744,11 +779,13 @@ class WorkflowExecutionController extends Controller
                     $currentStep['input'] = $stepInput;
                 }
 
-                $aiResult = app(GeminiService::class)->generate(
+                $aiResult = $this->aiProviders->generate(
+                    $ownerId,
+                    $provider,
+                    $model,
                     $systemMessage,
                     $userMessage,
                     (float) ($data['temperature'] ?? 0.7),
-                    is_string($data['model'] ?? null) ? $data['model'] : null,
                     $schema,
                     match ($verbosity) {
                         'concise' => 800,
@@ -839,7 +876,7 @@ class WorkflowExecutionController extends Controller
                 }
 
                 $message = 'AI Agent berhasil menghasilkan jawaban.';
-                $logContext['provider'] = 'gemini';
+                $logContext['provider'] = $provider;
                 $logContext['model'] = $model;
                 $logContext['agent_namespace'] = $agentNamespace;
                 $logContext['verbosity'] = $verbosity;
@@ -1008,6 +1045,7 @@ class WorkflowExecutionController extends Controller
             ];
 
             $currentStep = null;
+            $this->liveContext = $context;
 
             $logs[] = [
                 'step' => $stepNumber,
@@ -1061,6 +1099,13 @@ class WorkflowExecutionController extends Controller
             'executed_steps' => $steps,
             'tokens' => $tokens,
         ];
+    }
+
+    private function isResumable(WorkflowExecution $execution): bool
+    {
+        return in_array($execution->status, ['waiting', 'failed'], true)
+            && is_string($execution->current_node_id)
+            && trim($execution->current_node_id) !== '';
     }
 
     private function nodeName(array $node): string

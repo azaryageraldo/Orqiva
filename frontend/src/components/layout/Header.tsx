@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Globe2,
   Inbox,
+  KeyRound,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -41,6 +42,7 @@ export type HeaderIcon =
   | "inbox"
   | "channel"
   | "activity"
+  | "keys"
   | "settings";
 
 interface HeaderProps {
@@ -58,6 +60,7 @@ const ICONS: Record<HeaderIcon, LucideIcon> = {
   inbox: Inbox,
   channel: Globe2,
   activity: Activity,
+  keys: KeyRound,
   settings: Settings,
 };
 

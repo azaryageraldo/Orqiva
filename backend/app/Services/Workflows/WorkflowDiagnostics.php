@@ -137,7 +137,7 @@ class WorkflowDiagnostics
                 'ai_provider_error',
                 'Layanan AI gagal',
                 $error,
-                'Periksa GEMINI_API_KEY, kuota, dan koneksi backend. Setelah diperbaiki, kirim ulang pesan pelanggan.',
+                'Buka menu API Keys, periksa API key provider, kuota, dan koneksi backend. Setelah diperbaiki, kirim ulang pesan pelanggan.',
                 null
             );
         }

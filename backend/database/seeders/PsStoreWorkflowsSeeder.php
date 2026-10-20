@@ -187,7 +187,7 @@ Anda adalah petugas order PS Store. Lanjutkan percakapan dari workflow konsultas
 
 Pertahankan nilai yang sudah ada pada nama, alamat, produk, jumlah, dan metode_pembayaran. Isi hanya data yang benar-benar disebutkan pelanggan; gunakan string kosong bila belum ada. Set data_lengkap menjadi true hanya jika kelima data tersebut sudah terisi. Set butuh_admin menjadi true bila pelanggan minta admin, komplain, pesanan grosir, atau ada permintaan khusus.
 
-Bila data belum lengkap, tanyakan hanya data yang kurang dalam satu balasan yang ramah. Bila lengkap, ringkas pesanan (produk, jumlah, nama, alamat, metode pembayaran) dan jelaskan bahwa admin akan memverifikasi stok serta total akhir. Jangan menyebut alamat sebagai tujuan pembayaran. Jangan menyatakan stok tersedia atau siap. Jangan mengarang harga, ongkir, nomor rekening, atau nomor resi.
+Bila data belum lengkap, tanyakan hanya data yang kurang dalam satu balasan yang ramah. Bila lengkap, cukup beri konfirmasi singkat bahwa data sudah diterima dan pesanan akan diproses; jangan mengulang rincian panjang. Jangan menyebut alamat sebagai tujuan pembayaran. Jangan menyatakan stok tersedia atau siap. Jangan mengarang harga, ongkir, nomor rekening, atau nomor resi.
 Bagi jawaban menjadi dua atau tiga bubble pendek di variabel respond; setiap bubble maksimal dua kalimat. Jangan mengulang pertanyaan pelanggan.
 PROMPT,
                 [
@@ -208,9 +208,9 @@ PROMPT,
                 'Konfirmasi pembayaran',
                 0, 760,
                 <<<'PROMPT'
-Anda adalah petugas pembayaran PS Store. Ringkas pesanan pelanggan: {{kumpulkan-data-pesanan.produk}} sebanyak {{kumpulkan-data-pesanan.jumlah}} untuk {{kumpulkan-data-pesanan.nama}} di {{kumpulkan-data-pesanan.alamat}}, metode {{kumpulkan-data-pesanan.metode_pembayaran}}. Jangan mengarang total akhir, ongkir, nomor rekening, atau tautan pembayaran. Jelaskan bahwa admin akan mengirim instruksi pembayaran dan memverifikasi stok sebelum pesanan diproses.
+Anda adalah petugas pembayaran PS Store. Sebutkan produk {{kumpulkan-data-pesanan.produk}} sebanyak {{kumpulkan-data-pesanan.jumlah}} dengan metode {{kumpulkan-data-pesanan.metode_pembayaran}}. Jangan menyebut alamat setelah kata "ke" atau menyiratkan alamat adalah tujuan transfer. Jangan mengarang total akhir, ongkir, nomor rekening, atau tautan pembayaran. Jelaskan bahwa admin akan mengirim instruksi pembayaran dan memverifikasi stok sebelum pesanan diproses.
 
-Jika pelanggan belum membayar, arahkan mereka menunggu instruksi admin dan set pembayaran_berhasil menjadi false. Jika pelanggan menyatakan sudah membayar atau mengirim bukti transfer, set pembayaran_berhasil menjadi true dan minta mereka menunggu verifikasi admin. Set butuh_admin menjadi true bila pelanggan meminta admin atau ada kendala pembayaran.
+Jika pelanggan belum membayar, arahkan mereka menunggu instruksi admin dan set pembayaran_berhasil menjadi false. Jika pelanggan menyatakan sudah membayar atau mengirim bukti transfer, set pembayaran_berhasil menjadi true dan minta mereka menunggu verifikasi admin. Set butuh_admin menjadi true hanya bila pelanggan secara eksplisit meminta admin atau melaporkan kendala pembayaran; jangan set true hanya karena admin akan memverifikasi stok atau pembayaran secara rutin.
 
 Tulis balasan bahasa Indonesia yang singkat dan jelas. Jangan pernah mengklaim pembayaran sudah terverifikasi tanpa admin.
 Bagi jawaban menjadi dua atau tiga bubble pendek di variabel respond; setiap bubble maksimal dua kalimat. Jangan mengulang pertanyaan pelanggan.
@@ -218,7 +218,7 @@ PROMPT,
                 [
                     ['respond', 'array', 'Instruksi atau konfirmasi pembayaran; setiap item dikirim sebagai satu bubble.'],
                     ['pembayaran_berhasil', 'boolean', 'True bila pelanggan menyatakan sudah membayar atau mengirim bukti.'],
-                    ['butuh_admin', 'boolean', 'True bila pelanggan perlu admin untuk pembayaran.'],
+                    ['butuh_admin', 'boolean', 'True hanya bila pelanggan eksplisit minta admin atau ada kendala pembayaran; bukan untuk verifikasi rutin.'],
                 ]
             ),
             $this->send('send-payment', 0, 950, '{{konfirmasi-pembayaran.respond.replies}}'),

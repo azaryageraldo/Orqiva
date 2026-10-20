@@ -2,6 +2,7 @@ import {
   Activity,
   Globe2,
   Inbox,
+  KeyRound,
   LayoutDashboard,
   LifeBuoy,
   Settings,
@@ -33,6 +34,7 @@ export type NavKey =
   | "inbox"
   | "channel"
   | "activity"
+  | "ai-providers"
   | "settings";
 
 interface SidebarProps {
@@ -43,6 +45,7 @@ interface SidebarProps {
   onInboxClick: () => void;
   onChannelClick: () => void;
   onActivityClick: () => void;
+  onAiProvidersClick: () => void;
   onHelpClick: () => void;
   onSettingsClick: () => void;
 }
@@ -73,6 +76,7 @@ export default function Sidebar({
   onInboxClick,
   onChannelClick,
   onActivityClick,
+  onAiProvidersClick,
   onHelpClick,
   onSettingsClick,
 }: SidebarProps) {
@@ -84,6 +88,7 @@ export default function Sidebar({
     inbox: onInboxClick,
     channel: onChannelClick,
     activity: onActivityClick,
+    "ai-providers": onAiProvidersClick,
     settings: onSettingsClick,
   };
   const runNav = (handler: () => void) => () => {
@@ -194,9 +199,13 @@ export default function Sidebar({
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={runNav(onHelpClick)} className={MENU_BUTTON}>
-                  <LifeBuoy />
-                  <span>Help &amp; Support</span>
+                <SidebarMenuButton
+                  isActive={activeNav === "ai-providers"}
+                  onClick={runNav(onAiProvidersClick)}
+                  className={MENU_BUTTON}
+                >
+                  <KeyRound />
+                  <span>API Keys</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -208,6 +217,13 @@ export default function Sidebar({
                 >
                   <Settings />
                   <span>Settings</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={runNav(onHelpClick)} className={MENU_BUTTON}>
+                  <LifeBuoy />
+                  <span>Help &amp; Support</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

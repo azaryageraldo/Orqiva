@@ -8,8 +8,10 @@ use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use App\Models\Contact;
 use App\Models\WorkflowExecution;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -134,6 +136,7 @@ class PublicChatController extends Controller
 
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:4000'],
+            'client_message_id' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
         $text = trim($validated['message']);
@@ -144,29 +147,64 @@ class PublicChatController extends Controller
             ]);
         }
 
+        $clientMessageId = trim((string) ($validated['client_message_id'] ?? ''));
+        $lock = Cache::lock('public-chat-send:'.$session->id, 120);
+
+        try {
+            return $lock->block(
+                20,
+                fn (): JsonResponse => $this->processSend(
+                    $session->fresh(['channel.workflow', 'contact', 'workflow', 'user']),
+                    $text,
+                    $clientMessageId !== '' ? $clientMessageId : null
+                )
+            );
+        } catch (LockTimeoutException) {
+            throw ValidationException::withMessages([
+                'message' => 'Pesan sebelumnya masih diproses. Tunggu sebentar lalu coba lagi.',
+            ]);
+        }
+    }
+
+    private function processSend(
+        ChatSession $session,
+        string $text,
+        ?string $clientMessageId
+    ): JsonResponse {
+        if ($session->status === ChatSession::STATUS_ENDED) {
+            throw ValidationException::withMessages([
+                'message' => 'Sesi sudah berakhir. Muat ulang widget untuk memulai sesi baru.',
+            ]);
+        }
+
+        if ($clientMessageId !== null) {
+            $existing = ChatMessage::query()
+                ->where('chat_session_id', $session->id)
+                ->where('client_message_id', $clientMessageId)
+                ->first();
+
+            if ($existing !== null) {
+                return $this->stateResponse($session);
+            }
+        }
+
         $channel = $session->channel;
         $this->assertAvailable($channel);
 
         $history = $this->history($session);
 
-        $customerMessage = ChatMessage::create([
+        ChatMessage::create([
             'chat_session_id' => $session->id,
             'contact_id' => $session->contact_id,
             'role' => 'customer',
             'content' => $text,
+            'client_message_id' => $clientMessageId,
         ]);
 
         $session->update(['last_activity_at' => now()]);
 
         if ($session->status === ChatSession::STATUS_HUMAN) {
-            return response()->json([
-                'data' => [
-                    'status' => $session->status,
-                    'session_status' => $session->status,
-                    'messages' => $this->messagesPayload($session->fresh()),
-                    'notice' => 'Admin akan membalas percakapan ini.',
-                ],
-            ]);
+            return $this->stateResponse($session);
         }
 
         $workflow = $session->workflow;
@@ -175,6 +213,12 @@ class PublicChatController extends Controller
             throw ValidationException::withMessages([
                 'message' => 'Workflow entry belum dikonfigurasi pada channel ini.',
             ]);
+        }
+
+        $delayMs = max(0, min(5000, (int) ($session->user?->ai_reply_debounce_ms ?? 0)));
+
+        if ($delayMs > 0) {
+            usleep($delayMs * 1000);
         }
 
         $executionRequest = Request::create(
@@ -187,6 +231,7 @@ class PublicChatController extends Controller
                     'customer_name' => $session->contact?->name ?? 'Pengunjung',
                     'conversation_id' => $session->contact?->public_id,
                     'conversation_history' => $history,
+                    'client_message_id' => $clientMessageId,
                 ],
             ]
         );
@@ -263,12 +308,19 @@ class PublicChatController extends Controller
 
         $session->update(['last_activity_at' => now()]);
 
+        return $this->stateResponse($session, $execution?->status);
+    }
+
+    private function stateResponse(ChatSession $session, ?string $executionStatus = null): JsonResponse
+    {
+        $session->refresh();
+
         return response()->json([
             'data' => [
-                'status' => $execution?->status,
-                'session_status' => $session->fresh()->status,
+                'status' => $executionStatus ?? $session->execution?->status,
+                'session_status' => $session->status,
                 'messages' => $this->messagesPayload($session->fresh()),
-                'notice' => $session->fresh()->status === ChatSession::STATUS_HUMAN
+                'notice' => $session->status === ChatSession::STATUS_HUMAN
                     ? 'Admin akan membalas percakapan ini.'
                     : null,
             ],

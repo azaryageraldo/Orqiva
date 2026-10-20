@@ -6,7 +6,7 @@ Platform SaaS AI Workflow Automation (MVP portfolio). Pengguna menyusun alur oto
 
 - Backend: PHP 8.3+ + Laravel 13, MySQL 8
 - Frontend: React + TypeScript + Vite, React Flow, Tailwind CSS
-- AI: Google Gemini API (hanya melalui backend)
+- AI: Google Gemini, OpenAI, atau OpenRouter dengan API key per pengguna (BYOK)
 
 ## Instalasi cepat
 
@@ -18,7 +18,7 @@ cd backend
 composer install
 cp .env.example .env
 php artisan key:generate
-# Sesuaikan DB dan GEMINI_API_KEY di .env
+# Sesuaikan koneksi DB, lalu atur API key AI di halaman API Keys setelah login
 php artisan migrate
 php artisan serve
 

@@ -13,20 +13,26 @@ use App\Services\GeminiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\Concerns\BuildsWorkflowDefinitions;
+use Tests\Concerns\ConfiguresAiProvider;
 use Tests\TestCase;
 
 class PublicWidgetTest extends TestCase
 {
     use BuildsWorkflowDefinitions;
+    use ConfiguresAiProvider;
     use RefreshDatabase;
 
     private function user(string $email = 'owner@example.com'): User
     {
-        return User::create([
+        $user = User::create([
             'name' => 'Owner',
             'email' => $email,
             'password' => 'password',
         ]);
+
+        $this->configureAiProvider($user);
+
+        return $user;
     }
 
     private function workflow(User $user, array $definition = []): Workflow
@@ -116,6 +122,106 @@ class PublicWidgetTest extends TestCase
         $this->assertSame(
             'Budi',
             Contact::query()->where('public_id', $started['contact_id'])->value('name')
+        );
+    }
+
+    public function test_duplicate_client_message_id_does_not_run_workflow_twice(): void
+    {
+        $calls = 0;
+
+        $this->mock(GeminiService::class, function (MockInterface $mock) use (&$calls): void {
+            $mock->shouldReceive('generate')->andReturnUsing(function () use (&$calls) {
+                $calls++;
+
+                return [
+                    'text' => 'Halo!',
+                    'finish_reason' => 'STOP',
+                    'usage' => [
+                        'prompt_tokens' => 10,
+                        'completion_tokens' => 5,
+                        'total_tokens' => 15,
+                    ],
+                ];
+            });
+        });
+
+        $user = $this->user();
+        $workflow = $this->workflow($user);
+        $this->channel($user, $workflow);
+        $session = $this->startWidgetSession('widget-token');
+        $payload = [
+            'message' => 'Halo',
+            'client_message_id' => 'client-message-1',
+        ];
+
+        $this->postJson("/api/v1/public/sessions/{$session['session_token']}/messages", $payload)
+            ->assertOk();
+        $this->postJson("/api/v1/public/sessions/{$session['session_token']}/messages", $payload)
+            ->assertOk();
+
+        $this->assertSame(1, $calls);
+        $this->assertSame(1, ChatMessage::query()->where('role', 'customer')->count());
+        $this->assertSame(1, ChatMessage::query()->where('role', 'assistant')->count());
+        $this->assertDatabaseCount('workflow_executions', 1);
+    }
+
+    public function test_public_failed_turn_resumes_from_failed_node_on_next_message(): void
+    {
+        $calls = 0;
+
+        $this->mock(GeminiService::class, function (MockInterface $mock) use (&$calls): void {
+            $mock->shouldReceive('generate')->andReturnUsing(function () use (&$calls) {
+                $calls++;
+
+                if ($calls === 2) {
+                    throw new \RuntimeException('Provider sedang down.');
+                }
+
+                return [
+                    'text' => $calls === 1 ? 'Jawaban pertama' : 'Jawaban kedua',
+                    'finish_reason' => 'STOP',
+                    'usage' => [
+                        'prompt_tokens' => 10,
+                        'completion_tokens' => 5,
+                        'total_tokens' => 15,
+                    ],
+                ];
+            });
+        });
+
+        $user = $this->user();
+        $workflow = $this->workflow($user, $this->resumableDefinition());
+        $this->channel($user, $workflow);
+        $session = $this->startWidgetSession('widget-token');
+        $token = $session['session_token'];
+
+        $this->postJson("/api/v1/public/sessions/{$token}/messages", [
+            'message' => 'Halo',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'waiting');
+
+        $this->postJson("/api/v1/public/sessions/{$token}/messages", [
+            'message' => 'Lanjut',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'failed');
+
+        $execution = WorkflowExecution::query()->firstOrFail();
+        $this->assertSame('failed', $execution->status);
+        $this->assertSame('ai-2', $execution->current_node_id);
+
+        $this->postJson("/api/v1/public/sessions/{$token}/messages", [
+            'message' => 'Coba lagi',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'success');
+
+        $this->assertSame(3, $calls);
+        $this->assertSame(1, $execution->steps()->where('node_type', 'trigger')->count());
+        $this->assertSame(
+            'Jawaban kedua',
+            data_get($execution->fresh()->context, 'ai_response')
         );
     }
 

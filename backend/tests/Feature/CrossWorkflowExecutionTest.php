@@ -9,20 +9,26 @@ use App\Services\GeminiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\Concerns\BuildsWorkflowDefinitions;
+use Tests\Concerns\ConfiguresAiProvider;
 use Tests\TestCase;
 
 class CrossWorkflowExecutionTest extends TestCase
 {
     use BuildsWorkflowDefinitions;
+    use ConfiguresAiProvider;
     use RefreshDatabase;
 
     private function user(): User
     {
-        return User::create([
+        $user = User::create([
             'name' => 'Owner',
             'email' => 'owner@example.com',
             'password' => 'password',
         ]);
+
+        $this->configureAiProvider($user);
+
+        return $user;
     }
 
     private function fakeGemini(string $text = 'Halo!'): void

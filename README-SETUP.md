@@ -8,7 +8,7 @@ Repository ini berisi MVP yang sudah berjalan: autentikasi Sanctum, CRUD workflo
 - Composer
 - Node.js dan npm
 - MySQL 8 (gunakan layanan lokal yang sudah ada)
-- Gemini API key (hanya disimpan di backend)
+- API key Gemini/OpenAI/OpenRouter (disimpan terenkripsi lewat halaman API Keys)
 
 ## Install dependencies
 
@@ -20,7 +20,7 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-Isi koneksi MySQL dan `GEMINI_API_KEY` di `backend/.env`. Kunci API tidak boleh diletakkan di frontend.
+Isi koneksi MySQL di `backend/.env`. API key provider AI tidak perlu ditulis di `.env`; simpan lewat halaman **API Keys** di aplikasi agar langsung dipakai workflow.
 
 ```sh
 cd ../frontend

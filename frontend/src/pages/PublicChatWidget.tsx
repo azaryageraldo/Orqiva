@@ -64,6 +64,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const started = useRef(false);
+  const pendingClientRef = useRef<{ id: string; text: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -136,8 +137,18 @@ export default function PublicChatWidget({ token }: { token: string }) {
     setNotice("");
     setDraft("");
 
+    const pending = pendingClientRef.current;
+    const clientMessageId =
+      pending?.text === text ? pending.id : crypto.randomUUID();
+    pendingClientRef.current = { id: clientMessageId, text };
+
     try {
-      const result = await sendPublicMessage(sessionToken, text);
+      const result = await sendPublicMessage(
+        sessionToken,
+        text,
+        clientMessageId,
+      );
+      pendingClientRef.current = null;
       setMessages(result.messages);
       setSessionStatus(result.session_status);
       setNotice(result.notice ?? "");

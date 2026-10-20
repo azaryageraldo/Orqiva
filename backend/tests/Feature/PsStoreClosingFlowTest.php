@@ -11,10 +11,12 @@ use App\Services\GeminiService;
 use Database\Seeders\PsStoreWorkflowsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
+use Tests\Concerns\ConfiguresAiProvider;
 use Tests\TestCase;
 
 class PsStoreClosingFlowTest extends TestCase
 {
+    use ConfiguresAiProvider;
     use RefreshDatabase;
 
     private function fakeGeminiSequence(array $payloads): void
@@ -44,11 +46,13 @@ class PsStoreClosingFlowTest extends TestCase
 
     public function test_ps_store_flow_moves_from_offer_to_closing_and_payment(): void
     {
-        User::create([
+        $admin = User::create([
             'name' => 'Admin',
             'email' => 'admin@gmail.com',
             'password' => 'password',
         ]);
+
+        $this->configureAiProvider($admin);
 
         $this->seed(PsStoreWorkflowsSeeder::class);
 

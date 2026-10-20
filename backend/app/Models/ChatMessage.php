@@ -13,6 +13,7 @@ class ChatMessage extends Model
         'workflow_execution_id',
         'role',
         'content',
+        'client_message_id',
         'metadata',
     ];
 
