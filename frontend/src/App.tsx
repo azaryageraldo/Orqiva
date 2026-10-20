@@ -11,12 +11,13 @@ import Workflows from "./pages/Workflows";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import WorkflowChat from "./pages/WorkflowChat";
 import Activity from "./pages/Activity";
+import Inbox from "./pages/Inbox";
 import ExecutionDetail from "./pages/ExecutionDetail";
 import Settings from "./pages/Settings";
 import "./App.css";
 
 type Health = "checking" | "online" | "offline";
-type View = "dashboard" | "workflows" | "activity" | "settings";
+type View = "dashboard" | "workflows" | "inbox" | "activity" | "settings";
 
 function ErrorBanner({
   message,
@@ -195,6 +196,7 @@ export default function App() {
     onLogout: () => void handleLogout(),
     onDashboardClick: () => goTo("dashboard"),
     onWorkflowsClick: () => goTo("workflows"),
+    onInboxClick: () => goTo("inbox"),
     onActivityClick: () => goTo("activity"),
     onHelpClick: () => goTo("settings", "settings-support"),
     onSettingsClick: () => goTo("settings"),
@@ -269,6 +271,21 @@ export default function App() {
         {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
         <Dashboard health={health} onViewActivity={() => goTo("activity")} />
+      </DashboardLayout>
+    );
+  }
+
+  if (view === "inbox") {
+    return (
+      <DashboardLayout
+        title="Inbox"
+        icon="inbox"
+        activeNav="inbox"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <Inbox />
       </DashboardLayout>
     );
   }

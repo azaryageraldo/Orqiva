@@ -1,6 +1,7 @@
 import {
   Activity,
   ChevronDown,
+  Inbox,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -36,6 +37,7 @@ export type HeaderIcon =
   | "workflows"
   | "editor"
   | "chat"
+  | "inbox"
   | "activity"
   | "settings";
 
@@ -51,6 +53,7 @@ const ICONS: Record<HeaderIcon, LucideIcon> = {
   workflows: Workflow,
   editor: Workflow,
   chat: MessageSquare,
+  inbox: Inbox,
   activity: Activity,
   settings: Settings,
 };

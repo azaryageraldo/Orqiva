@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\InboxController;
 use App\Http\Controllers\Api\UsageStatsController;
 use App\Http\Controllers\Api\WorkflowController;
 use App\Http\Controllers\Api\WorkflowExecutionController;
@@ -37,6 +38,9 @@ Route::prefix('v1')->group(function () {
             '/workflows/{workflow}/execute',
             [WorkflowExecutionController::class, 'execute']
         )->middleware('throttle:30,1');
+
+        Route::get('/inbox', [InboxController::class, 'index']);
+        Route::get('/inbox/{execution}', [InboxController::class, 'show']);
 
         Route::get(
             '/stats/token-usage',

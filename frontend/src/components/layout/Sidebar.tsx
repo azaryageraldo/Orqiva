@@ -1,5 +1,6 @@
 import {
   Activity,
+  Inbox,
   LayoutDashboard,
   LifeBuoy,
   Settings,
@@ -20,17 +21,19 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import flowPilotLogo from "../../assets/flowpilot-logo.png";
 
 export type Health = "checking" | "online" | "offline";
-export type NavKey = "dashboard" | "workflows" | "activity" | "settings";
+export type NavKey = "dashboard" | "workflows" | "inbox" | "activity" | "settings";
 
 interface SidebarProps {
   health: Health;
   activeNav: NavKey;
   onDashboardClick: () => void;
   onWorkflowsClick: () => void;
+  onInboxClick: () => void;
   onActivityClick: () => void;
   onHelpClick: () => void;
   onSettingsClick: () => void;
@@ -59,16 +62,23 @@ export default function Sidebar({
   activeNav,
   onDashboardClick,
   onWorkflowsClick,
+  onInboxClick,
   onActivityClick,
   onHelpClick,
   onSettingsClick,
 }: SidebarProps) {
+  const { isMobile, setOpenMobile } = useSidebar();
   const status = HEALTH_STYLES[health];
   const navHandlers: Record<NavKey, () => void> = {
     dashboard: onDashboardClick,
     workflows: onWorkflowsClick,
+    inbox: onInboxClick,
     activity: onActivityClick,
     settings: onSettingsClick,
+  };
+  const runNav = (handler: () => void) => () => {
+    handler();
+    if (isMobile) setOpenMobile(false);
   };
 
   return (
@@ -96,7 +106,7 @@ export default function Sidebar({
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
                     isActive={activeNav === item.key}
-                    onClick={navHandlers[item.key]}
+                    onClick={runNav(navHandlers[item.key])}
                     className={MENU_BUTTON}
                   >
                     <item.icon />
@@ -120,7 +130,7 @@ export default function Sidebar({
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
                     isActive={activeNav === item.key}
-                    onClick={navHandlers[item.key]}
+                    onClick={runNav(navHandlers[item.key])}
                     className={MENU_BUTTON}
                   >
                     <item.icon />
@@ -131,8 +141,19 @@ export default function Sidebar({
 
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  isActive={activeNav === "inbox"}
+                  onClick={runNav(onInboxClick)}
+                  className={MENU_BUTTON}
+                >
+                  <Inbox />
+                  <span>Inbox</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
                   isActive={activeNav === "activity"}
-                  onClick={onActivityClick}
+                  onClick={runNav(onActivityClick)}
                   className={MENU_BUTTON}
                 >
                   <Activity />
@@ -152,7 +173,7 @@ export default function Sidebar({
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={onHelpClick} className={MENU_BUTTON}>
+                <SidebarMenuButton onClick={runNav(onHelpClick)} className={MENU_BUTTON}>
                   <LifeBuoy />
                   <span>Help &amp; Support</span>
                 </SidebarMenuButton>
@@ -161,7 +182,7 @@ export default function Sidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeNav === "settings"}
-                  onClick={onSettingsClick}
+                  onClick={runNav(onSettingsClick)}
                   className={MENU_BUTTON}
                 >
                   <Settings />

@@ -31,14 +31,8 @@ import "@xyflow/react/dist/style.css";
 
 import {
   ArrowLeft,
-  Bot,
-  CircleStop,
   Check,
-  CornerUpRight,
-  GitBranch,
-  Handshake,
   ListPlus,
-  MessageSquare,
   MousePointer2,
   Plus,
   Save,
@@ -48,8 +42,29 @@ import {
   Webhook,
   Workflow as WorkflowIcon,
   X,
-  Zap,
 } from "lucide-react";
+import {
+  ArrowBendUpRight,
+  ChatCircleDots,
+  GitFork,
+  Handshake,
+  Lightning,
+  PauseCircle,
+  Robot,
+  Sparkle,
+  type Icon as PhosphorIcon,
+} from "@phosphor-icons/react";
+
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 
 import { getWorkflow, updateWorkflow } from "../services/workflow";
 import { getErrorMessage } from "../services/api";
@@ -121,36 +136,43 @@ const inputClass =
   "mt-2.5 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
 
 const labelClass = "text-sm font-medium leading-6 text-muted-foreground";
+const compactInputClass =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
 const buttonClass =
   "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
 const nodeOptions: {
   label: NodeKind;
   description: string;
-  icon: typeof Zap;
+  icon: PhosphorIcon;
 }[] = [
-  { label: "Trigger", description: "Start from a chat message", icon: Zap },
-  { label: "AI Agent", description: "Generate replies and decisions", icon: Bot },
+  { label: "Trigger", description: "Start from a chat message", icon: Lightning },
+  { label: "AI Agent", description: "Generate replies and decisions", icon: Robot },
   {
     label: "Send Message",
     description: "Reply with one or more bubbles",
-    icon: MessageSquare,
+    icon: ChatCircleDots,
   },
   {
     label: "Condition",
     description: "Branch on a yes/no variable",
-    icon: GitBranch,
+    icon: GitFork,
   },
   {
     label: "Go To",
     description: "Jump to another step",
-    icon: CornerUpRight,
+    icon: ArrowBendUpRight,
   },
   {
     label: "Relocate",
     description: "Hand the chat to a human admin",
     icon: Handshake,
   },
+];
+
+const PROMPT_BUILTINS = [
+  { token: "customer_message", description: "Pesan terakhir pelanggan" },
+  { token: "customer_name", description: "Nama pelanggan" },
 ];
 
 const geminiModels = [
@@ -187,8 +209,9 @@ const initialNodes: FlowNode[] = [
       outputVariables: [
         {
           name: "respond",
-          type: "string",
-          description: "Jawaban AI yang dikirim ke pelanggan",
+          type: "array",
+          itemField: "replies",
+          description: "Balasan AI; setiap item dikirim sebagai bubble",
         },
       ],
       variableDefinitions: [
@@ -219,7 +242,7 @@ const initialNodes: FlowNode[] = [
       nodeName: "Send AI reply",
       description: "Send the AI response to the visitor",
       messageMode: "smart_value",
-      messageTemplate: "{{respond}}",
+      messageTemplate: "{{respond.replies}}",
     },
   },
 ];
@@ -239,124 +262,130 @@ const initialEdges: Edge[] = [
   },
 ];
 
-const NODE_ICONS: Record<NodeKind, typeof Zap> = {
-  Trigger: Zap,
-  "AI Agent": Bot,
-  "Send Message": MessageSquare,
-  Condition: GitBranch,
-  "Go To": CornerUpRight,
+const NODE_ICONS: Record<NodeKind, PhosphorIcon> = {
+  Trigger: Lightning,
+  "AI Agent": Robot,
+  "Send Message": ChatCircleDots,
+  Condition: GitFork,
+  "Go To": ArrowBendUpRight,
   Relocate: Handshake,
-  Stopper: CircleStop,
+  Stopper: PauseCircle,
 };
 
-const NODE_TONES: Record<NodeKind, { tile: string }> = {
-  Trigger: { tile: "bg-amber-400/15 text-amber-300" },
-  "AI Agent": { tile: "bg-violet-400/15 text-violet-300" },
-  "Send Message": { tile: "bg-primary/15 text-primary" },
-  Condition: { tile: "bg-orange-400/15 text-orange-300" },
-  "Go To": { tile: "bg-sky-400/15 text-sky-300" },
-  Relocate: { tile: "bg-teal-400/15 text-teal-300" },
-  Stopper: { tile: "bg-rose-400/15 text-rose-300" },
+const NODE_TONES: Record<NodeKind, { tile: string; glow: string }> = {
+  Trigger: {
+    tile: "bg-amber-400/15 text-amber-300",
+    glow: "shadow-[0_0_16px_-6px_rgba(251,191,36,0.7)]",
+  },
+  "AI Agent": {
+    tile: "bg-violet-400/15 text-violet-200",
+    glow: "shadow-[0_0_20px_-4px_rgba(167,139,250,0.7)]",
+  },
+  "Send Message": {
+    tile: "bg-primary/15 text-primary",
+    glow: "shadow-[0_0_16px_-6px_var(--primary)]",
+  },
+  Condition: {
+    tile: "bg-orange-400/15 text-orange-300",
+    glow: "shadow-[0_0_16px_-6px_rgba(251,146,60,0.65)]",
+  },
+  "Go To": {
+    tile: "bg-sky-400/15 text-sky-300",
+    glow: "shadow-[0_0_16px_-6px_rgba(56,189,248,0.65)]",
+  },
+  Relocate: {
+    tile: "bg-teal-400/15 text-teal-300",
+    glow: "shadow-[0_0_16px_-6px_rgba(45,212,191,0.65)]",
+  },
+  Stopper: {
+    tile: "bg-rose-400/15 text-rose-300",
+    glow: "shadow-[0_0_16px_-6px_rgba(251,113,133,0.65)]",
+  },
 };
-
-function nodeSubtitle(data: AutomationNodeData): string {
-  switch (data.label) {
-    case "Trigger":
-      return "Starts from an incoming message";
-    case "AI Agent": {
-      const count = (data.outputVariables ?? []).filter(
-        (item) => item.name.trim() !== "",
-      ).length;
-      return [data.model, count ? `${count} variables` : null]
-        .filter(Boolean)
-        .join(" · ") || "Gemini";
-    }
-    case "Send Message":
-      return String(data.messageTemplate ?? "").trim() || "No message yet";
-    case "Condition":
-      return data.conditionVariable
-        ? `{{${data.conditionVariable}}} · If match / Else`
-        : "Pilih variabel boolean";
-    case "Go To":
-      return data.endFlow ? "Jump · end flow" : "Jump to a step";
-    case "Relocate":
-      return "Handoff to a human admin";
-    case "Stopper":
-      return "Waits for the next message";
-    default:
-      return "";
-  }
-}
 
 function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
   const deleteNode = useContext(NodeActionsContext);
   const Icon = NODE_ICONS[data.label] ?? WorkflowIcon;
   const tone = NODE_TONES[data.label] ?? NODE_TONES["Send Message"];
   const isCondition = data.label === "Condition";
+  const isAgent = data.label === "AI Agent";
   const hasSourceHandle = !["Send Message", "Relocate", "Go To"].includes(
     data.label,
   );
+  const nodeTitle = data.nodeName?.trim() || "Untitled step";
+  const conditionVariable = data.conditionVariable?.trim();
 
   return (
     <div
-      className={`group relative w-[252px] rounded-2xl border bg-card shadow-lg shadow-black/20 transition ${
+      className={`group relative w-[224px] overflow-hidden rounded-xl border bg-card shadow-lg shadow-black/20 transition ${
         selected
           ? "border-primary/70 ring-2 ring-primary/20"
           : "border-border hover:border-ring/40"
+      } ${
+        isAgent
+          ? "bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.12),transparent_58%)]"
+          : ""
       }`}
     >
       <button
         type="button"
-        aria-label={`Delete ${data.nodeName || data.label}`}
+        aria-label={`Delete ${nodeTitle}`}
         title="Delete node"
         onClick={(event) => {
           event.stopPropagation();
           deleteNode?.(id);
         }}
-        className={`nodrag absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive ${
+        className={`nodrag absolute top-1.5 right-1.5 z-10 flex size-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive ${
           selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         }`}
       >
-        <Trash2 size={14} />
+        <Trash2 size={13} />
       </button>
 
       <Handle
         type="target"
         position={Position.Top}
-        className="!size-3 !rounded-full !border-2 !border-background !bg-muted-foreground/70"
+        className="!size-2.5 !rounded-full !border-2 !border-background !bg-muted-foreground/70"
       />
 
-      <div className="flex items-center gap-3 p-3.5 pr-9">
+      <div className="flex items-center gap-2.5 py-2.5 pr-8 pl-3">
         <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${tone.tile}`}
+          className={`relative flex size-8 shrink-0 items-center justify-center rounded-lg ${tone.tile} ${tone.glow}`}
         >
-          <Icon size={19} />
+          <Icon size={17} weight="duotone" />
+          {isAgent && (
+            <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.9)]" />
+          )}
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            {data.label}
-          </p>
           <p
-            className="mt-1 truncate text-sm font-semibold text-foreground"
-            title={data.nodeName || data.label}
+            className="truncate text-[13px] font-semibold text-foreground"
+            title={nodeTitle}
           >
-            {data.nodeName || data.label}
+            {nodeTitle}
           </p>
+          {isCondition && (
+            <p
+              className={`mt-0.5 truncate font-mono text-[10px] ${
+                conditionVariable ? "text-amber-200/80" : "text-muted-foreground/70"
+              }`}
+              title={
+                conditionVariable
+                  ? `{{${conditionVariable}}}`
+                  : "Pilih variabel boolean"
+              }
+            >
+              {conditionVariable
+                ? `{{${conditionVariable}}}`
+                : "Pilih variabel"}
+            </p>
+          )}
         </div>
       </div>
 
-      <div className="border-t border-border/70 px-3.5 py-2">
-        <p className="truncate text-[11px] text-muted-foreground" title={nodeSubtitle(data)}>
-          {nodeSubtitle(data)}
-        </p>
-      </div>
-
-      {isCondition && (
-        <div className="flex items-center justify-between border-t border-border/70 px-3.5 py-1.5 text-[10px] font-semibold">
-          <span className="text-rose-300">↓ Else</span>
-          <span className="text-emerald-300">If match →</span>
-        </div>
+      {isAgent && (
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
       )}
 
       {isCondition ? (
@@ -365,22 +394,24 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
             id="true"
             type="source"
             position={Position.Right}
+            title="If match"
             style={{ top: "50%", background: "#34d399" }}
-            className="!size-3 !rounded-full !border-2 !border-background"
+            className="!size-2.5 !rounded-full !border-2 !border-background"
           />
           <Handle
             id="false"
             type="source"
             position={Position.Bottom}
+            title="Else"
             style={{ left: "50%", background: "#fb7185" }}
-            className="!size-3 !rounded-full !border-2 !border-background"
+            className="!size-2.5 !rounded-full !border-2 !border-background"
           />
         </>
       ) : hasSourceHandle ? (
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!size-3 !rounded-full !border-2 !border-background !bg-primary"
+          className="!size-2.5 !rounded-full !border-2 !border-background !bg-primary"
         />
       ) : null}
     </div>
@@ -649,6 +680,7 @@ export default function WorkflowEditor({
   const [showLibrary, setShowLibrary] = useState(false);
   const [draftData, setDraftData] = useState<AutomationNodeData | null>(null);
   const [agentTab, setAgentTab] = useState<"node" | "prompt" | "variables">("node");
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(workflowId));
   const [isSaving, setIsSaving] = useState(false);
@@ -782,6 +814,20 @@ export default function WorkflowEditor({
         : [],
     [nodes, edges, selectedNodeId],
   );
+  const promptVariables = useMemo(() => {
+    const values = [
+      ...PROMPT_BUILTINS,
+      ...upstreamVariables.map((variable) => ({
+        token: variable.token,
+        description: variable.description,
+      })),
+    ];
+
+    return values.filter(
+      (value, index) =>
+        values.findIndex((item) => item.token === value.token) === index,
+    );
+  }, [upstreamVariables]);
   const booleanVariables = upstreamVariables.filter(
     (variable) => variable.type === "boolean",
   );
@@ -864,8 +910,9 @@ export default function WorkflowEditor({
         outputVariables: [
           {
             name: "respond",
-            type: "string",
-            description: "Jawaban AI yang dikirim ke pelanggan",
+            type: "array",
+            itemField: "replies",
+            description: "Balasan AI; setiap item dikirim sebagai bubble",
           },
         ],
         provider: "gemini",
@@ -877,7 +924,7 @@ export default function WorkflowEditor({
         nodeName: "Send message",
         description: "Send a message to the visitor",
         messageMode: "template",
-        messageTemplate: "{{respond}}",
+        messageTemplate: "{{respond.replies}}",
       },
       Condition: {
         label,
@@ -924,6 +971,27 @@ export default function WorkflowEditor({
 
   function updateNode(patch: Partial<AutomationNodeData>) {
     setDraftData((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  function insertPromptToken(token: string) {
+    const textarea = promptRef.current;
+    const current = String(inspectorData?.systemMessage ?? "");
+    const tokenText = `{{${token}}}`;
+
+    if (!textarea) {
+      updateNode({ systemMessage: `${current}${tokenText}` });
+      return;
+    }
+
+    const start = textarea.selectionStart ?? current.length;
+    const end = textarea.selectionEnd ?? current.length;
+    const next = `${current.slice(0, start)}${tokenText}${current.slice(end)}`;
+
+    updateNode({ systemMessage: next });
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + tokenText.length, start + tokenText.length);
+    });
   }
 
   function updateOutputVariable(
@@ -1194,7 +1262,7 @@ export default function WorkflowEditor({
                   className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.045]"
                 >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">
-                    <Icon size={17} />
+                    <Icon size={17} weight="duotone" />
                   </span>
 
                   <span className="min-w-0 flex-1">
@@ -1226,7 +1294,7 @@ export default function WorkflowEditor({
         {/* Node settings inspector */}
 
         {selectedNode && (
-          <aside className="flex h-full max-h-full w-[min(420px,88vw)] max-w-[88vw] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
+          <aside className="flex h-full max-h-full w-[min(460px,92vw)] max-w-[92vw] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
             <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-5">
               <div className="flex items-center gap-2.5">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -1289,7 +1357,7 @@ export default function WorkflowEditor({
 
                   <div className={`${panelClass} p-3.5`}>
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <MessageSquare size={16} className="text-primary" />
+                      <ChatCircleDots size={16} className="text-primary" />
                       Customer message
                     </div>
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -1335,179 +1403,266 @@ export default function WorkflowEditor({
                   </div>
 
                   {agentTab === "prompt" && (
-                  <label className="block">
-                    <span className={labelClass}>
-                      <span className="inline-flex items-center gap-2">
-                        <Bot size={15} className="text-violet-300" />
-                        System Message
-                      </span>
-                    </span>
-                    <textarea
-                      rows={6}
-                      className={inputClass}
-                      placeholder="You are a helpful assistant..."
-                      value={String(inspectorData?.systemMessage ?? "")}
-                      onChange={(event) =>
-                        updateNode({ systemMessage: event.target.value })
-                      }
-                    />
-                    <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                      Define the AI's role, instructions, tone, and constraints.
-                    </span>
-                  </label>
-                  )}
-
-                  {agentTab === "variables" && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Variable size={15} className="text-primary" /> Output
-                        variables
-                      </span>
-                      <button
-                        type="button"
-                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/60"
-                        onClick={addOutputVariable}
-                      >
-                        <Plus size={13} className="mr-1 inline" /> Add variable
-                      </button>
-                    </div>
-
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      AI mengisi variabel ini otomatis. Text untuk Send Message,
-                      Yes-No untuk Condition, dan List untuk beberapa bubble.
-                    </p>
-
-                    {(inspectorData?.outputVariables ?? []).map(
-                      (variable, index) => (
-                        <div
-                          key={`output-variable-${index}`}
-                          className={`${panelClass} space-y-3 p-3`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-muted-foreground">
-                              Variable {index + 1}
-                            </span>
-                            <button
-                              type="button"
-                              aria-label="Remove variable"
-                              onClick={() => removeOutputVariable(index)}
-                              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-
-                          <label className="block">
-                            <span className={labelClass}>Name</span>
-                            <input
-                              className={inputClass}
-                              value={variable.name}
-                              onChange={(event) =>
-                                updateOutputVariable(index, {
-                                  name: event.target.value,
-                                })
-                              }
-                              placeholder="respond"
-                            />
-                          </label>
-
-                          <label className="block">
-                            <span className={labelClass}>Type</span>
-                            <select
-                              className={inputClass}
-                              value={variable.type}
-                              onChange={(event) => {
-                                const type = event.target.value as VariableType;
-
-                                updateOutputVariable(index, {
-                                  type,
-                                  itemField:
-                                    type === "array"
-                                      ? variable.itemField || "replies"
-                                      : variable.itemField,
-                                });
-                              }}
-                            >
-                              <option value="string">Text</option>
-                              <option value="boolean">
-                                Yes-No (Condition)
-                              </option>
-                              <option value="array">
-                                List (multiple bubbles)
-                              </option>
-                            </select>
-                          </label>
-
-                          {variable.type === "array" && (
-                            <label className="block">
-                              <span className={labelClass}>
-                                Nama sub-variabel
-                              </span>
-                              <input
-                                className={inputClass}
-                                value={variable.itemField ?? "replies"}
-                                onChange={(event) =>
-                                  updateOutputVariable(index, {
-                                    itemField: event.target.value,
-                                  })
-                                }
-                                placeholder="replies"
+                    <div className="space-y-4">
+                      <div className={`${panelClass} p-4`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <Sparkle
+                                size={16}
+                                weight="duotone"
+                                className="text-violet-300"
                               />
-                              <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                                Dipanggil di Send Message sebagai{" "}
-                                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
-                                  {`{{${variable.name || "respond"}.${variable.itemField || "replies"}}}`}
-                                </code>
-                                . Setiap item menjadi satu bubble.
-                              </span>
-                            </label>
-                          )}
-
-                          <label className="block">
-                            <span className={labelClass}>Description</span>
-                            <input
-                              className={inputClass}
-                              value={variable.description}
-                              onChange={(event) =>
-                                updateOutputVariable(index, {
-                                  description: event.target.value,
-                                })
-                              }
-                              placeholder="Jawaban AI untuk pelanggan"
-                            />
-                            <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                              Deskripsi ini membantu AI memahami isi variabel.
-                            </span>
-                          </label>
+                              System prompt
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              Tetapkan peran, gaya bahasa, dan batasan AI.
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2 py-1 text-[10px] text-muted-foreground">
+                            {String(inspectorData?.systemMessage ?? "").length.toLocaleString("id-ID")}{" "}
+                            karakter
+                          </span>
                         </div>
-                      ),
-                    )}
 
-                    <div className={`${panelClass} p-3.5`}>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Contoh
-                      </p>
-                      <div className="mt-2 space-y-1.5 text-xs leading-5 text-muted-foreground">
-                        <p>
-                          <code className="font-mono text-foreground">respond</code>{" "}
-                          (Text) → dikirim lewat Send Message.
+                        <textarea
+                          ref={promptRef}
+                          rows={12}
+                          className="mt-3 min-h-[300px] w-full resize-y rounded-xl border border-border bg-background px-4 py-3.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+                          placeholder="You are a helpful assistant. Answer clearly, stay on brand, and ask a follow-up question when needed..."
+                          value={String(inspectorData?.systemMessage ?? "")}
+                          onChange={(event) =>
+                            updateNode({ systemMessage: event.target.value })
+                          }
+                          spellCheck={false}
+                        />
+                      </div>
+
+                      <div className={`${panelClass} p-3.5`}>
+                        <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                          Sisipkan nilai dinamis
                         </p>
-                        <p>
-                          <code className="font-mono text-foreground">beli</code>{" "}
-                          (Yes-No) → dipakai di Condition.
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {promptVariables.map((variable) => (
+                            <button
+                              key={variable.token}
+                              type="button"
+                              onClick={() => insertPromptToken(variable.token)}
+                              title={variable.description}
+                              className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-[11px] text-primary transition hover:border-primary/40 hover:bg-primary/15"
+                            >
+                              {`{{${variable.token}}}`}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                          Klik token untuk menyisipkannya di posisi kursor.
                         </p>
+                      </div>
+
+                      <div className="flex items-start gap-2 rounded-xl border border-primary/15 bg-primary/[0.04] p-3 text-xs leading-5 text-muted-foreground">
+                        <Sparkle
+                          size={14}
+                          weight="duotone"
+                          className="mt-0.5 shrink-0 text-primary"
+                        />
                         <p>
-                          <code className="font-mono text-foreground">
-                            respond
-                          </code>{" "}
-                          (List, sub-variabel{" "}
-                          <code className="font-mono text-foreground">replies</code>
-                          ) → beberapa bubble chat.
+                          Sebutkan tujuan, nada bicara, dan hal yang harus
+                          dihindari. Prompt panjang tetap nyaman dibaca karena
+                          panel bisa digulir.
                         </p>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {agentTab === "variables" && (
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <Variable size={15} className="text-primary" />
+                            Output variables
+                            <span className="rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {(inspectorData?.outputVariables ?? []).length}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            Nilai yang diisi AI otomatis untuk dipakai node
+                            berikutnya.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
+                          onClick={addOutputVariable}
+                        >
+                          <Plus size={13} />
+                          Add
+                        </button>
+                      </div>
+
+                      {(inspectorData?.outputVariables ?? []).map(
+                        (variable, index) => {
+                          const name = variable.name.trim();
+                          const itemField =
+                            variable.itemField?.trim() || "replies";
+                          const preview =
+                            variable.type === "array"
+                              ? `${name || "respond"}.${itemField}`
+                              : name || "respond";
+
+                          return (
+                            <div
+                              key={`output-variable-${index}`}
+                              className={`${panelClass} overflow-hidden`}
+                            >
+                              <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/20 px-3 py-2">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-muted-foreground">
+                                    {index + 1}
+                                  </span>
+                                  <code
+                                    className="truncate font-mono text-[11px] text-primary"
+                                    title={`{{${preview}}}`}
+                                  >
+                                    {`{{${preview}}}`}
+                                  </code>
+                                </div>
+                                <button
+                                  type="button"
+                                  aria-label="Remove variable"
+                                  onClick={() => removeOutputVariable(index)}
+                                  className="rounded p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+
+                              <div className="space-y-2.5 p-3">
+                                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_138px]">
+                                  <label className="block min-w-0">
+                                    <span className="text-[11px] text-muted-foreground">
+                                      Name
+                                    </span>
+                                    <input
+                                      className={`${compactInputClass} mt-1 font-mono`}
+                                      value={variable.name}
+                                      onChange={(event) =>
+                                        updateOutputVariable(index, {
+                                          name: event.target.value,
+                                        })
+                                      }
+                                      placeholder="respond"
+                                    />
+                                  </label>
+
+                                  <label className="block">
+                                    <span className="text-[11px] text-muted-foreground">
+                                      Type
+                                    </span>
+                                    <select
+                                      className={`${compactInputClass} mt-1`}
+                                      value={variable.type}
+                                      onChange={(event) => {
+                                        const type =
+                                          event.target.value as VariableType;
+
+                                        updateOutputVariable(index, {
+                                          type,
+                                          itemField:
+                                            type === "array"
+                                              ? variable.itemField || "replies"
+                                              : variable.itemField,
+                                        });
+                                      }}
+                                    >
+                                      <option value="string">Text</option>
+                                      <option value="boolean">
+                                        Yes-No (Condition)
+                                      </option>
+                                      <option value="array">
+                                        List (bubbles)
+                                      </option>
+                                    </select>
+                                  </label>
+                                </div>
+
+                                {variable.type === "array" && (
+                                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                    <label className="block min-w-0">
+                                      <span className="text-[11px] text-muted-foreground">
+                                        Item field
+                                      </span>
+                                      <input
+                                        className={`${compactInputClass} mt-1 font-mono`}
+                                        value={variable.itemField ?? "replies"}
+                                        onChange={(event) =>
+                                          updateOutputVariable(index, {
+                                            itemField: event.target.value,
+                                          })
+                                        }
+                                        placeholder="replies"
+                                      />
+                                    </label>
+                                    <span className="rounded-lg border border-border bg-muted/30 px-2.5 py-2 font-mono text-[10px] text-primary">
+                                      {`{{${name || "respond"}.${itemField}}}`}
+                                    </span>
+                                  </div>
+                                )}
+
+                                <label className="block">
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Description{" "}
+                                    <span className="text-muted-foreground/60">
+                                      (dipakai AI)
+                                    </span>
+                                  </span>
+                                  <input
+                                    className={`${compactInputClass} mt-1`}
+                                    value={variable.description}
+                                    onChange={(event) =>
+                                      updateOutputVariable(index, {
+                                        description: event.target.value,
+                                      })
+                                    }
+                                    placeholder="Jawaban AI untuk pelanggan"
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        },
+                      )}
+
+                      {(inspectorData?.outputVariables ?? []).length === 0 && (
+                        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-5 text-center">
+                          <Variable
+                            size={20}
+                            className="mx-auto text-muted-foreground"
+                          />
+                          <p className="mt-2 text-sm font-medium text-foreground">
+                            Belum ada variabel
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            Tambahkan variabel agar AI bisa mengisi nilai untuk
+                            node berikutnya.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={addOutputVariable}
+                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-muted/60"
+                          >
+                            <Plus size={13} />
+                            Add variable
+                          </button>
+                        </div>
+                      )}
+
+                      <p className="text-[11px] leading-5 text-muted-foreground">
+                        Gunakan tipe List untuk membalas dengan beberapa bubble
+                        chat sekaligus.
+                      </p>
+                    </div>
                   )}
 
                   {agentTab === "node" && <div className="space-y-5">
@@ -1805,7 +1960,7 @@ export default function WorkflowEditor({
               {inspectorData?.label === "Stopper" && (
                 <div className="rounded-xl border border-rose-400/15 bg-rose-400/[0.05] p-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-rose-200">
-                    <CircleStop size={17} /> Pause point
+                    <PauseCircle size={17} /> Pause point
                   </div>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
                     This step pauses the workflow. When the customer sends another message, execution continues from the next connected step.
@@ -1853,23 +2008,52 @@ export default function WorkflowEditor({
         </div>
       )}
 
-      {confirmLeave && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-title" className="w-full max-w-md rounded-2xl border border-border bg-[#14161b] p-6 shadow-2xl shadow-black/60">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300"><Save size={18} /></div>
-            <h2 id="unsaved-title" className="mt-4 text-lg font-semibold text-foreground">Unsaved workflow changes</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">You have changes that are not saved yet. Save them before leaving?</p>
-            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setConfirmLeave(false)} className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}>Continue editing</button>
-              <button type="button" disabled={isSaving} onClick={() => { setConfirmLeave(false); onBack(); }} className={`${buttonClass} border border-border bg-transparent text-muted-foreground hover:bg-muted/60`}>Leave without saving</button>
-              <button type="button" disabled={isSaving || isLoading} onClick={() => void saveAndLeave()} className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}>
-                {isSaving && <span className="size-4 animate-spin rounded-full border-2 border-ring/40 border-t-white" />}
-                Save and leave
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      <AlertDialog
+        open={confirmLeave}
+        onOpenChange={(open) => {
+          if (!open && !isSaving) setConfirmLeave(false);
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogMedia className="bg-amber-400/10 text-amber-300">
+              <Save />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Unsaved workflow changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have changes that are not saved yet. Save them before
+              leaving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:flex-nowrap">
+            <AlertDialogCancel disabled={isSaving} className="h-9 whitespace-nowrap px-3">
+              Continue editing
+            </AlertDialogCancel>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => {
+                setConfirmLeave(false);
+                onBack();
+              }}
+              className={`${buttonClass} h-9 whitespace-nowrap border border-border bg-transparent px-3 text-muted-foreground hover:bg-muted/60`}
+            >
+              Discard & leave
+            </button>
+            <button
+              type="button"
+              disabled={isSaving || isLoading}
+              onClick={() => void saveAndLeave()}
+              className={`${buttonClass} h-9 whitespace-nowrap bg-primary px-3 text-primary-foreground hover:bg-primary/90`}
+            >
+              {isSaving && (
+                <span className="size-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
+              )}
+              Save & leave
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
