@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Workflow;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,5 +32,24 @@ class AppServiceProvider extends ServiceProvider
                 )
                 ->findOrFail($value);
         });
+
+        /*
+         * Setiap endpoint memakai bucket rate limit sendiri supaya polling
+         * pesan widget tidak ikut memblokir pengiriman pesan pelanggan.
+         */
+        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)
+            ->by('login|'.$request->ip()));
+
+        RateLimiter::for('public-start', fn (Request $request) => Limit::perMinute(20)
+            ->by('public-start|'.$request->ip()));
+
+        RateLimiter::for('public-poll', fn (Request $request) => Limit::perMinute(120)
+            ->by('public-poll|'.$request->ip().'|'.$request->route('token')));
+
+        RateLimiter::for('public-send', fn (Request $request) => Limit::perMinute(30)
+            ->by('public-send|'.$request->ip().'|'.$request->route('token')));
+
+        RateLimiter::for('workflow-execute', fn (Request $request) => Limit::perMinute(30)
+            ->by('workflow-execute|'.($request->user()?->id ?? $request->ip())));
     }
 }

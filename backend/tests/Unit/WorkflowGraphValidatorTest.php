@@ -178,7 +178,7 @@ class WorkflowGraphValidatorTest extends TestCase
         $this->validator->validateDefinition($definition);
     }
 
-    public function test_output_cannot_have_outgoing_edge(): void
+    public function test_output_can_have_outgoing_edge(): void
     {
         $definition = $this->singleAgentDefinition();
         $definition['nodes'][] = $this->sendNode('send-2');
@@ -187,10 +187,9 @@ class WorkflowGraphValidatorTest extends TestCase
             'target' => 'send-2',
         ];
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('tidak boleh memiliki koneksi keluar');
+        $graph = $this->validator->validateDefinition($definition);
 
-        $this->validator->validateDefinition($definition);
+        $this->assertSame('send-2', $graph['next']['send-1:default']);
     }
 
     public function test_relocate_cannot_have_outgoing_edge(): void

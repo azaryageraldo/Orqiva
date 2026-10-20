@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 import {
   addEdge,
@@ -37,6 +38,7 @@ import {
   Plus,
   Save,
   Settings2,
+  TriangleAlert,
   Trash2,
   Variable,
   Webhook,
@@ -66,7 +68,12 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 
-import { getWorkflow, updateWorkflow } from "../services/workflow";
+import {
+  getWorkflow,
+  getWorkflowOptions,
+  updateWorkflow,
+} from "../services/workflow";
+import type { WorkflowOption } from "../services/channel";
 import { getErrorMessage } from "../services/api";
 
 type NodeKind =
@@ -79,6 +86,7 @@ type NodeKind =
   | "Stopper";
 type MessageMode = "template" | "smart_value";
 type VariableType = "string" | "boolean" | "array";
+type AgentVerbosity = "concise" | "balanced" | "detailed";
 
 type OutputVariable = {
   name: string;
@@ -103,12 +111,15 @@ type AutomationNodeData = {
   provider?: string;
   model?: string;
   temperature?: number;
+  verbosity?: AgentVerbosity;
+  contextMessages?: number;
   messageMode?: MessageMode;
   messageTemplate?: string;
   conditionVariable?: string;
   conditionOperator?: string;
   conditionValue?: string;
   targetNodeId?: string;
+  targetWorkflowId?: string;
   endFlow?: boolean;
   setStartingPoint?: boolean;
   triggerType?: string;
@@ -116,6 +127,17 @@ type AutomationNodeData = {
 };
 
 type FlowNode = Node<AutomationNodeData>;
+
+type ValidationIssue = {
+  nodeId?: string;
+  title: string;
+  message: string;
+  fix: string;
+};
+
+const VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SMART_PATH_PATTERN =
+  /^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 type WorkflowDefinition = {
   nodes: Array<{
     id: string;
@@ -167,6 +189,11 @@ const nodeOptions: {
     label: "Relocate",
     description: "Hand the chat to a human admin",
     icon: Handshake,
+  },
+  {
+    label: "Stopper",
+    description: "Pause until the next customer message",
+    icon: PauseCircle,
   },
 ];
 
@@ -231,6 +258,8 @@ const initialNodes: FlowNode[] = [
       provider: "gemini",
       model: "gemini-3.8-flash",
       temperature: 0.7,
+      verbosity: "concise",
+      contextMessages: 10,
     },
   },
   {
@@ -242,7 +271,7 @@ const initialNodes: FlowNode[] = [
       nodeName: "Send AI reply",
       description: "Send the AI response to the visitor",
       messageMode: "smart_value",
-      messageTemplate: "{{respond.replies}}",
+      messageTemplate: "{{ai-response.respond.replies}}",
     },
   },
 ];
@@ -309,9 +338,7 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
   const tone = NODE_TONES[data.label] ?? NODE_TONES["Send Message"];
   const isCondition = data.label === "Condition";
   const isAgent = data.label === "AI Agent";
-  const hasSourceHandle = !["Send Message", "Relocate", "Go To"].includes(
-    data.label,
-  );
+  const hasSourceHandle = !["Relocate", "Go To"].includes(data.label);
   const nodeTitle = data.nodeName?.trim() || "Untitled step";
   const conditionVariable = data.conditionVariable?.trim();
 
@@ -368,7 +395,7 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
           {isCondition && (
             <p
               className={`mt-0.5 truncate font-mono text-[10px] ${
-                conditionVariable ? "text-amber-200/80" : "text-muted-foreground/70"
+                conditionVariable ? "text-primary" : "text-muted-foreground/70"
               }`}
               title={
                 conditionVariable
@@ -502,33 +529,50 @@ type AgentVariable = {
   itemField?: string;
 };
 
+function nodeVariableNamespace(node: FlowNode): string {
+  const base = (node.data.nodeName?.trim() || node.id)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (!base) return `agent-${node.id}`;
+  return /^[a-z_]/.test(base) ? base : `agent-${base}`;
+}
+
 function getUpstreamAgentVariables(
   nodes: FlowNode[],
   edges: Edge[],
   targetId: string,
 ): AgentVariable[] {
-  const upstream = new Set<string>();
-  const pending = [targetId];
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const nearestAgents: FlowNode[] = [];
 
-  while (pending.length) {
-    const current = pending.pop()!;
+  function walk(nodeId: string, seen: Set<string>) {
     for (const edge of edges) {
-      if (edge.target === current && !upstream.has(edge.source)) {
-        upstream.add(edge.source);
-        pending.push(edge.source);
+      if (edge.target !== nodeId) continue;
+
+      const source = nodeById.get(edge.source);
+      if (!source || seen.has(source.id)) continue;
+
+      if (source.data.label === "AI Agent") {
+        if (!nearestAgents.some((agent) => agent.id === source.id)) {
+          nearestAgents.push(source);
+        }
+        continue;
       }
+
+      walk(source.id, new Set([...seen, source.id]));
     }
   }
 
+  walk(targetId, new Set([targetId]));
+
   const result: AgentVariable[] = [];
   for (const node of nodes) {
-    if (!upstream.has(node.id) || node.data.label !== "AI Agent") continue;
-    result.push({
-      name: "ai_response",
-      token: "ai_response",
-      type: "string",
-      description: "Jawaban teks AI (format lama)",
-    });
+    if (!nearestAgents.some((agent) => agent.id === node.id)) continue;
+
+    const namespace = nodeVariableNamespace(node);
+    const agentLabel = node.data.nodeName?.trim() || node.id;
 
     for (const variable of node.data.outputVariables ?? []) {
       const name = variable.name.trim();
@@ -537,32 +581,37 @@ function getUpstreamAgentVariables(
 
       if (variable.type === "array") {
         const field = variable.itemField?.trim() || "replies";
+        const token = `${namespace}.${name}.${field}`;
 
         result.push({
-          name,
-          token: `${name}.${field}`,
+          name: token,
+          token,
           type: "array",
           description:
             variable.description ||
-            `List — setiap item menjadi satu bubble (${field})`,
+            `${agentLabel} — list; setiap item menjadi satu bubble (${field})`,
           itemField: field,
         });
 
         continue;
       }
 
+      const token = `${namespace}.${name}`;
+
       result.push({
-        name,
-        token: name,
+        name: token,
+        token,
         type: variable.type,
-        description: variable.description,
+        description: variable.description
+          ? `${agentLabel} — ${variable.description}`
+          : agentLabel,
       });
     }
   }
 
   return result.filter(
     (variable, index) =>
-      result.findIndex((item) => item.name === variable.name) === index,
+      result.findIndex((item) => item.token === variable.token) === index,
   );
 }
 
@@ -584,14 +633,19 @@ function SmartValueTextarea({
   variables,
   rows = 5,
   placeholder,
+  textareaRef,
+  showVariables = true,
 }: {
   value: string;
   onChange: (value: string) => void;
-  variables: AgentVariable[];
+  variables: Array<{ token: string; description?: string; type?: string }>;
   rows?: number;
   placeholder?: string;
+  textareaRef?: RefObject<HTMLTextAreaElement | null>;
+  showVariables?: boolean;
 }) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const localRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = textareaRef ?? localRef;
   const highlightRef = useRef<HTMLPreElement>(null);
   const parts = value.split(/(\{\{\s*[\w.-]+\s*\}\})/g);
 
@@ -643,28 +697,29 @@ function SmartValueTextarea({
           spellCheck={false}
         />
       </div>
-      {variables.length > 0 ? (
-        <div className="mt-3">
-          <p className="text-xs font-medium text-muted-foreground">Available values</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {variables.map((variable) => (
-              <button
-                key={variable.token}
-                type="button"
-                onClick={() => insertVariable(variable.token)}
-                title={variable.description || variable.type}
-                className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-xs text-primary transition hover:border-primary/40 hover:bg-primary/15"
-              >
-                {`{{${variable.token}}}`}
-              </button>
-            ))}
+      {showVariables &&
+        (variables.length > 0 ? (
+          <div className="mt-3">
+            <p className="text-xs font-medium text-muted-foreground">Available values</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {variables.map((variable) => (
+                <button
+                  key={variable.token}
+                  type="button"
+                  onClick={() => insertVariable(variable.token)}
+                  title={variable.description || variable.type}
+                  className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-xs text-primary transition hover:border-primary/40 hover:bg-primary/15"
+                >
+                  {`{{${variable.token}}}`}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : (
-        <p className="mt-3 text-xs leading-5 text-muted-foreground">
-          Connect an AI Agent before this step and define its variables to see suggestions.
-        </p>
-      )}
+        ) : (
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            Connect an AI Agent before this step and define its variables to see suggestions.
+          </p>
+        ))}
     </div>
   );
 }
@@ -677,6 +732,9 @@ export default function WorkflowEditor({
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [noticeTone, setNoticeTone] = useState<"success" | "error">("success");
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
+  const [workflowOptions, setWorkflowOptions] = useState<WorkflowOption[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [draftData, setDraftData] = useState<AutomationNodeData | null>(null);
   const [agentTab, setAgentTab] = useState<"node" | "prompt" | "variables">("node");
@@ -693,6 +751,22 @@ export default function WorkflowEditor({
     setAgentTab("node");
     setSelectedNodeId(id);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    getWorkflowOptions()
+      .then((options) => {
+        if (active) setWorkflowOptions(options);
+      })
+      .catch(() => {
+        if (active) setWorkflowOptions([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [workflowId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -734,47 +808,16 @@ export default function WorkflowEditor({
           animated: false,
         }));
 
-        // Node Stopper lama diganti Go To dengan End flow aktif,
-        // sehingga alurnya tetap sama tetapi tipe node lebih sederhana.
-        const convertedStopperIds = new Set(
-          loadedNodes
-            .filter((node) => node.data.label === "Stopper")
-            .map((node) => node.id),
-        );
-
-        const migratedNodes = loadedNodes.map((node) => {
-          if (node.data.label !== "Stopper") return node;
-
-          const outgoing = loadedEdges.find(
-            (edge) => edge.source === node.id,
-          );
-
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              label: "Go To" as NodeKind,
-              nodeName: node.data.nodeName || "Continue from here",
-              targetNodeId: outgoing?.target ?? "",
-              endFlow: true,
-              setStartingPoint: false,
-            },
-          };
-        });
-
-        const migratedEdges = loadedEdges.filter(
-          (edge) => !convertedStopperIds.has(edge.source),
-        );
-
-        setNodes(migratedNodes);
-        setEdges(migratedEdges);
-        setSavedSnapshot(makeSnapshot(migratedNodes, migratedEdges));
+        setNodes(loadedNodes);
+        setEdges(loadedEdges);
+        setSavedSnapshot(makeSnapshot(loadedNodes, loadedEdges));
 
         changeSelection(null);
       } catch (error) {
         if (cancelled) return;
 
         console.error("Failed to load workflow:", error);
+        setNoticeTone("error");
         setNotice(getErrorMessage(error, "Workflow gagal dimuat. Coba lagi."));
       } finally {
         if (!cancelled) {
@@ -838,6 +881,45 @@ export default function WorkflowEditor({
       messageTemplate.trim() === `{{${variable.token}}}`,
   );
 
+  const currentWorkflowId = workflowId ? Number(workflowId) : null;
+  const goToWorkflowOptions = useMemo<WorkflowOption[]>(() => {
+    const currentOption: WorkflowOption = {
+      id: currentWorkflowId ?? 0,
+      name: workflowName || "Workflow ini",
+      status: "draft",
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        type: node.data.label,
+        name: node.data.nodeName || node.data.label,
+      })),
+    };
+
+    if (currentWorkflowId === null) return [currentOption];
+
+    return [
+      currentOption,
+      ...workflowOptions.filter(
+        (option) => option.id !== currentWorkflowId,
+      ),
+    ];
+  }, [currentWorkflowId, nodes, workflowName, workflowOptions]);
+
+  const selectedGoToWorkflowId = Number(
+    inspectorData?.targetWorkflowId || currentWorkflowId || 0,
+  );
+  const selectedGoToWorkflow =
+    goToWorkflowOptions.find(
+      (option) => option.id === selectedGoToWorkflowId,
+    ) ?? goToWorkflowOptions[0];
+  const goToTargetNodes =
+    selectedGoToWorkflowId === currentWorkflowId || selectedGoToWorkflowId === 0
+      ? nodes.map((node) => ({
+          id: node.id,
+          type: node.data.label,
+          name: node.data.nodeName || node.data.label,
+        }))
+      : (selectedGoToWorkflow?.nodes ?? []);
+
   useEffect(() => {
     if (!isDirty) return;
     const warnBeforeLeave = (event: BeforeUnloadEvent) => {
@@ -850,9 +932,12 @@ export default function WorkflowEditor({
 
   useEffect(() => {
     if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 4200);
+    const timer = window.setTimeout(
+      () => setNotice(""),
+      noticeTone === "error" ? 7000 : 4200,
+    );
     return () => window.clearTimeout(timer);
-  }, [notice]);
+  }, [notice, noticeTone]);
 
   function requestBack() {
     if (isDirty) {
@@ -918,13 +1003,15 @@ export default function WorkflowEditor({
         provider: "gemini",
         model: "gemini-3.8-flash",
         temperature: 0.7,
+        verbosity: "concise",
+        contextMessages: 10,
       },
       "Send Message": {
         label,
         nodeName: "Send message",
         description: "Send a message to the visitor",
         messageMode: "template",
-        messageTemplate: "{{respond.replies}}",
+        messageTemplate: "{{ai-response.respond.replies}}",
       },
       Condition: {
         label,
@@ -967,6 +1054,7 @@ export default function WorkflowEditor({
     changeSelection(id);
     setShowLibrary(false);
     setNotice("");
+    setValidationIssues([]);
   }
 
   function updateNode(patch: Partial<AutomationNodeData>) {
@@ -1050,6 +1138,7 @@ export default function WorkflowEditor({
     changeSelection(null);
     setDraftData(null);
     setShowLibrary(false);
+    setNoticeTone("success");
     setNotice("Changes applied to the canvas. Save the workflow to keep them.");
   }
 
@@ -1072,9 +1161,223 @@ export default function WorkflowEditor({
     setDraftData(null);
   }, []);
 
+  function validateCanvas(candidates: FlowNode[]): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const triggerNodes = candidates.filter(
+      (node) => node.data.label === "Trigger",
+    );
+    const agentNamespaces = new Map<string, string>();
+
+    if (triggerNodes.length > 1) {
+      issues.push({
+        title: "Trigger lebih dari satu",
+        message: `Workflow ini memiliki ${triggerNodes.length} Trigger. Hanya workflow entry yang boleh memiliki satu Trigger.`,
+        fix: "Hapus Trigger tambahan. Workflow lanjutan cukup dimasuki lewat Go To dan tidak perlu Trigger.",
+      });
+    }
+
+    for (const node of triggerNodes) {
+      if (!edges.some((edge) => edge.source === node.id)) {
+        issues.push({
+          nodeId: node.id,
+          title: "Trigger belum tersambung",
+          message: `Node "${node.data.nodeName || "Trigger"}" tidak memiliki koneksi keluar.`,
+          fix: "Hubungkan port Trigger ke node pertama, misalnya AI Agent.",
+        });
+      }
+    }
+
+    for (const node of candidates) {
+      const label = node.data.label;
+      const nodeName = node.data.nodeName || label;
+
+      if (label === "AI Agent") {
+        const namespace = nodeVariableNamespace(node);
+        const existingAgent = agentNamespaces.get(namespace);
+
+        if (existingAgent) {
+          issues.push({
+            nodeId: node.id,
+            title: "Nama AI Agent bentrok",
+            message: `Namespace "${namespace}" dipakai oleh "${existingAgent}" dan "${nodeName}".`,
+            fix: "Beri nama unik pada setiap AI Agent agar smart value tidak tercampur.",
+          });
+        } else {
+          agentNamespaces.set(namespace, nodeName);
+        }
+
+        if (!String(node.data.systemMessage ?? "").trim()) {
+          issues.push({
+            nodeId: node.id,
+            title: "Prompt AI Agent kosong",
+            message: `AI Agent "${nodeName}" belum memiliki system prompt.`,
+            fix: "Isi prompt dengan peran, tujuan, gaya bahasa, dan aturan kapan harus mengisi variabel.",
+          });
+        }
+
+        const seen = new Set<string>();
+
+        for (const variable of node.data.outputVariables ?? []) {
+          const name = variable.name.trim();
+          if (!name) continue;
+
+          if (!VARIABLE_NAME_PATTERN.test(name)) {
+            issues.push({
+              nodeId: node.id,
+              title: "Nama variabel tidak valid",
+              message: `Variabel "${name}" pada "${nodeName}" mengandung spasi atau karakter yang tidak didukung.`,
+              fix: "Gunakan huruf, angka, dan underscore tanpa spasi. Contoh: mau_beli. Samakan nama di prompt AI dan Condition.",
+            });
+            continue;
+          }
+
+          if (seen.has(name)) {
+            issues.push({
+              nodeId: node.id,
+              title: "Nama variabel duplikat",
+              message: `Variabel "${name}" muncul lebih dari sekali pada "${nodeName}".`,
+              fix: "Ganti salah satu nama agar setiap variabel memiliki nama unik.",
+            });
+          }
+
+          seen.add(name);
+
+          if (
+            variable.type === "array" &&
+            variable.itemField?.trim() &&
+            !VARIABLE_NAME_PATTERN.test(variable.itemField.trim())
+          ) {
+            issues.push({
+              nodeId: node.id,
+              title: "Nama item list tidak valid",
+              message: `Item field "${variable.itemField}" pada variabel "${name}" mengandung karakter yang tidak didukung.`,
+              fix: "Gunakan nama tanpa spasi, misalnya replies atau daftar_produk.",
+            });
+          }
+        }
+      }
+
+      if (label === "Condition") {
+        const field = String(node.data.conditionVariable ?? "").trim();
+
+        if (!field) {
+          issues.push({
+            nodeId: node.id,
+            title: "Condition belum memilih variabel",
+            message: `Condition "${nodeName}" tidak memiliki variabel boolean.`,
+            fix: "Pilih variabel bertipe Yes-No dari AI Agent yang terhubung sebelum Condition.",
+          });
+        } else if (!SMART_PATH_PATTERN.test(field)) {
+          issues.push({
+            nodeId: node.id,
+            title: "Condition memakai smart value tidak valid",
+            message: `Condition "${nodeName}" memakai "${field}". Gunakan format {{nama-agent.variabel}}.`,
+            fix: "Pilih smart value dari daftar AI Agent terdekat, misalnya rekomendasi-penawaran.mau_beli.",
+          });
+        } else {
+          const available = getUpstreamAgentVariables(candidates, edges, node.id)
+            .filter((variable) => variable.type === "boolean")
+            .map((variable) => variable.name);
+
+          if (available.length > 0 && !available.includes(field)) {
+            issues.push({
+              nodeId: node.id,
+              title: "Condition memakai variabel yang tidak tersedia",
+              message: `Variabel "${field}" tidak dihasilkan AI Agent sebelum Condition "${nodeName}".`,
+              fix: `Hubungkan AI Agent yang menghasilkan ${field}, atau pilih salah satu smart value: ${available.join(", ")}.`,
+            });
+          }
+        }
+      }
+
+      if (label === "Send Message") {
+        if (!String(node.data.messageTemplate ?? "").trim()) {
+          issues.push({
+            nodeId: node.id,
+            title: "Pesan kosong",
+            message: `Send Message "${nodeName}" belum memiliki isi pesan.`,
+            fix: "Tulis pesan, atau sisipkan variabel seperti {{respond.replies}} dari AI Agent.",
+          });
+        }
+      }
+
+      if (label === "Go To") {
+        const targetNodeId = String(node.data.targetNodeId ?? "").trim();
+        const targetWorkflowId = Number(
+          node.data.targetWorkflowId || currentWorkflowId || 0,
+        );
+
+        if (!targetNodeId) {
+          issues.push({
+            nodeId: node.id,
+            title: "Go To belum memilih tujuan",
+            message: `Node Go To "${nodeName}" belum memiliki node tujuan.`,
+            fix: "Pilih workflow dan node tujuan, lalu simpan kembali.",
+          });
+          continue;
+        }
+
+        const targetWorkflow = goToWorkflowOptions.find(
+          (option) => option.id === targetWorkflowId,
+        );
+
+        if (!targetWorkflow) {
+          issues.push({
+            nodeId: node.id,
+            title: "Workflow tujuan tidak ditemukan",
+            message: `Go To "${nodeName}" menunjuk workflow yang tidak tersedia di akun ini.`,
+            fix: "Pilih ulang workflow tujuan. Pastikan workflow tersebut masih ada dan milik akun yang sama.",
+          });
+          continue;
+        }
+
+        const targetNodes =
+          targetWorkflowId === currentWorkflowId || targetWorkflowId === 0
+            ? candidates
+            : workflowOptions.find((option) => option.id === targetWorkflowId)
+                ?.nodes ?? [];
+
+        if (!targetNodes.some((target) => target.id === targetNodeId)) {
+          issues.push({
+            nodeId: node.id,
+            title: "Node tujuan Go To tidak ditemukan",
+            message: `Node "${targetNodeId}" tidak ada di workflow "${targetWorkflow.name}".`,
+            fix: "Pilih ulang node tujuan. Jika node diganti nama atau dihapus, perbarui Go To.",
+          });
+        }
+
+        if (
+          targetNodeId === node.id &&
+          targetWorkflowId === currentWorkflowId
+        ) {
+          issues.push({
+            nodeId: node.id,
+            title: "Go To menunjuk dirinya sendiri",
+            message: `Node Go To "${nodeName}" akan berulang tanpa kemajuan.`,
+            fix: "Pilih node lain setelah Go To, atau pindah ke workflow lain.",
+          });
+        }
+      }
+    }
+
+    return issues;
+  }
+
   async function saveWorkflow(): Promise<boolean> {
     if (!workflowId) {
+      setNoticeTone("error");
       setNotice("Simpan workflow melalui halaman Workflows terlebih dahulu.");
+      return false;
+    }
+
+    const issues = validateCanvas(nodesForSave);
+    setValidationIssues(issues);
+
+    if (issues.length > 0) {
+      setNoticeTone("error");
+      setNotice(
+        `Workflow belum disimpan. Ada ${issues.length} hal yang perlu diperbaiki.`,
+      );
       return false;
     }
 
@@ -1089,6 +1392,7 @@ export default function WorkflowEditor({
     };
 
     setIsSaving(true);
+    setNoticeTone("success");
     setNotice("");
 
     try {
@@ -1098,10 +1402,13 @@ export default function WorkflowEditor({
       changeSelection(null);
       setDraftData(null);
       setShowLibrary(false);
+      setValidationIssues([]);
+      setNoticeTone("success");
       setNotice("Workflow saved.");
       return true;
     } catch (error) {
       console.error("Failed to save workflow:", error);
+      setNoticeTone("error");
       setNotice(getErrorMessage(error, "Workflow gagal disimpan. Coba lagi."));
       return false;
     } finally {
@@ -1158,6 +1465,53 @@ export default function WorkflowEditor({
           </button>
         </div>
       </header>
+
+      {validationIssues.length > 0 && (
+        <div
+          role="alert"
+          className="max-h-44 shrink-0 overflow-y-auto border-b border-destructive/25 bg-destructive/[0.06] px-5 py-3 lg:px-7"
+        >
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border border-destructive/30 bg-destructive/10 text-destructive">
+              <TriangleAlert size={15} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-destructive">
+                  {validationIssues.length} masalah perlu diperbaiki sebelum
+                  menyimpan
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setValidationIssues([])}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Tutup daftar masalah"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <ul className="mt-2 space-y-2">
+                {validationIssues.map((issue, index) => (
+                  <li
+                    key={`${issue.nodeId ?? "workflow"}-${index}`}
+                    className="rounded-lg border border-destructive/15 bg-background/40 px-3 py-2"
+                  >
+                    <p className="text-xs font-medium text-foreground">
+                      {issue.title}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                      {issue.message}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-5 text-destructive/90">
+                      {issue.fix}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Workspace */}
       <div className="flex h-0 min-h-0 flex-1 overflow-hidden">
@@ -1374,9 +1728,9 @@ export default function WorkflowEditor({
                   </div>
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Jika ada node Go To dengan &ldquo;Set starting point&rdquo;,
-                    percakapan baru dimulai dari node tujuan tersebut, bukan
-                    dari Trigger.
+                    Trigger hanya dipakai workflow entry. Workflow lanjutan
+                    tidak perlu Trigger dan dimasuki lewat Go To lintas
+                    workflow.
                   </p>
                 </div>
               )}
@@ -1425,17 +1779,19 @@ export default function WorkflowEditor({
                           </span>
                         </div>
 
-                        <textarea
-                          ref={promptRef}
-                          rows={12}
-                          className="mt-3 min-h-[300px] w-full resize-y rounded-xl border border-border bg-background px-4 py-3.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-                          placeholder="You are a helpful assistant. Answer clearly, stay on brand, and ask a follow-up question when needed..."
-                          value={String(inspectorData?.systemMessage ?? "")}
-                          onChange={(event) =>
-                            updateNode({ systemMessage: event.target.value })
-                          }
-                          spellCheck={false}
-                        />
+                        <div className="mt-3">
+                          <SmartValueTextarea
+                            textareaRef={promptRef}
+                            rows={12}
+                            value={String(inspectorData?.systemMessage ?? "")}
+                            onChange={(value) =>
+                              updateNode({ systemMessage: value })
+                            }
+                            variables={promptVariables}
+                            showVariables={false}
+                            placeholder="You are a helpful assistant. Answer clearly, stay on brand, and ask a follow-up question when needed..."
+                          />
+                        </div>
                       </div>
 
                       <div className={`${panelClass} p-3.5`}>
@@ -1554,6 +1910,12 @@ export default function WorkflowEditor({
                                       }
                                       placeholder="respond"
                                     />
+                                    {name && !VARIABLE_NAME_PATTERN.test(name) && (
+                                      <span className="mt-1 block text-[10px] leading-4 text-destructive">
+                                        Tanpa spasi. Gunakan huruf, angka, dan
+                                        underscore, misalnya mau_beli.
+                                      </span>
+                                    )}
                                   </label>
 
                                   <label className="block">
@@ -1603,6 +1965,13 @@ export default function WorkflowEditor({
                                         }
                                         placeholder="replies"
                                       />
+                                      {itemField &&
+                                        !VARIABLE_NAME_PATTERN.test(itemField) && (
+                                          <span className="mt-1 block text-[10px] leading-4 text-destructive">
+                                            Item field tidak boleh mengandung
+                                            spasi.
+                                          </span>
+                                        )}
                                     </label>
                                     <span className="rounded-lg border border-border bg-muted/30 px-2.5 py-2 font-mono text-[10px] text-primary">
                                       {`{{${name || "respond"}.${itemField}}}`}
@@ -1696,6 +2065,51 @@ export default function WorkflowEditor({
                       </select>
                     </div>
 
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block">
+                        <span className={labelClass}>Verbosity</span>
+                        <select
+                          className={inputClass}
+                          value={String(inspectorData?.verbosity ?? "concise")}
+                          onChange={(event) =>
+                            updateNode({
+                              verbosity: event.target
+                                .value as AgentVerbosity,
+                            })
+                          }
+                        >
+                          <option value="concise">Concise · singkat</option>
+                          <option value="balanced">Balanced · seimbang</option>
+                          <option value="detailed">Detailed · detail</option>
+                        </select>
+                        <span className="mt-2 block text-xs leading-5 text-muted-foreground">
+                          Concise membatasi jawaban agar tidak bertele-tele.
+                        </span>
+                      </label>
+
+                      <label className="block">
+                        <span className={labelClass}>Context memory</span>
+                        <select
+                          className={inputClass}
+                          value={String(inspectorData?.contextMessages ?? 10)}
+                          onChange={(event) =>
+                            updateNode({
+                              contextMessages: Number(event.target.value),
+                            })
+                          }
+                        >
+                          <option value="0">Tanpa riwayat</option>
+                          <option value="4">4 pesan terakhir</option>
+                          <option value="8">8 pesan terakhir</option>
+                          <option value="12">12 pesan terakhir</option>
+                          <option value="20">20 pesan terakhir</option>
+                        </select>
+                        <span className="mt-2 block text-xs leading-5 text-muted-foreground">
+                          Jumlah pesan sebelumnya yang dikirim ke AI.
+                        </span>
+                      </label>
+                    </div>
+
                     <label className="block">
                       <span className={labelClass}>
                         Temperature:{" "}
@@ -1784,8 +2198,9 @@ export default function WorkflowEditor({
                       Condition
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Pilih variabel Yes-No dari AI Agent. Jika nilainya true,
-                      alur masuk ke If match. Jika false, masuk ke Else.
+                      Pilih smart value boolean dari AI Agent terdekat. Jika
+                      kondisi terpenuhi, alur masuk ke If match; jika tidak,
+                      masuk ke Else.
                     </p>
                   </div>
 
@@ -1795,38 +2210,57 @@ export default function WorkflowEditor({
                       Yes-No di AI Agent yang terhubung sebelum node ini.
                     </div>
                   ) : (
-                    <label className="block">
-                      <span className={labelClass}>Boolean variable</span>
-                      <select
-                        className={inputClass}
-                        value={String(
-                          inspectorData?.conditionVariable ?? "",
-                        )}
-                        onChange={(event) =>
-                          updateNode({
-                            conditionVariable: event.target.value,
-                          })
-                        }
-                      >
-                        <option value="">Pilih variabel…</option>
-                        {booleanVariables.map((variable) => (
-                          <option key={variable.name} value={variable.name}>
-                            {`{{${variable.name}}}`}
-                            {variable.description
-                              ? ` — ${variable.description}`
-                              : ""}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="block">
+                      <span className={labelClass}>Boolean smart value</span>
+
+                      {String(inspectorData?.conditionVariable ?? "").trim() && (
+                        <div className="mt-2.5 rounded-lg border border-primary/25 bg-primary/[0.06] px-3 py-2">
+                          <code className="font-mono text-sm text-primary">
+                            {`{{${String(inspectorData?.conditionVariable)}}}`}
+                          </code>
+                        </div>
+                      )}
+
+                      <div className="mt-2.5 space-y-2">
+                        {booleanVariables.map((variable) => {
+                          const selected =
+                            String(inspectorData?.conditionVariable ?? "") ===
+                            variable.token;
+
+                          return (
+                            <button
+                              key={variable.token}
+                              type="button"
+                              onClick={() =>
+                                updateNode({ conditionVariable: variable.token })
+                              }
+                              className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
+                                selected
+                                  ? "border-primary/35 bg-primary/[0.08]"
+                                  : "border-border bg-background hover:border-primary/25 hover:bg-primary/[0.04]"
+                              }`}
+                            >
+                              <span className="min-w-0 flex-1">
+                                <code className="block truncate font-mono text-xs text-primary">
+                                  {`{{${variable.token}}}`}
+                                </code>
+                                <span className="mt-1 block text-[11px] leading-5 text-muted-foreground">
+                                  {variable.description}
+                                </span>
+                              </span>
+                              {selected && (
+                                <Check size={15} className="mt-0.5 shrink-0 text-primary" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                        Contoh: prompt AI menulis &ldquo;set beli=true jika
-                        pelanggan ingin membeli&rdquo;, lalu variabel{" "}
-                        <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
-                          beli
-                        </code>{" "}
-                        dipakai di sini.
+                        Smart value memakai nama AI Agent terdekat agar variabel
+                        dari node sebelumnya tidak tercampur.
                       </span>
-                    </label>
+                    </div>
                   )}
 
                   <div className="space-y-2">
@@ -1837,7 +2271,7 @@ export default function WorkflowEditor({
                           If match
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Variabel bernilai true.
+                          Cabang jika kondisi terpenuhi.
                         </p>
                       </div>
                     </div>
@@ -1848,7 +2282,7 @@ export default function WorkflowEditor({
                           Else
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Variabel bernilai false.
+                          Cabang jika kondisi tidak terpenuhi.
                         </p>
                       </div>
                     </div>
@@ -1872,6 +2306,33 @@ export default function WorkflowEditor({
                   </div>
 
                   <label className="block">
+                    <span className={labelClass}>Workflow tujuan</span>
+                    <select
+                      className={inputClass}
+                      value={String(
+                        inspectorData?.targetWorkflowId ||
+                          (currentWorkflowId ?? ""),
+                      )}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        updateNode({
+                          targetWorkflowId:
+                            value === String(currentWorkflowId) ? "" : value,
+                          targetNodeId: "",
+                        });
+                      }}
+                    >
+                      {goToWorkflowOptions.map((option) => (
+                        <option key={option.id} value={String(option.id)}>
+                          {option.id === currentWorkflowId
+                            ? `${option.name} (workflow ini)`
+                            : option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
                     <span className={labelClass}>Node tujuan</span>
                     <select
                       className={inputClass}
@@ -1881,11 +2342,16 @@ export default function WorkflowEditor({
                       }
                     >
                       <option value="">Pilih node tujuan…</option>
-                      {nodes
-                        .filter((node) => node.id !== selectedNodeId)
+                      {goToTargetNodes
+                        .filter((node) =>
+                          selectedGoToWorkflowId === currentWorkflowId
+                            ? node.id !== selectedNodeId
+                            : true,
+                        )
                         .map((node) => (
                           <option key={node.id} value={node.id}>
-                            {node.data.nodeName || node.data.label}
+                            {node.name || node.id}
+                            {node.type ? ` · ${node.type}` : ""}
                           </option>
                         ))}
                     </select>
@@ -1906,36 +2372,16 @@ export default function WorkflowEditor({
                       </span>
                       <span className="mt-1 block text-xs leading-5 text-muted-foreground">
                         Berhenti dulu di node tujuan. Alur lanjut saat pelanggan
-                        mengirim pesan lagi.
-                      </span>
-                    </span>
-                  </label>
-
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 size-4 accent-primary"
-                      checked={Boolean(inspectorData?.setStartingPoint)}
-                      onChange={(event) =>
-                        updateNode({
-                          setStartingPoint: event.target.checked,
-                        })
-                      }
-                    />
-                    <span>
-                      <span className="block text-sm font-medium text-foreground">
-                        Set starting point
-                      </span>
-                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                        Percakapan baru dimulai dari node tujuan ini, bukan dari
-                        Trigger.
+                        mengirim pesan lagi. Jika nonaktif, node tujuan langsung
+                        dijalankan pada turn yang sama.
                       </span>
                     </span>
                   </label>
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Hanya satu Go To yang boleh memakai Set starting point, dan
-                    node tujuan tidak boleh dirinya sendiri.
+                    Go To dapat berpindah ke workflow lain. Workflow tujuan
+                    tidak perlu Trigger. Variabel dari workflow sebelumnya tetap
+                    tersedia pada context percakapan.
                   </p>
                 </div>
               )}
@@ -2001,10 +2447,36 @@ export default function WorkflowEditor({
       </footer>
 
       {notice && (
-        <div role="status" className="fixed bottom-5 right-5 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground shadow-2xl shadow-black/50">
-          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check size={13} /></span>
+        <div
+          role={noticeTone === "error" ? "alert" : "status"}
+          className={`fixed bottom-5 right-5 z-[70] flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-2xl shadow-black/50 ${
+            noticeTone === "error"
+              ? "border-destructive/35 bg-destructive/10 text-destructive"
+              : "border-border bg-muted text-foreground"
+          }`}
+        >
+          <span
+            className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full ${
+              noticeTone === "error"
+                ? "bg-destructive/15 text-destructive"
+                : "bg-primary/10 text-primary"
+            }`}
+          >
+            {noticeTone === "error" ? (
+              <TriangleAlert size={13} />
+            ) : (
+              <Check size={13} />
+            )}
+          </span>
           <p className="flex-1 leading-5">{notice}</p>
-          <button type="button" aria-label="Dismiss notification" onClick={() => setNotice("")} className="text-muted-foreground hover:text-foreground"><X size={15} /></button>
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            onClick={() => setNotice("")}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X size={15} />
+          </button>
         </div>
       )}
 

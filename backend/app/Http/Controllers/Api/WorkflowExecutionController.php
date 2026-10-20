@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ChatSession;
 use App\Models\Workflow;
 use App\Models\WorkflowExecution;
 use App\Services\GeminiService;
@@ -10,6 +11,7 @@ use App\Services\Workflows\AiAgentVariables;
 use App\Services\Workflows\ConditionRule;
 use App\Services\Workflows\MessageRenderer;
 use App\Services\Workflows\WorkflowContext;
+use App\Services\Workflows\WorkflowDiagnostics;
 use App\Services\Workflows\WorkflowGraphValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,7 +31,8 @@ class WorkflowExecutionController extends Controller
         private readonly ConditionRule $conditionRule,
         private readonly WorkflowContext $context,
         private readonly AiAgentVariables $agentVariables,
-        private readonly MessageRenderer $messageRenderer
+        private readonly MessageRenderer $messageRenderer,
+        private readonly WorkflowDiagnostics $diagnostics
     ) {}
 
     public function index(Workflow $workflow): JsonResponse
@@ -47,18 +50,30 @@ class WorkflowExecutionController extends Controller
     ): JsonResponse {
         abort_unless($execution->workflow_id === $workflow->id, 404);
 
-        $execution->load('steps');
+        $execution->load(['steps', 'chatSession', 'contact', 'currentWorkflow']);
+
+        $errorStep = $execution->steps->firstWhere('status', 'error');
 
         return response()->json([
             'data' => [
                 'id' => $execution->id,
                 'workflow_id' => $execution->workflow_id,
                 'workflow_name' => $workflow->name,
+                'current_workflow_id' => $execution->current_workflow_id,
+                'current_workflow_name' => $execution->currentWorkflow?->name,
+                'chat_session_id' => $execution->chat_session_id,
+                'session_status' => $execution->chatSession?->status,
+                'contact_public_id' => $execution->contact?->public_id,
+                'contact_name' => $execution->contact?->name,
                 'status' => $execution->status,
                 'input' => $execution->input,
                 'output' => $execution->output,
                 'logs' => $execution->logs,
                 'error' => $execution->error,
+                'diagnostic' => $this->diagnostics->diagnose(
+                    $execution->error,
+                    $errorStep
+                ),
                 'context' => $execution->context,
                 'prompt_tokens' => (int) $execution->prompt_tokens,
                 'completion_tokens' => (int) $execution->completion_tokens,
@@ -70,6 +85,8 @@ class WorkflowExecutionController extends Controller
                     ->map(fn ($step) => [
                         'id' => $step->id,
                         'step' => $step->step,
+                        'workflow_id' => $step->workflow_id,
+                        'workflow_name' => $step->workflow_name,
                         'node_id' => $step->node_id,
                         'node_type' => $step->node_type,
                         'node_name' => $step->node_name,
@@ -93,13 +110,22 @@ class WorkflowExecutionController extends Controller
 
     public function execute(
         Request $request,
-        Workflow $workflow
+        Workflow $workflow,
+        ?ChatSession $chatSession = null
     ): JsonResponse {
         $validated = $request->validate([
             'input' => ['sometimes', 'array'],
         ]);
 
         $input = $validated['input'] ?? [];
+
+        if ($chatSession !== null) {
+            $input['conversation_id'] = $input['conversation_id']
+                ?? $chatSession->contact?->public_id;
+            $input['chat_session_id'] = $chatSession->id;
+            $input['contact_id'] = $chatSession->contact_id;
+        }
+
         $conversationId = $input['conversation_id'] ?? null;
 
         $tokens = [
@@ -109,52 +135,55 @@ class WorkflowExecutionController extends Controller
         ];
 
         $resumeNodeId = null;
+        $resumeWorkflowId = null;
         $resumeContext = null;
         $claimed = null;
+        $logs = [];
 
-        if (is_string($conversationId) && $conversationId !== '') {
-            /*
-             * Sesi yang sudah dialihkan ke admin tidak dijalankan lagi.
-             */
-            $escalated = $workflow->executions()
-                ->where('status', 'escalated')
-                ->latest()
-                ->get()
-                ->first(fn (WorkflowExecution $execution) => data_get(
-                    $execution->input,
-                    'conversation_id'
-                ) === $conversationId);
-
-            if ($escalated !== null) {
+        if ($chatSession !== null) {
+            if ($chatSession->status === ChatSession::STATUS_HUMAN) {
                 return response()->json([
                     'message' => 'Percakapan sedang ditangani admin.',
-                    'data' => $escalated,
+                    'data' => $chatSession->execution?->fresh(),
                 ]);
             }
 
-            /*
-             * Klaim eksekusi yang menunggu pesan berikutnya di dalam
-             * transaksi agar dua pesan bersamaan tidak menjalankan node
-             * yang sama dua kali.
-             */
-            $claimed = DB::transaction(function () use (
+            if ($chatSession->status === ChatSession::STATUS_ENDED) {
+                return response()->json([
+                    'message' => 'Sesi percakapan sudah berakhir.',
+                    'data' => null,
+                ], 422);
+            }
+
+            $sessionState = DB::transaction(function () use (
+                $chatSession,
                 $workflow,
-                $conversationId,
                 $input,
                 &$tokens
-            ): ?array {
-                $execution = $workflow->executions()
-                    ->where('status', 'waiting')
-                    ->latest()
+            ): array {
+                $execution = $chatSession->execution()
                     ->lockForUpdate()
-                    ->get()
-                    ->first(fn (WorkflowExecution $candidate) => data_get(
-                        $candidate->input,
-                        'conversation_id'
-                    ) === $conversationId);
+                    ->first();
 
                 if ($execution === null) {
-                    return null;
+                    $execution = WorkflowExecution::create([
+                        'workflow_id' => $workflow->id,
+                        'chat_session_id' => $chatSession->id,
+                        'contact_id' => $chatSession->contact_id,
+                        'status' => 'running',
+                        'input' => $input,
+                        'logs' => [],
+                        'started_at' => now(),
+                    ]);
+
+                    return [
+                        'execution' => $execution,
+                        'input' => $input,
+                        'logs' => [],
+                        'resume_node_id' => null,
+                        'resume_workflow_id' => null,
+                        'resume_context' => $input,
+                    ];
                 }
 
                 $tokens = [
@@ -163,43 +192,135 @@ class WorkflowExecutionController extends Controller
                     'total_tokens' => (int) ($execution->total_tokens ?? 0),
                 ];
 
-                $input = array_replace($execution->input ?? [], $input);
+                $mergedInput = array_replace($execution->input ?? [], $input);
+                $isWaiting = $execution->status === 'waiting';
                 $logs = $execution->logs ?? [];
+                $context = array_replace(
+                    $execution->context ?? [],
+                    $mergedInput
+                );
 
                 $execution->update([
                     'status' => 'running',
-                    'input' => $input,
+                    'input' => $mergedInput,
                     'waiting_since' => null,
+                    'finished_at' => null,
                 ]);
 
                 return [
                     'execution' => $execution,
-                    'input' => $input,
+                    'input' => $mergedInput,
                     'logs' => $logs,
-                    'resume_node_id' => $execution->current_node_id,
-                    'resume_context' => array_replace(
-                        $execution->context ?? [],
-                        $input
-                    ),
+                    'resume_node_id' => $isWaiting
+                        ? $execution->current_node_id
+                        : null,
+                    'resume_workflow_id' => $isWaiting
+                        ? ($execution->current_workflow_id ?? $execution->workflow_id)
+                        : null,
+                    'resume_context' => $context,
                 ];
             });
-        }
 
-        if ($claimed !== null) {
-            $execution = $claimed['execution'];
-            $input = $claimed['input'];
-            $logs = $claimed['logs'];
-            $resumeNodeId = $claimed['resume_node_id'];
-            $resumeContext = $claimed['resume_context'];
+            $execution = $sessionState['execution'];
+            $input = $sessionState['input'];
+            $logs = $sessionState['logs'];
+            $resumeNodeId = $sessionState['resume_node_id'];
+            $resumeWorkflowId = $sessionState['resume_workflow_id'];
+            $resumeContext = $sessionState['resume_context'];
         } else {
-            $logs = [];
-            $execution = WorkflowExecution::create([
-                'workflow_id' => $workflow->id,
-                'status' => 'running',
-                'input' => $input,
-                'logs' => [],
-                'started_at' => now(),
-            ]);
+            if (is_string($conversationId) && $conversationId !== '') {
+                /*
+                 * Sesi lama tanpa chat session: percakapan yang sudah
+                 * dialihkan ke admin tidak dijalankan lagi.
+                 */
+                $escalated = $workflow->executions()
+                    ->where('status', 'escalated')
+                    ->latest()
+                    ->get()
+                    ->first(fn (WorkflowExecution $execution) => data_get(
+                        $execution->input,
+                        'conversation_id'
+                    ) === $conversationId);
+
+                if ($escalated !== null) {
+                    return response()->json([
+                        'message' => 'Percakapan sedang ditangani admin.',
+                        'data' => $escalated,
+                    ]);
+                }
+
+                /*
+                 * Klaim eksekusi yang menunggu pesan berikutnya di dalam
+                 * transaksi agar dua pesan bersamaan tidak menjalankan node
+                 * yang sama dua kali.
+                 */
+                $claimed = DB::transaction(function () use (
+                    $workflow,
+                    $conversationId,
+                    $input,
+                    &$tokens
+                ): ?array {
+                    $execution = $workflow->executions()
+                        ->where('status', 'waiting')
+                        ->latest()
+                        ->lockForUpdate()
+                        ->get()
+                        ->first(fn (WorkflowExecution $candidate) => data_get(
+                            $candidate->input,
+                            'conversation_id'
+                        ) === $conversationId);
+
+                    if ($execution === null) {
+                        return null;
+                    }
+
+                    $tokens = [
+                        'prompt_tokens' => (int) ($execution->prompt_tokens ?? 0),
+                        'completion_tokens' => (int) ($execution->completion_tokens ?? 0),
+                        'total_tokens' => (int) ($execution->total_tokens ?? 0),
+                    ];
+
+                    $input = array_replace($execution->input ?? [], $input);
+                    $logs = $execution->logs ?? [];
+
+                    $execution->update([
+                        'status' => 'running',
+                        'input' => $input,
+                        'waiting_since' => null,
+                        'finished_at' => null,
+                    ]);
+
+                    return [
+                        'execution' => $execution,
+                        'input' => $input,
+                        'logs' => $logs,
+                        'resume_node_id' => $execution->current_node_id,
+                        'resume_workflow_id' => $execution->current_workflow_id,
+                        'resume_context' => array_replace(
+                            $execution->context ?? [],
+                            $input
+                        ),
+                    ];
+                });
+            }
+
+            if ($claimed !== null) {
+                $execution = $claimed['execution'];
+                $input = $claimed['input'];
+                $logs = $claimed['logs'];
+                $resumeNodeId = $claimed['resume_node_id'];
+                $resumeWorkflowId = $claimed['resume_workflow_id'];
+                $resumeContext = $claimed['resume_context'];
+            } else {
+                $logs = [];
+                $execution = WorkflowExecution::create([
+                    'workflow_id' => $workflow->id,
+                    'status' => 'running',
+                    'input' => $input,
+                    'logs' => [],
+                    'started_at' => now(),
+                ]);
+            }
         }
 
         /*
@@ -216,7 +337,22 @@ class WorkflowExecutionController extends Controller
         $stepsPersisted = false;
 
         try {
-            $definition = $workflow->definition ?? [];
+            $runWorkflow = $workflow;
+
+            if ($resumeWorkflowId !== null && $resumeWorkflowId !== $workflow->id) {
+                $runWorkflow = Workflow::query()
+                    ->whereKey($resumeWorkflowId)
+                    ->where('user_id', $workflow->user_id)
+                    ->first();
+
+                if ($runWorkflow === null) {
+                    throw new RuntimeException(
+                        'Workflow lanjutan tidak ditemukan. Perbaikan: periksa kembali node Go To lintas workflow.'
+                    );
+                }
+            }
+
+            $definition = $runWorkflow->definition ?? [];
             $nodes = $definition['nodes'] ?? [];
             $edges = $definition['edges'] ?? [];
 
@@ -236,7 +372,11 @@ class WorkflowExecutionController extends Controller
                 $resumeContext,
                 $stepStart,
                 $auditSteps,
-                $currentStep
+                $currentStep,
+                (int) $workflow->user_id,
+                (int) $runWorkflow->id,
+                (string) $runWorkflow->name,
+                $resumeWorkflowId === null || $resumeWorkflowId === $workflow->id
             );
 
             $common = [
@@ -255,6 +395,7 @@ class WorkflowExecutionController extends Controller
                 $execution->update($common + [
                     'status' => 'escalated',
                     'current_node_id' => null,
+                    'current_workflow_id' => null,
                     'waiting_since' => null,
                     'finished_at' => now(),
                 ]);
@@ -264,6 +405,7 @@ class WorkflowExecutionController extends Controller
                 $execution->update($common + [
                     'status' => 'waiting',
                     'current_node_id' => $result['resume_node_id'],
+                    'current_workflow_id' => $result['resume_workflow_id'],
                     'waiting_since' => now(),
                     'finished_at' => null,
                 ]);
@@ -273,11 +415,29 @@ class WorkflowExecutionController extends Controller
                 $execution->update($common + [
                     'status' => 'success',
                     'current_node_id' => null,
+                    'current_workflow_id' => null,
                     'waiting_since' => null,
                     'finished_at' => now(),
                 ]);
 
                 $message = 'Workflow berhasil dieksekusi.';
+            }
+
+            if ($chatSession !== null) {
+                $chatSession->update([
+                    'status' => $result['escalated']
+                        ? ChatSession::STATUS_HUMAN
+                        : ChatSession::STATUS_ACTIVE,
+                    'context' => $result['context'],
+                    'current_workflow_id' => $result['paused']
+                        ? $result['resume_workflow_id']
+                        : null,
+                    'current_node_id' => $result['paused']
+                        ? $result['resume_node_id']
+                        : null,
+                    'takeover_at' => $result['escalated'] ? now() : null,
+                    'last_activity_at' => now(),
+                ]);
             }
 
             return response()->json([
@@ -317,6 +477,12 @@ class WorkflowExecutionController extends Controller
                 'total_tokens' => $tokens['total_tokens'],
             ]);
 
+            if ($chatSession !== null) {
+                $chatSession->update([
+                    'last_activity_at' => now(),
+                ]);
+            }
+
             return response()->json([
                 'message' => 'Workflow gagal dieksekusi.',
                 'data' => $execution->fresh(),
@@ -339,16 +505,23 @@ class WorkflowExecutionController extends Controller
         ?array $resumeContext = null,
         int $stepStart = 0,
         array &$auditSteps = [],
-        ?array &$currentStep = null
+        ?array &$currentStep = null,
+        int $ownerId = 0,
+        int $workflowId = 0,
+        string $workflowName = 'Workflow',
+        bool $requireRunnable = true
     ): array {
         $graph = $this->graphValidator->validate(
             $nodes,
             $edges,
-            $resumeNodeId
+            $resumeNodeId,
+            $requireRunnable
         );
 
         $nodeMap = $graph['nodes'];
         $next = $graph['next'];
+        $currentWorkflowId = $workflowId;
+        $currentWorkflowName = $workflowName;
 
         $currentId = $resumeNodeId ?? $graph['entry_id'];
 
@@ -406,6 +579,7 @@ class WorkflowExecutionController extends Controller
         $paused = false;
         $escalated = false;
         $resumeAtNodeId = null;
+        $resumeAtWorkflowId = null;
         $steps = 0;
 
         while (true) {
@@ -441,8 +615,13 @@ class WorkflowExecutionController extends Controller
             $stepCompletionTokens = 0;
             $stepTotalTokens = 0;
 
+            $stepWorkflowId = $currentWorkflowId;
+            $stepWorkflowName = $currentWorkflowName;
+
             $currentStep = [
                 'step' => $stepNumber,
+                'workflow_id' => $stepWorkflowId,
+                'workflow_name' => $stepWorkflowName,
                 'node_id' => $currentId,
                 'node_type' => $type,
                 'node_name' => $this->nodeName($node),
@@ -461,6 +640,19 @@ class WorkflowExecutionController extends Controller
             } elseif ($type === 'ai_agent') {
                 $outputVariables = $this->agentVariables->normalize($data);
                 $schema = $this->agentVariables->schema($outputVariables);
+                $agentNamespace = $this->agentVariables->namespace(
+                    $data,
+                    $currentId
+                );
+                $verbosity = in_array(
+                    $data['verbosity'] ?? null,
+                    ['concise', 'balanced', 'detailed'],
+                    true
+                ) ? (string) $data['verbosity'] : 'concise';
+                $contextMessages = max(
+                    0,
+                    min(20, (int) ($data['contextMessages'] ?? 10))
+                );
 
                 $systemMessage = (string) (
                     $data['systemMessage'] ?? 'You are a helpful assistant.'
@@ -470,6 +662,8 @@ class WorkflowExecutionController extends Controller
                     $systemMessage,
                     $context
                 );
+
+                $systemMessage .= "\n\n".$this->verbosityInstruction($verbosity);
 
                 if ($schema !== null) {
                     $systemMessage .= "\n\nRespond only with JSON matching the provided schema.";
@@ -491,6 +685,38 @@ class WorkflowExecutionController extends Controller
                     ) ?: '';
                 }
 
+                $history = $context['conversation_history'] ?? null;
+
+                if (is_array($history) && $contextMessages > 0) {
+                    $history = array_slice($history, -$contextMessages);
+                    $history = collect($history)
+                        ->map(function (mixed $message): string {
+                            if (! is_array($message)) {
+                                return '';
+                            }
+
+                            $role = match ($message['role'] ?? null) {
+                                'customer' => 'Pelanggan',
+                                'admin' => 'Admin',
+                                'assistant' => 'AI',
+                                default => 'Sistem',
+                            };
+
+                            return $role.': '.trim((string) ($message['content'] ?? ''));
+                        })
+                        ->filter()
+                        ->implode("\n");
+                }
+
+                if (is_string($history) && trim($history) !== '' && $contextMessages > 0) {
+                    $userMessage = "Riwayat percakapan sesi ini (terbaru di bawah):\n"
+                        .trim($history)
+                        ."\n\nPesan pelanggan terbaru: "
+                        .$userMessage;
+                } elseif ($history === [] || $contextMessages === 0) {
+                    $userMessage = "Pesan pelanggan terbaru: ".$userMessage;
+                }
+
                 $customerName = $context['customer_name'] ?? null;
 
                 if (is_string($customerName) && trim($customerName) !== '') {
@@ -509,6 +735,9 @@ class WorkflowExecutionController extends Controller
                     'user_message' => $userMessage,
                     'model' => $model,
                     'temperature' => (float) ($data['temperature'] ?? 0.7),
+                    'verbosity' => $verbosity,
+                    'context_messages' => $contextMessages,
+                    'agent_namespace' => $agentNamespace,
                 ];
 
                 if ($currentStep !== null) {
@@ -520,7 +749,12 @@ class WorkflowExecutionController extends Controller
                     $userMessage,
                     (float) ($data['temperature'] ?? 0.7),
                     is_string($data['model'] ?? null) ? $data['model'] : null,
-                    $schema
+                    $schema,
+                    match ($verbosity) {
+                        'concise' => 800,
+                        'detailed' => 2000,
+                        default => 1200,
+                    }
                 );
 
                 $stepPromptTokens = (int) $aiResult['usage']['prompt_tokens'];
@@ -533,6 +767,12 @@ class WorkflowExecutionController extends Controller
 
                 if ($schema !== null) {
                     $json = trim($aiResult['text']);
+
+                    if (($aiResult['finish_reason'] ?? 'STOP') === 'MAX_TOKENS') {
+                        throw new RuntimeException(
+                            'Jawaban AI terpotong karena batas token. Ringkas system prompt atau tambah kapasitas output.'
+                        );
+                    }
 
                     if (str_starts_with($json, '```')) {
                         $json = (string) preg_replace(
@@ -551,6 +791,7 @@ class WorkflowExecutionController extends Controller
 
                     foreach ($values as $name => $value) {
                         $context[$name] = $value;
+                        $context[$agentNamespace][$name] = $value;
                     }
 
                     $aiText = '';
@@ -583,6 +824,7 @@ class WorkflowExecutionController extends Controller
                     }
 
                     $context['ai_response'] = $aiText;
+                    $context[$agentNamespace]['ai_response'] = $aiText;
                     $logContext['variables'] = $values;
                     $stepVariables = $values;
                     $stepOutput = [
@@ -592,21 +834,25 @@ class WorkflowExecutionController extends Controller
                     ];
                 } else {
                     $context['ai_response'] = $aiResult['text'];
+                    $context[$agentNamespace]['ai_response'] = $aiResult['text'];
                     $stepOutput = ['text' => $aiResult['text']];
                 }
 
                 $message = 'AI Agent berhasil menghasilkan jawaban.';
                 $logContext['provider'] = 'gemini';
                 $logContext['model'] = $model;
+                $logContext['agent_namespace'] = $agentNamespace;
+                $logContext['verbosity'] = $verbosity;
+                $logContext['context_messages'] = $contextMessages;
                 $logContext['prompt_tokens'] = $aiResult['usage']['prompt_tokens'];
                 $logContext['completion_tokens'] = $aiResult['usage']['completion_tokens'];
                 $logContext['total_tokens'] = $aiResult['usage']['total_tokens'];
             } elseif ($type === 'if_else') {
-                $field = $this->conditionRule->field($data);
+                $field = $this->conditionRule->validatedField($data);
 
-                if ($field === null) {
+                if (! $this->context->has($context, $field)) {
                     throw new RuntimeException(
-                        'Condition belum memilih variabel boolean.'
+                        'Variabel Condition "'.$field.'" tidak ditemukan. Perbaikan: pakai format {{nama-agent.variabel}} dari AI Agent sebelumnya, contoh: rekomendasi-penawaran.mau_beli.'
                     );
                 }
 
@@ -665,6 +911,16 @@ class WorkflowExecutionController extends Controller
             } elseif ($type === 'go_to') {
                 $jumpTo = (string) ($data['targetNodeId'] ?? '');
                 $endFlow = (bool) ($data['endFlow'] ?? false);
+                $targetWorkflowId = $data['targetWorkflowId'] ?? null;
+                $targetWorkflowId = is_numeric($targetWorkflowId)
+                    ? (int) $targetWorkflowId
+                    : null;
+
+                if ($jumpTo === '') {
+                    throw new RuntimeException(
+                        'Node Go To belum memilih node tujuan. Perbaikan: buka node Go To lalu pilih node tujuan.'
+                    );
+                }
 
                 $message = 'Go To → '.$jumpTo;
 
@@ -672,23 +928,57 @@ class WorkflowExecutionController extends Controller
                 $logContext['end_flow'] = $endFlow;
                 $stepInput = [
                     'target_node_id' => $jumpTo,
+                    'target_workflow_id' => $targetWorkflowId,
                     'end_flow' => $endFlow,
                 ];
+
+                if (
+                    $targetWorkflowId !== null
+                    && $targetWorkflowId !== $currentWorkflowId
+                ) {
+                    $targetWorkflow = Workflow::query()
+                        ->whereKey($targetWorkflowId)
+                        ->where('user_id', $ownerId)
+                        ->first();
+
+                    if ($targetWorkflow === null) {
+                        throw new RuntimeException(
+                            'Workflow tujuan Go To tidak ditemukan. Perbaikan: pilih ulang workflow tujuan yang masih ada.'
+                        );
+                    }
+
+                    $targetGraph = $this->graphValidator->validateDefinition(
+                        $targetWorkflow->definition ?? [],
+                        $jumpTo,
+                        false
+                    );
+
+                    $nodeMap = $targetGraph['nodes'];
+                    $next = $targetGraph['next'];
+                    $currentWorkflowId = (int) $targetWorkflow->id;
+                    $currentWorkflowName = (string) $targetWorkflow->name;
+
+                    $logContext['target_workflow_id'] = $currentWorkflowId;
+                    $logContext['target_workflow_name'] = $currentWorkflowName;
+                }
 
                 if ($endFlow) {
                     $paused = true;
                     $resumeAtNodeId = $jumpTo;
+                    $resumeAtWorkflowId = $currentWorkflowId;
                     $message .= ' (End flow)';
                 }
 
                 $stepOutput = [
                     'paused' => $paused && $endFlow,
                     'resume_node_id' => $resumeAtNodeId,
+                    'resume_workflow_id' => $resumeAtWorkflowId,
                 ];
             } else {
                 $message = 'Workflow menunggu pesan pelanggan berikutnya.';
                 $paused = true;
                 $resumeAtNodeId = $next[$currentId.':default'] ?? null;
+                $resumeAtWorkflowId = $currentWorkflowId;
                 $stepOutput = ['resume_node_id' => $resumeAtNodeId];
             }
 
@@ -698,6 +988,8 @@ class WorkflowExecutionController extends Controller
 
             $auditSteps[] = [
                 'step' => $stepNumber,
+                'workflow_id' => $stepWorkflowId,
+                'workflow_name' => $stepWorkflowName,
                 'node_id' => $currentId,
                 'node_type' => $type,
                 'node_name' => $this->nodeName($node),
@@ -728,7 +1020,11 @@ class WorkflowExecutionController extends Controller
                 'duration_ms' => $durationMs,
             ] + $logContext;
 
-            if ($escalated || $paused || $type === 'output') {
+            if ($escalated || $paused) {
+                break;
+            }
+
+            if ($type === 'output' && ! isset($next[$currentId.':default'])) {
                 break;
             }
 
@@ -761,6 +1057,7 @@ class WorkflowExecutionController extends Controller
             'paused' => $paused,
             'escalated' => $escalated,
             'resume_node_id' => $resumeAtNodeId,
+            'resume_workflow_id' => $resumeAtWorkflowId,
             'executed_steps' => $steps,
             'tokens' => $tokens,
         ];
@@ -804,6 +1101,8 @@ class WorkflowExecutionController extends Controller
     {
         return [
             'step' => $currentStep['step'],
+            'workflow_id' => $currentStep['workflow_id'] ?? null,
+            'workflow_name' => $currentStep['workflow_name'] ?? null,
             'node_id' => $currentStep['node_id'],
             'node_type' => $currentStep['node_type'],
             'node_name' => $currentStep['node_name'] ?? null,
@@ -822,5 +1121,14 @@ class WorkflowExecutionController extends Controller
             'error' => $error,
             'executed_at' => now(),
         ];
+    }
+
+    private function verbosityInstruction(string $verbosity): string
+    {
+        return match ($verbosity) {
+            'detailed' => 'Gaya jawaban: cukup detail, tetapi tetap terstruktur dan tanpa pengulangan. Gunakan maksimal tiga paragraf pendek atau tiga poin. Setiap bubble maksimal tiga kalimat.',
+            'balanced' => 'Gaya jawaban: ringkas dan jelas. Gunakan maksimal dua paragraf pendek. Setiap bubble maksimal dua sampai tiga kalimat. Jangan mengulang pertanyaan atau informasi yang sudah diketahui.',
+            default => 'Gaya jawaban: sangat ringkas. Setiap bubble maksimal dua kalimat. Langsung jawab inti, jangan mengulang pertanyaan pelanggan, jangan bertele-tele, dan ajukan paling banyak satu pertanyaan lanjutan.',
+        };
     }
 }

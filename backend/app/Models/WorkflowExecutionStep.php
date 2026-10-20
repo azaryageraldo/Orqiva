@@ -9,6 +9,8 @@ class WorkflowExecutionStep extends Model
 {
     protected $fillable = [
         'workflow_execution_id',
+        'workflow_id',
+        'workflow_name',
         'step',
         'node_id',
         'node_type',
@@ -46,5 +48,10 @@ class WorkflowExecutionStep extends Model
     public function execution(): BelongsTo
     {
         return $this->belongsTo(WorkflowExecution::class, 'workflow_execution_id');
+    }
+
+    public function workflow(): BelongsTo
+    {
+        return $this->belongsTo(Workflow::class);
     }
 }

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  CircleAlert,
   Clock,
   Coins,
   Layers,
   LoaderCircle,
   RefreshCw,
   Timer,
+  Workflow as WorkflowIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -122,6 +124,12 @@ function StepCard({ step }: { step: ExecutionStep }) {
               {typeLabel !== stepNodeLabel(step) && (
                 <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                   {typeLabel}
+                </span>
+              )}
+              {step.workflow_name && (
+                <span className="inline-flex items-center gap-1 rounded-md border border-sky-400/25 bg-sky-400/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+                  <WorkflowIcon className="size-3" />
+                  {step.workflow_name}
                 </span>
               )}
               {step.status === "error" && (
@@ -335,18 +343,39 @@ export default function ExecutionDetail({
               className="mb-4 -ml-2 text-muted-foreground"
             >
               <ArrowLeft />
-              Kembali ke Activity
+              Kembali ke Audit Log
             </Button>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                Eksekusi #{executionId}
+                {detail?.chat_session_id
+                  ? `Audit session #${detail.chat_session_id}`
+                  : `Audit eksekusi #${executionId}`}
               </h1>
               {detail && <ExecutionStatusBadge status={detail.status} />}
             </div>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
               {detail?.workflow_name || "Memuat workflow…"} · Audit setiap
-              langkah, input, output, dan konsumsi token.
+              langkah, perpindahan workflow, input, output, dan konsumsi token.
             </p>
+            {detail && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>
+                  Contact{" "}
+                  <span className="font-mono text-foreground">
+                    {detail.contact_public_id || "tidak tercatat"}
+                  </span>
+                </span>
+                <span>Session {detail.chat_session_id ?? "—"}</span>
+                {detail.current_workflow_name && (
+                  <span>
+                    Workflow aktif:{" "}
+                    <span className="text-foreground">
+                      {detail.current_workflow_name}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <Button
@@ -437,6 +466,45 @@ export default function ExecutionDetail({
               >
                 {detail.error}
               </div>
+            )}
+
+            {detail.diagnostic && (
+              <Card className="border-amber-400/25 bg-amber-400/[0.04] p-5">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-amber-400/25 bg-amber-400/10 text-amber-300">
+                    <CircleAlert className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-semibold text-foreground">
+                      {detail.diagnostic.title}
+                    </h2>
+                    {detail.diagnostic.node_name && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Node: {detail.diagnostic.node_name}
+                        {detail.diagnostic.node_id
+                          ? ` · ${detail.diagnostic.node_id}`
+                          : ""}
+                      </p>
+                    )}
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {detail.diagnostic.reason}
+                    </p>
+                    <div className="mt-3 rounded-lg border border-border bg-background/60 p-3">
+                      <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                        Cara memperbaiki
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-foreground">
+                        {detail.diagnostic.fix}
+                      </p>
+                      {detail.diagnostic.example && (
+                        <pre className="mt-2 overflow-x-auto rounded-md bg-muted/50 px-2.5 py-2 text-xs text-foreground">
+                          {detail.diagnostic.example}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
             )}
 
             <Card className="gap-0 py-0">

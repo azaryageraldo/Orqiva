@@ -65,7 +65,8 @@ trait BuildsWorkflowDefinitions
         string $id,
         string $target,
         bool $endFlow = false,
-        bool $setStartingPoint = false
+        bool $setStartingPoint = false,
+        ?int $targetWorkflowId = null
     ): array {
         return [
             'id' => $id,
@@ -74,6 +75,7 @@ trait BuildsWorkflowDefinitions
             'data' => [
                 'label' => 'Go To',
                 'targetNodeId' => $target,
+                'targetWorkflowId' => $targetWorkflowId,
                 'endFlow' => $endFlow,
                 'setStartingPoint' => $setStartingPoint,
             ],

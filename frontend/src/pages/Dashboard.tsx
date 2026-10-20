@@ -328,7 +328,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                 className="h-10 px-4"
               >
                 <ActivityIcon />
-                Lihat aktivitas
+                Lihat audit log
               </Button>
             )}
           </div>
@@ -524,7 +524,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   Eksekusi terbaru
                 </h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Delapan aktivitas terakhir dari seluruh workflow.
+                  Delapan session terakhir dari seluruh workflow.
                 </p>
               </div>
               {onViewActivity && (
@@ -551,11 +551,10 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   <ActivityIcon className="size-5" />
                 </span>
                 <p className="text-sm font-medium text-foreground">
-                  Belum ada eksekusi
+                  Belum ada session
                 </p>
                 <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                  Jalankan workflow dari Chat Widget untuk melihat riwayat di
-                  sini.
+                  Mulai percakapan lewat widget Channel untuk melihat audit log di sini.
                 </p>
               </div>
             ) : (

@@ -16,6 +16,32 @@ class AiAgentVariables
     public const TYPES = ['string', 'boolean', 'array'];
 
     /**
+     * Namespace stabil dari nama node AI Agent, misalnya
+     * "Rekomendasi & Penawaran" menjadi "rekomendasi-penawaran".
+     */
+    public function namespace(array $data, string $fallback = 'agent'): string
+    {
+        $name = trim((string) ($data['nodeName'] ?? ''));
+        $slug = mb_strtolower($name);
+        $slug = (string) preg_replace('/[^a-z0-9]+/u', '-', $slug);
+        $slug = trim($slug, '-');
+
+        if ($slug === '') {
+            $slug = mb_strtolower($fallback);
+            $slug = (string) preg_replace('/[^a-z0-9]+/u', '-', $slug);
+            $slug = trim($slug, '-');
+        }
+
+        if ($slug === '') {
+            return 'agent';
+        }
+
+        return preg_match('/^[a-z_]/', $slug) === 1
+            ? $slug
+            : 'agent-'.$slug;
+    }
+
+    /**
      * @return array<int, array{name: string, type: string, description: string, item_field: ?string}>
      */
     public function normalize(array $data): array

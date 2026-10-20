@@ -9,15 +9,22 @@ import { Button } from "./components/ui/button";
 import Dashboard from "./pages/Dashboard";
 import Workflows from "./pages/Workflows";
 import WorkflowEditor from "./pages/WorkflowEditor";
-import WorkflowChat from "./pages/WorkflowChat";
 import Activity from "./pages/Activity";
 import Inbox from "./pages/Inbox";
+import Channel from "./pages/Channel";
+import PublicChatWidget from "./pages/PublicChatWidget";
 import ExecutionDetail from "./pages/ExecutionDetail";
 import Settings from "./pages/Settings";
 import "./App.css";
 
 type Health = "checking" | "online" | "offline";
-type View = "dashboard" | "workflows" | "inbox" | "activity" | "settings";
+type View =
+  | "dashboard"
+  | "workflows"
+  | "inbox"
+  | "channel"
+  | "activity"
+  | "settings";
 
 function ErrorBanner({
   message,
@@ -57,10 +64,6 @@ export default function App() {
     null,
   );
 
-  const [testingWorkflowId, setTestingWorkflowId] = useState<string | null>(
-    () => new URLSearchParams(window.location.search).get("testWorkflow"),
-  );
-
   const [viewingExecution, setViewingExecution] = useState<{
     workflowId: string;
     executionId: number;
@@ -89,7 +92,6 @@ export default function App() {
     const handleUnauthorized = () => {
       setAuthenticated(false);
       setEditingWorkflowId(null);
-      setTestingWorkflowId(null);
       setViewingExecution(null);
       setView("dashboard");
     };
@@ -129,7 +131,6 @@ export default function App() {
       await logout();
       setAuthenticated(false);
       setEditingWorkflowId(null);
-      setTestingWorkflowId(null);
       setViewingExecution(null);
       setView("dashboard");
     } catch {
@@ -139,18 +140,10 @@ export default function App() {
     }
   }
 
-  const clearWorkflowUrls = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("testWorkflow");
-    window.history.replaceState({}, "", url);
-  };
-
   const goTo = (next: View, section?: string) => {
     setError("");
     setEditingWorkflowId(null);
-    setTestingWorkflowId(null);
     setViewingExecution(null);
-    clearWorkflowUrls();
     setView(next);
 
     if (section) {
@@ -166,10 +159,16 @@ export default function App() {
 
   const openWorkflow = (workflowId: string) => {
     setError("");
-    setTestingWorkflowId(null);
     setViewingExecution(null);
     setEditingWorkflowId(workflowId);
   };
+
+  const publicWidgetToken =
+    window.location.pathname.match(/^\/widget\/([^/]+)\/?$/)?.[1] ?? null;
+
+  if (publicWidgetToken) {
+    return <PublicChatWidget token={publicWidgetToken} />;
+  }
 
   if (authChecking) {
     return (
@@ -197,6 +196,7 @@ export default function App() {
     onDashboardClick: () => goTo("dashboard"),
     onWorkflowsClick: () => goTo("workflows"),
     onInboxClick: () => goTo("inbox"),
+    onChannelClick: () => goTo("channel"),
     onActivityClick: () => goTo("activity"),
     onHelpClick: () => goTo("settings", "settings-support"),
     onSettingsClick: () => goTo("settings"),
@@ -221,30 +221,11 @@ export default function App() {
     );
   }
 
-  // Halaman Chat Widget untuk menguji workflow
-  if (testingWorkflowId !== null) {
-    return (
-      <DashboardLayout
-        title="Test Chat Widget"
-        icon="chat"
-        activeNav="workflows"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <WorkflowChat
-          workflowId={testingWorkflowId}
-          onBack={() => goTo("workflows")}
-        />
-      </DashboardLayout>
-    );
-  }
-
   // Halaman detail eksekusi (audit per langkah)
   if (viewingExecution !== null) {
     return (
       <DashboardLayout
-        title="Execution detail"
+        title="Audit log"
         icon="activity"
         activeNav="activity"
         {...layoutProps}
@@ -290,10 +271,25 @@ export default function App() {
     );
   }
 
+  if (view === "channel") {
+    return (
+      <DashboardLayout
+        title="Channel"
+        icon="channel"
+        activeNav="channel"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <Channel />
+      </DashboardLayout>
+    );
+  }
+
   if (view === "activity") {
     return (
       <DashboardLayout
-        title="Activity"
+        title="Audit Log"
         icon="activity"
         activeNav="activity"
         {...layoutProps}
@@ -305,7 +301,6 @@ export default function App() {
           onOpenExecution={(execution) => {
             setError("");
             setEditingWorkflowId(null);
-            setTestingWorkflowId(null);
             setViewingExecution({
               workflowId: String(execution.workflow_id),
               executionId: execution.id,
@@ -341,14 +336,7 @@ export default function App() {
     >
       {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
-      <Workflows
-        onOpenWorkflow={openWorkflow}
-        onTestWorkflow={(workflowId) => {
-          const testUrl = new URL(window.location.href);
-          testUrl.searchParams.set("testWorkflow", workflowId);
-          window.open(testUrl.toString(), "_blank", "noopener,noreferrer");
-        }}
-      />
+      <Workflows onOpenWorkflow={openWorkflow} />
     </DashboardLayout>
   );
 }

@@ -35,7 +35,7 @@ class WorkflowGraphValidator
     /**
      * Node yang tidak boleh memiliki koneksi keluar.
      */
-    public const TERMINAL_TYPES = ['output', 'relocate', 'go_to'];
+    public const TERMINAL_TYPES = ['relocate', 'go_to'];
 
     public function __construct(
         private readonly ConditionRule $conditionRule,
@@ -90,6 +90,7 @@ class WorkflowGraphValidator
         }
 
         $nodeMap = [];
+        $agentNamespaces = [];
 
         foreach ($nodes as $node) {
             if (
@@ -129,6 +130,21 @@ class WorkflowGraphValidator
 
             if ($type === 'ai_agent') {
                 $this->agentVariables->normalize($node['data'] ?? []);
+
+                $namespace = $this->agentVariables->namespace(
+                    $node['data'] ?? [],
+                    $node['id']
+                );
+
+                if (isset($agentNamespaces[$namespace])) {
+                    throw new RuntimeException(
+                        'Nama AI Agent menghasilkan namespace yang sama: '
+                        .$namespace
+                        .'. Beri nama unik pada setiap AI Agent.'
+                    );
+                }
+
+                $agentNamespaces[$namespace] = $node['id'];
             }
 
             $nodeMap[$node['id']] = $node;
@@ -157,13 +173,13 @@ class WorkflowGraphValidator
         if ($requireRunnable) {
             if (count($triggers) !== 1) {
                 throw new RuntimeException(
-                    'Workflow harus memiliki tepat satu Trigger.'
+                    'Workflow entry harus memiliki tepat satu Trigger. Perbaikan: gunakan satu node Trigger, atau masuk ke workflow ini lewat node Go To dari workflow lain.'
                 );
             }
 
             if (count($terminals) < 1) {
                 throw new RuntimeException(
-                    'Workflow harus memiliki minimal satu Send Message atau Relocate.'
+                    'Workflow harus memiliki minimal satu Send Message atau Relocate agar pelanggan menerima pesan atau admin bisa mengambil alih.'
                 );
             }
         }
@@ -257,20 +273,31 @@ class WorkflowGraphValidator
             $data = $node['data'] ?? [];
             $target = $data['targetNodeId'] ?? null;
             $isStartingPoint = (bool) ($data['setStartingPoint'] ?? false);
+            $targetWorkflowId = $data['targetWorkflowId'] ?? null;
+            $isCrossWorkflow = is_numeric($targetWorkflowId)
+                && (int) $targetWorkflowId > 0;
 
             if ($target === null || $target === '') {
                 if ($requireRunnable) {
                     throw new RuntimeException(
-                        'Node Go To harus memilih node tujuan.'
+                        'Node Go To harus memilih node tujuan. Perbaikan: buka node Go To lalu pilih workflow dan node tujuan.'
                     );
                 }
 
                 continue;
             }
 
+            if ($isCrossWorkflow) {
+                /*
+                 * Node tujuan berada di workflow lain. Keberadaan workflow
+                 * dan node tujuannya divalidasi saat simpan dan saat runtime.
+                 */
+                continue;
+            }
+
             if (! is_string($target) || ! isset($nodeMap[$target])) {
                 throw new RuntimeException(
-                    'Node tujuan Go To tidak ditemukan.'
+                    'Node tujuan Go To tidak ditemukan. Perbaikan: pilih ulang node tujuan yang masih ada di workflow tersebut.'
                 );
             }
 
@@ -314,13 +341,15 @@ class WorkflowGraphValidator
                         || ! isset($next[$nodeId.':false'])
                     ) {
                         throw new RuntimeException(
-                            'Condition harus memiliki cabang If match dan Else.'
+                            'Condition harus memiliki cabang If match dan Else. Perbaikan: hubungkan port hijau dan port merah ke node berikutnya.'
                         );
                     }
 
-                    if ($this->conditionRule->field($data) === null) {
+                    $field = $this->conditionRule->validatedField($data);
+
+                    if (! preg_match('/^[a-zA-Z_][a-zA-Z0-9_-]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/', $field)) {
                         throw new RuntimeException(
-                            'Condition belum memilih variabel boolean.'
+                            'Nama variabel Condition "'.$field.'" tidak valid. Perbaikan: pakai format {{nama-agent.variabel}} tanpa spasi. Contoh: rekomendasi-penawaran.mau_beli.'
                         );
                     }
                 }

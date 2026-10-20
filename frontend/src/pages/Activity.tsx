@@ -105,7 +105,7 @@ export default function Activity({
       setError(
         getErrorMessage(
           caught,
-          "Riwayat eksekusi gagal dimuat. Periksa koneksi backend.",
+          "Audit log gagal dimuat. Periksa koneksi backend.",
         ),
       );
     } finally {
@@ -176,7 +176,7 @@ export default function Activity({
           setError(
             getErrorMessage(
               caught,
-              "Riwayat eksekusi gagal dimuat. Periksa koneksi backend.",
+              "Audit log gagal dimuat. Periksa koneksi backend.",
             ),
           );
         }
@@ -200,11 +200,11 @@ export default function Activity({
               Workspace
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Activity
+              Audit Log
             </h1>
             <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              Riwayat eksekusi workflow terbaru beserta status dan konsumsi
-              tokennya.
+              Satu log per session pelanggan, mencakup seluruh workflow yang
+              dijalankan lewat Go To.
             </p>
           </div>
 
@@ -260,16 +260,16 @@ export default function Activity({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-foreground">
-                  Eksekusi terbaru
+                  Session terbaru
                 </h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   Filter berdasarkan status dan tanggal, lalu buka detail untuk
-                  audit per langkah.
+                  audit per langkah dan workflow.
                 </p>
               </div>
 
               <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
-                {stats?.executions.length ?? 0} eksekusi dimuat
+                {stats?.executions.length ?? 0} session dimuat
               </span>
             </div>
 
@@ -454,13 +454,13 @@ export default function Activity({
               </span>
               <p className="text-sm font-medium text-foreground">
                 {hasFilters
-                  ? "Tidak ada eksekusi yang cocok"
-                  : "Belum ada eksekusi"}
+                  ? "Tidak ada session yang cocok"
+                  : "Belum ada session"}
               </p>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {hasFilters
                   ? "Ubah status atau rentang tanggal, lalu terapkan kembali."
-                  : "Jalankan workflow dari Chat Widget untuk melihat riwayat di sini."}
+                  : "Buka Channel lalu mulai percakapan lewat widget untuk melihat audit log di sini."}
               </p>
             </div>
           ) : (
@@ -522,10 +522,16 @@ function ActivityRow({
           {execution.workflow_name || `Workflow #${execution.workflow_id}`}
         </button>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          Eksekusi #{execution.id} · {formatDate(execution.started_at)}
+          Session {execution.session_id ?? `#${execution.id}`} ·{" "}
+          {formatDate(execution.started_at)}
           {execution.steps_count > 0
             ? ` · ${execution.steps_count} langkah`
             : ""}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {execution.contact_id
+            ? `Contact ${execution.contact_name || execution.contact_id}`
+            : "Contact tidak tercatat"}
         </p>
         {execution.error && (
           <p className="mt-1 line-clamp-2 text-xs text-destructive">

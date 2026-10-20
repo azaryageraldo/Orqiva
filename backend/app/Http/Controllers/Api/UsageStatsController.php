@@ -112,7 +112,7 @@ class UsageStatsController extends Controller
 
         $executions = WorkflowExecution::query()
             ->whereHas('workflow', $owned)
-            ->with('workflow:id,name')
+            ->with(['workflow:id,name', 'contact:id,public_id,name', 'chatSession:id,status'])
             ->withCount('steps')
             ->when(
                 $status !== null,
@@ -143,6 +143,11 @@ class UsageStatsController extends Controller
                 'id' => $execution->id,
                 'workflow_id' => $execution->workflow_id,
                 'workflow_name' => $execution->workflow?->name,
+                'contact_id' => $execution->contact?->public_id
+                    ?? data_get($execution->input, 'conversation_id'),
+                'contact_name' => $execution->contact?->name,
+                'session_id' => $execution->chat_session_id,
+                'session_status' => $execution->chatSession?->status,
                 'status' => $execution->status,
                 'total_tokens' => (int) $execution->total_tokens,
                 'steps_count' => (int) $execution->steps_count,

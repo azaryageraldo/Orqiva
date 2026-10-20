@@ -34,4 +34,19 @@ class User extends Authenticatable
     {
         return $this->hasMany(Workflow::class);
     }
+
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(Contact::class);
+    }
+
+    public function channels(): HasMany
+    {
+        return $this->hasMany(Channel::class);
+    }
+
+    public function chatSessions(): HasMany
+    {
+        return $this->hasMany(ChatSession::class);
+    }
 }

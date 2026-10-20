@@ -3,302 +3,252 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\WorkflowExecution;
+use App\Models\ChatMessage;
+use App\Models\ChatSession;
+use App\Models\Contact;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class InboxController extends Controller
 {
-    /**
-     * Daftar percakapan terbaru dari seluruh workflow milik pengguna.
-     */
     public function index(Request $request): JsonResponse
     {
-        $executions = WorkflowExecution::query()
-            ->whereHas(
-                'workflow',
-                fn ($query) => $query->where('user_id', $request->user()->id)
-            )
-            ->with('workflow:id,name,user_id')
-            ->orderByDesc('id')
-            ->limit(500)
+        $contacts = Contact::query()
+            ->where('user_id', $request->user()->id)
+            ->with([
+                'sessions' => fn ($query) => $query
+                    ->with(['workflow:id,name', 'execution:id,chat_session_id,status'])
+                    ->latest('id'),
+            ])
             ->get();
 
-        $conversations = [];
+        $data = $contacts
+            ->map(function (Contact $contact): array {
+                $latestSession = $contact->sessions->first();
+                $lastMessage = $contact->messages()->latest('id')->first();
+                $lastActivity = $lastMessage?->created_at
+                    ?? $latestSession?->last_activity_at
+                    ?? $contact->last_seen_at
+                    ?? $contact->created_at;
 
-        foreach ($executions as $execution) {
-            $conversationId = $this->conversationId($execution);
-
-            if ($conversationId === null) {
-                continue;
-            }
-
-            $key = $execution->workflow_id.'|'.$conversationId;
-
-            if (isset($conversations[$key])) {
-                $conversations[$key]['execution_count']++;
-
-                continue;
-            }
-
-            $customerName = data_get($execution->input, 'customer_name');
-            $lastActivity = $execution->finished_at
-                ?? $execution->started_at
-                ?? $execution->created_at;
-
-            $conversations[$key] = [
-                'conversation_id' => $conversationId,
-                'execution_id' => $execution->id,
-                'workflow_id' => $execution->workflow_id,
-                'workflow_name' => $execution->workflow?->name,
-                'customer_name' => is_string($customerName)
-                    && trim($customerName) !== ''
-                    ? trim($customerName)
-                    : 'Pengunjung',
-                'last_message' => $this->lastMessagePreview($execution),
-                'last_status' => $execution->status,
-                'last_activity_at' => $lastActivity?->toISOString(),
-                'execution_count' => 1,
-            ];
-        }
+                return [
+                    'id' => $contact->id,
+                    'contact_id' => $contact->public_id,
+                    'name' => $contact->name ?: 'Pengunjung',
+                    'last_message' => $lastMessage?->content,
+                    'last_activity_at' => $lastActivity?->toISOString(),
+                    'session_status' => $latestSession?->status ?? 'ended',
+                    'workflow_name' => $latestSession?->workflow?->name,
+                    'session_count' => $contact->sessions->count(),
+                    'latest_session_id' => $latestSession?->id,
+                    'latest_execution_id' => $latestSession?->execution?->id,
+                    'latest_status' => $latestSession?->execution?->status,
+                ];
+            })
+            ->sortByDesc(fn (array $item) => $item['last_activity_at'] ?? '')
+            ->values();
 
         return response()->json([
-            'data' => array_values($conversations),
-            'meta' => [
-                'total' => count($conversations),
-            ],
+            'data' => $data,
+            'meta' => ['total' => $data->count()],
         ]);
     }
 
-    /**
-     * Riwayat pesan untuk satu percakapan.
-     */
-    public function show(
-        Request $request,
-        WorkflowExecution $execution
-    ): JsonResponse {
-        $execution->loadMissing('workflow');
+    public function show(Request $request, Contact $contact): JsonResponse
+    {
+        abort_unless($contact->user_id === $request->user()->id, 404);
 
-        abort_unless(
-            $execution->workflow !== null
-            && $execution->workflow->user_id === $request->user()->id,
-            404
-        );
+        $contact->load([
+            'sessions' => fn ($query) => $query
+                ->with([
+                    'workflow:id,name',
+                    'execution:id,chat_session_id,status,started_at,finished_at',
+                    'messages' => fn ($messages) => $messages->orderBy('id'),
+                ])
+                ->orderBy('id'),
+        ]);
 
-        $conversationId = $this->conversationId($execution);
+        $sessions = $contact->sessions->map(fn (ChatSession $session) => [
+            'id' => $session->id,
+            'status' => $session->status,
+            'workflow_name' => $session->workflow?->name,
+            'execution_id' => $session->execution?->id,
+            'execution_status' => $session->execution?->status,
+            'started_at' => $session->created_at?->toISOString(),
+            'ended_at' => $session->ended_at?->toISOString(),
+            'takeover_at' => $session->takeover_at?->toISOString(),
+            'last_activity_at' => $session->last_activity_at?->toISOString(),
+            'messages' => $session->messages->map(
+                fn (ChatMessage $message) => $this->messagePayload($message)
+            )->values()->all(),
+        ])->values();
 
-        abort_if($conversationId === null, 404);
-
-        $executions = WorkflowExecution::query()
-            ->where('workflow_id', $execution->workflow_id)
-            ->with('steps')
-            ->orderBy('id')
-            ->get()
-            ->filter(
-                fn (WorkflowExecution $item) => $this->conversationId($item)
-                    === $conversationId
-            )
-            ->values();
-
-        $messages = [];
-
-        foreach ($executions as $item) {
-            $messages = array_merge(
-                $messages,
-                $this->messagesFor($item)
-            );
-        }
-
-        $latest = $executions->last() ?? $execution;
-        $customerName = data_get($latest->input, 'customer_name');
+        $latest = $contact->sessions->last();
 
         return response()->json([
             'data' => [
-                'conversation_id' => $conversationId,
-                'execution_id' => $latest->id,
-                'workflow_id' => $latest->workflow_id,
-                'workflow_name' => $latest->workflow?->name
-                    ?? $execution->workflow?->name,
-                'customer_name' => is_string($customerName)
-                    && trim($customerName) !== ''
-                    ? trim($customerName)
-                    : 'Pengunjung',
-                'status' => $latest->status,
-                'started_at' => $executions->first()?->started_at?->toISOString(),
-                'last_activity_at' => (
-                    $latest->finished_at
-                    ?? $latest->started_at
-                    ?? $latest->created_at
-                )?->toISOString(),
-                'messages' => $messages,
+                'id' => $contact->id,
+                'contact_id' => $contact->public_id,
+                'name' => $contact->name ?: 'Pengunjung',
+                'latest_session' => $latest === null ? null : [
+                    'id' => $latest->id,
+                    'status' => $latest->status,
+                    'execution_id' => $latest->execution?->id,
+                    'execution_status' => $latest->execution?->status,
+                    'workflow_name' => $latest->workflow?->name,
+                    'takeover_at' => $latest->takeover_at?->toISOString(),
+                ],
+                'sessions' => $sessions,
             ],
         ]);
     }
 
-    private function conversationId(WorkflowExecution $execution): ?string
+    public function takeover(Request $request, ChatSession $session): JsonResponse
     {
-        $conversationId = data_get($execution->input, 'conversation_id');
+        $this->authorizeSession($request, $session);
 
-        if (! is_string($conversationId) || trim($conversationId) === '') {
-            return null;
+        if ($session->status === ChatSession::STATUS_ENDED) {
+            throw ValidationException::withMessages([
+                'session' => 'Sesi ini sudah berakhir. Pelanggan perlu membuka widget baru.',
+            ]);
         }
 
-        return trim($conversationId);
+        $session->update([
+            'status' => ChatSession::STATUS_HUMAN,
+            'takeover_at' => now(),
+            'last_activity_at' => now(),
+        ]);
+
+        $session->execution?->update([
+            'status' => 'escalated',
+            'current_workflow_id' => null,
+            'current_node_id' => null,
+            'waiting_since' => null,
+            'finished_at' => now(),
+        ]);
+
+        ChatMessage::create([
+            'chat_session_id' => $session->id,
+            'contact_id' => $session->contact_id,
+            'role' => 'system',
+            'content' => 'Admin mengambil alih percakapan. AI berhenti membalas.',
+            'metadata' => ['variant' => 'escalated'],
+        ]);
+
+        return response()->json([
+            'data' => $this->sessionPayload($session->fresh(['workflow', 'execution'])),
+        ]);
     }
 
-    private function lastMessagePreview(WorkflowExecution $execution): string
+    public function release(Request $request, ChatSession $session): JsonResponse
     {
-        $messages = data_get($execution->output, 'messages');
+        $this->authorizeSession($request, $session);
 
-        if (is_array($messages)) {
-            $assistant = collect($messages)
-                ->filter(fn ($message) => is_string($message) && trim($message) !== '')
-                ->last();
-
-            if (is_string($assistant)) {
-                return Str::limit(trim($assistant), 140);
-            }
+        if ($session->status === ChatSession::STATUS_ENDED) {
+            throw ValidationException::withMessages([
+                'session' => 'Sesi ini sudah berakhir.',
+            ]);
         }
 
-        $customer = data_get($execution->input, 'customer_message')
-            ?? data_get($execution->input, 'message');
+        $session->update([
+            'status' => ChatSession::STATUS_ACTIVE,
+            'takeover_at' => null,
+            'current_workflow_id' => null,
+            'current_node_id' => null,
+            'last_activity_at' => now(),
+        ]);
 
-        return is_string($customer) && trim($customer) !== ''
-            ? Str::limit(trim($customer), 140)
-            : 'Tidak ada pesan';
+        $session->execution?->update([
+            'status' => 'success',
+            'current_workflow_id' => null,
+            'current_node_id' => null,
+            'waiting_since' => null,
+            'finished_at' => now(),
+        ]);
+
+        ChatMessage::create([
+            'chat_session_id' => $session->id,
+            'contact_id' => $session->contact_id,
+            'role' => 'system',
+            'content' => 'Percakapan dikembalikan ke AI. Pesan berikutnya akan dijawab AI.',
+            'metadata' => ['variant' => null],
+        ]);
+
+        return response()->json([
+            'data' => $this->sessionPayload($session->fresh(['workflow', 'execution'])),
+        ]);
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function messagesFor(WorkflowExecution $execution): array
+    public function reply(Request $request, ChatSession $session): JsonResponse
     {
-        $messages = [];
-        $hasSteps = $execution->steps->isNotEmpty();
-        $hasRelocateStep = false;
+        $this->authorizeSession($request, $session);
 
-        if ($hasSteps) {
-            foreach ($execution->steps as $step) {
-                $createdAt = (
-                    $step->executed_at
-                    ?? $execution->started_at
-                    ?? $execution->created_at
-                )?->toISOString();
-
-                if ($step->node_type === 'trigger') {
-                    $text = data_get($step->input, 'customer_message');
-
-                    if (is_string($text) && trim($text) !== '') {
-                        $messages[] = $this->message(
-                            "step-{$step->id}-customer",
-                            'customer',
-                            trim($text),
-                            $createdAt
-                        );
-                    }
-
-                    continue;
-                }
-
-                if ($step->node_type === 'output') {
-                    foreach ($step->messages ?? [] as $index => $text) {
-                        if (! is_string($text) || trim($text) === '') {
-                            continue;
-                        }
-
-                        $messages[] = $this->message(
-                            "step-{$step->id}-assistant-{$index}",
-                            'assistant',
-                            trim($text),
-                            $createdAt
-                        );
-                    }
-
-                    continue;
-                }
-
-                if ($step->node_type === 'relocate') {
-                    $hasRelocateStep = true;
-                    $messages[] = $this->message(
-                        "step-{$step->id}-handoff",
-                        'system',
-                        'Percakapan dialihkan ke admin manusia.',
-                        $createdAt,
-                        'escalated'
-                    );
-                }
-            }
-        } else {
-            $customer = data_get($execution->input, 'customer_message')
-                ?? data_get($execution->input, 'message');
-
-            if (is_string($customer) && trim($customer) !== '') {
-                $messages[] = $this->message(
-                    "execution-{$execution->id}-customer",
-                    'customer',
-                    trim($customer),
-                    ($execution->started_at ?? $execution->created_at)?->toISOString()
-                );
-            }
-
-            $replies = data_get($execution->output, 'messages');
-
-            if (is_array($replies)) {
-                foreach ($replies as $index => $text) {
-                    if (! is_string($text) || trim($text) === '') {
-                        continue;
-                    }
-
-                    $messages[] = $this->message(
-                        "execution-{$execution->id}-assistant-{$index}",
-                        'assistant',
-                        trim($text),
-                        ($execution->finished_at ?? $execution->started_at)?->toISOString()
-                    );
-                }
-            }
+        if ($session->status !== ChatSession::STATUS_HUMAN) {
+            throw ValidationException::withMessages([
+                'session' => 'Ambil alih percakapan terlebih dahulu sebelum membalas sebagai admin.',
+            ]);
         }
 
-        if ($execution->status === 'escalated' && ! $hasRelocateStep) {
-            $messages[] = $this->message(
-                "execution-{$execution->id}-handoff",
-                'system',
-                'Percakapan dialihkan ke admin manusia.',
-                ($execution->finished_at ?? $execution->started_at)?->toISOString(),
-                'escalated'
-            );
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:4000'],
+        ]);
+
+        $text = trim($validated['message']);
+
+        if ($text === '') {
+            throw ValidationException::withMessages([
+                'message' => 'Pesan tidak boleh kosong.',
+            ]);
         }
 
-        if ($execution->status === 'failed' && is_string($execution->error)) {
-            $messages[] = $this->message(
-                "execution-{$execution->id}-error",
-                'system',
-                'Workflow gagal: '.$execution->error,
-                ($execution->finished_at ?? $execution->started_at)?->toISOString(),
-                'error'
-            );
-        }
+        $message = ChatMessage::create([
+            'chat_session_id' => $session->id,
+            'contact_id' => $session->contact_id,
+            'role' => 'admin',
+            'content' => $text,
+        ]);
 
-        return $messages;
+        $session->update(['last_activity_at' => now()]);
+
+        return response()->json([
+            'data' => $this->messagePayload($message),
+        ], 201);
+    }
+
+    private function authorizeSession(Request $request, ChatSession $session): void
+    {
+        abort_unless($session->user_id === $request->user()->id, 404);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function message(
-        string $id,
-        string $role,
-        string $content,
-        ?string $createdAt,
-        ?string $variant = null
-    ): array {
+    private function messagePayload(ChatMessage $message): array
+    {
         return [
-            'id' => $id,
-            'role' => $role,
-            'content' => $content,
-            'variant' => $variant,
-            'created_at' => $createdAt,
+            'id' => $message->id,
+            'role' => $message->role,
+            'content' => $message->content,
+            'variant' => data_get($message->metadata, 'variant'),
+            'created_at' => $message->created_at?->toISOString(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sessionPayload(ChatSession $session): array
+    {
+        return [
+            'id' => $session->id,
+            'status' => $session->status,
+            'workflow_name' => $session->workflow?->name,
+            'execution_id' => $session->execution?->id,
+            'execution_status' => $session->execution?->status,
+            'takeover_at' => $session->takeover_at?->toISOString(),
+            'ended_at' => $session->ended_at?->toISOString(),
+            'last_activity_at' => $session->last_activity_at?->toISOString(),
         ];
     }
 }

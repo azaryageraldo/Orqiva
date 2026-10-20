@@ -2,20 +2,23 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class GeminiService
 {
     /**
-     * @return array{text: string, usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int}}
+     * @return array{text: string, finish_reason: string, usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int}}
      */
     public function generate(
         string $systemMessage,
         string $userMessage,
         float $temperature = 0.7,
         ?string $modelOverride = null,
-        ?array $responseSchema = null
+        ?array $responseSchema = null,
+        ?int $maxOutputTokens = null
     ): array {
         $apiKey = config('services.gemini.api_key');
         $model = $modelOverride ?: config('services.gemini.model', 'gemini-2.5-flash');
@@ -34,12 +37,39 @@ class GeminiService
             ),
         ];
 
+        if ($maxOutputTokens !== null && $maxOutputTokens > 0) {
+            $generationConfig['maxOutputTokens'] = $maxOutputTokens;
+        }
+
         if ($responseSchema !== null) {
             $generationConfig['responseMimeType'] = 'application/json';
             $generationConfig['responseSchema'] = $responseSchema;
+
+            if (str_starts_with($model, 'gemini-2.5')) {
+                $generationConfig['thinkingConfig'] = [
+                    'thinkingBudget' => 0,
+                ];
+            }
         }
 
         $response = Http::timeout($timeout)
+            ->retry(
+                3,
+                500,
+                static function (\Throwable $exception): bool {
+                    if ($exception instanceof ConnectionException) {
+                        return true;
+                    }
+
+                    return $exception instanceof RequestException
+                        && in_array(
+                            $exception->response->status(),
+                            [429, 500, 502, 503, 504],
+                            true
+                        );
+                },
+                false
+            )
             ->withHeaders([
                 'x-goog-api-key' => $apiKey,
             ])
@@ -73,6 +103,10 @@ class GeminiService
         }
 
         $text = $response->json('candidates.0.content.parts.0.text');
+        $finishReason = (string) $response->json(
+            'candidates.0.finishReason',
+            'STOP'
+        );
 
         if (! is_string($text) || trim($text) === '') {
             throw new RuntimeException(
@@ -82,6 +116,7 @@ class GeminiService
 
         return [
             'text' => trim($text),
+            'finish_reason' => $finishReason,
             'usage' => [
                 'prompt_tokens' => (int) $response->json(
                     'usageMetadata.promptTokenCount',

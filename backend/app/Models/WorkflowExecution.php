@@ -10,6 +10,8 @@ class WorkflowExecution extends Model
 {
     protected $fillable = [
         'workflow_id',
+        'chat_session_id',
+        'contact_id',
         'status',
         'input',
         'output',
@@ -18,6 +20,7 @@ class WorkflowExecution extends Model
         'started_at',
         'finished_at',
         'current_node_id',
+        'current_workflow_id',
         'context',
         'waiting_since',
         'prompt_tokens',
@@ -44,6 +47,21 @@ class WorkflowExecution extends Model
     public function workflow(): BelongsTo
     {
         return $this->belongsTo(Workflow::class);
+    }
+
+    public function currentWorkflow(): BelongsTo
+    {
+        return $this->belongsTo(Workflow::class, 'current_workflow_id');
+    }
+
+    public function chatSession(): BelongsTo
+    {
+        return $this->belongsTo(ChatSession::class);
+    }
+
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class);
     }
 
     public function steps(): HasMany

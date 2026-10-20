@@ -1,5 +1,6 @@
 import {
   Activity,
+  Globe2,
   Inbox,
   LayoutDashboard,
   LifeBuoy,
@@ -26,7 +27,13 @@ import {
 import flowPilotLogo from "../../assets/flowpilot-logo.png";
 
 export type Health = "checking" | "online" | "offline";
-export type NavKey = "dashboard" | "workflows" | "inbox" | "activity" | "settings";
+export type NavKey =
+  | "dashboard"
+  | "workflows"
+  | "inbox"
+  | "channel"
+  | "activity"
+  | "settings";
 
 interface SidebarProps {
   health: Health;
@@ -34,6 +41,7 @@ interface SidebarProps {
   onDashboardClick: () => void;
   onWorkflowsClick: () => void;
   onInboxClick: () => void;
+  onChannelClick: () => void;
   onActivityClick: () => void;
   onHelpClick: () => void;
   onSettingsClick: () => void;
@@ -63,6 +71,7 @@ export default function Sidebar({
   onDashboardClick,
   onWorkflowsClick,
   onInboxClick,
+  onChannelClick,
   onActivityClick,
   onHelpClick,
   onSettingsClick,
@@ -73,6 +82,7 @@ export default function Sidebar({
     dashboard: onDashboardClick,
     workflows: onWorkflowsClick,
     inbox: onInboxClick,
+    channel: onChannelClick,
     activity: onActivityClick,
     settings: onSettingsClick,
   };
@@ -152,12 +162,23 @@ export default function Sidebar({
 
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  isActive={activeNav === "channel"}
+                  onClick={runNav(onChannelClick)}
+                  className={MENU_BUTTON}
+                >
+                  <Globe2 />
+                  <span>Channel</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
                   isActive={activeNav === "activity"}
                   onClick={runNav(onActivityClick)}
                   className={MENU_BUTTON}
                 >
                   <Activity />
-                  <span>Activity</span>
+                  <span>Audit Log</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

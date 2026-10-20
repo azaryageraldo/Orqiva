@@ -14,6 +14,7 @@ interface DashboardLayoutProps {
   onDashboardClick: () => void;
   onWorkflowsClick: () => void;
   onInboxClick: () => void;
+  onChannelClick: () => void;
   onActivityClick: () => void;
   onHelpClick: () => void;
   onSettingsClick: () => void;
@@ -30,6 +31,7 @@ export default function DashboardLayout({
   onDashboardClick,
   onWorkflowsClick,
   onInboxClick,
+  onChannelClick,
   onActivityClick,
   onHelpClick,
   onSettingsClick,
@@ -45,6 +47,7 @@ export default function DashboardLayout({
         onDashboardClick={onDashboardClick}
         onWorkflowsClick={onWorkflowsClick}
         onInboxClick={onInboxClick}
+        onChannelClick={onChannelClick}
         onActivityClick={onActivityClick}
         onHelpClick={onHelpClick}
         onSettingsClick={onSettingsClick}

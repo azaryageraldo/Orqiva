@@ -1,5 +1,6 @@
 import api from "./api";
 import type { Workflow, WorkflowPage } from "../types/workflow";
+import type { WorkflowOption } from "./channel";
 
 export type WorkflowQuery = {
   page?: number;
@@ -16,6 +17,14 @@ export async function getWorkflows({
       ...(search.trim() ? { search: search.trim() } : {}),
     },
   });
+
+  return response.data.data;
+}
+
+export async function getWorkflowOptions(): Promise<WorkflowOption[]> {
+  const response = await api.get<{ data: WorkflowOption[] }>(
+    "/workflow-options",
+  );
 
   return response.data.data;
 }

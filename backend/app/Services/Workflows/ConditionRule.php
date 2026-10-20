@@ -2,6 +2,8 @@
 
 namespace App\Services\Workflows;
 
+use RuntimeException;
+
 /**
  * Aturan node Condition: satu variabel boolean, dua cabang
  * (If match / Else).
@@ -21,6 +23,25 @@ class ConditionRule
         }
 
         return trim($field);
+    }
+
+    public function validatedField(array $data): string
+    {
+        $field = $this->field($data);
+
+        if ($field === null) {
+            throw new RuntimeException(
+                'Condition belum memilih variabel boolean. Perbaikan: buka node Condition, lalu pilih variabel Yes-No dari AI Agent sebelumnya.'
+            );
+        }
+
+        if (! preg_match('/^[a-zA-Z_][a-zA-Z0-9_-]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/', $field)) {
+            throw new RuntimeException(
+                'Nama variabel Condition "'.$field.'" tidak valid. Perbaikan: pakai format {{nama-agent.variabel}} tanpa spasi. Contoh: rekomendasi-penawaran.mau_beli.'
+            );
+        }
+
+        return $field;
     }
 
     public function isTruthy(mixed $value): bool

@@ -92,10 +92,16 @@ class WorkflowApiTest extends TestCase
 
     public function test_store_rejects_terminal_outgoing_edge(): void
     {
-        $definition = $this->singleAgentDefinition();
-        $definition['edges'][] = [
-            'source' => 'send-1',
-            'target' => 'ai-1',
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->relocateNode(),
+                $this->sendNode('send-1'),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'relocate-1'],
+                ['source' => 'relocate-1', 'target' => 'send-1'],
+            ],
         ];
 
         $this->actingAs($this->user())
@@ -152,15 +158,123 @@ class WorkflowApiTest extends TestCase
             'name' => 'Draft',
         ]);
 
-        $definition = $this->singleAgentDefinition();
-        $definition['edges'][] = [
-            'source' => 'send-1',
-            'target' => 'ai-1',
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->relocateNode(),
+                $this->sendNode('send-1'),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'relocate-1'],
+                ['source' => 'relocate-1', 'target' => 'send-1'],
+            ],
         ];
 
         $this->actingAs($owner)
             ->putJson('/api/v1/workflows/'.$workflow->id, [
                 'definition' => $definition,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('definition');
+    }
+
+    public function test_options_only_lists_own_workflows(): void
+    {
+        $owner = $this->user();
+        $other = $this->user('other@example.com');
+
+        Workflow::create([
+            'user_id' => $owner->id,
+            'name' => 'Mine',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+        Workflow::create([
+            'user_id' => $other->id,
+            'name' => 'Theirs',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $this->actingAs($owner)
+            ->getJson('/api/v1/workflow-options')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Mine')
+            ->assertJsonPath('data.0.nodes.0.type', 'Trigger');
+    }
+
+    public function test_store_accepts_cross_workflow_go_to_target(): void
+    {
+        $owner = $this->user();
+        $target = Workflow::create([
+            'user_id' => $owner->id,
+            'name' => 'Closing',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson('/api/v1/workflows', [
+                'name' => 'Entry',
+                'definition' => [
+                    'nodes' => [
+                        $this->triggerNode(),
+                        $this->goToNode('goto-1', 'ai-1', true, false, $target->id),
+                    ],
+                    'edges' => [
+                        ['source' => 'trigger-1', 'target' => 'goto-1'],
+                    ],
+                ],
+            ])
+            ->assertCreated();
+    }
+
+    public function test_store_rejects_cross_workflow_target_from_other_user(): void
+    {
+        $owner = $this->user();
+        $other = $this->user('other@example.com');
+        $target = Workflow::create([
+            'user_id' => $other->id,
+            'name' => 'Private closing',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson('/api/v1/workflows', [
+                'name' => 'Entry',
+                'definition' => [
+                    'nodes' => [
+                        $this->triggerNode(),
+                        $this->goToNode('goto-1', 'ai-1', true, false, $target->id),
+                    ],
+                    'edges' => [
+                        ['source' => 'trigger-1', 'target' => 'goto-1'],
+                    ],
+                ],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('definition');
+    }
+
+    public function test_store_rejects_missing_cross_workflow_target_node(): void
+    {
+        $owner = $this->user();
+        $target = Workflow::create([
+            'user_id' => $owner->id,
+            'name' => 'Closing',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson('/api/v1/workflows', [
+                'name' => 'Entry',
+                'definition' => [
+                    'nodes' => [
+                        $this->triggerNode(),
+                        $this->goToNode('goto-1', 'missing-node', true, false, $target->id),
+                    ],
+                    'edges' => [
+                        ['source' => 'trigger-1', 'target' => 'goto-1'],
+                    ],
+                ],
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('definition');

@@ -28,7 +28,7 @@ class MessageRenderer
         // beberapa bubble jika variabelnya berupa array.
         if (
             preg_match(
-                '/^\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}$/',
+                '/^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/',
                 $template,
                 $matches
             ) === 1

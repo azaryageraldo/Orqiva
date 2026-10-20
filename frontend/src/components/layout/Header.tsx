@@ -1,6 +1,7 @@
 import {
   Activity,
   ChevronDown,
+  Globe2,
   Inbox,
   LayoutDashboard,
   LoaderCircle,
@@ -38,6 +39,7 @@ export type HeaderIcon =
   | "editor"
   | "chat"
   | "inbox"
+  | "channel"
   | "activity"
   | "settings";
 
@@ -54,6 +56,7 @@ const ICONS: Record<HeaderIcon, LucideIcon> = {
   editor: Workflow,
   chat: MessageSquare,
   inbox: Inbox,
+  channel: Globe2,
   activity: Activity,
   settings: Settings,
 };

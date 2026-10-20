@@ -163,6 +163,73 @@ class WorkflowExecutionTest extends TestCase
             ]);
     }
 
+    public function test_node_scoped_smart_values_send_multiple_bubbles_and_conditions(): void
+    {
+        $this->fakeGeminiJson([
+            'respond' => [
+                ['replies' => 'Rekomendasi untuk Anda.'],
+                ['replies' => 'Mau saya proses?'],
+            ],
+            'mau_beli' => true,
+        ]);
+
+        $user = $this->user();
+        $definition = [
+            'nodes' => [
+                $this->triggerNode(),
+                $this->aiNode('ai-offer', 'Rekomendasi & Penawaran', [
+                    [
+                        'name' => 'respond',
+                        'type' => 'array',
+                        'itemField' => 'replies',
+                        'description' => 'Balasan untuk pelanggan',
+                    ],
+                    [
+                        'name' => 'mau_beli',
+                        'type' => 'boolean',
+                        'description' => 'True jika pelanggan ingin membeli',
+                    ],
+                ]),
+                $this->sendNode('send-offer', '{{rekomendasi-penawaran.respond.replies}}'),
+                $this->conditionNode(
+                    'condition-1',
+                    'rekomendasi-penawaran.mau_beli'
+                ),
+                $this->sendNode('send-yes', 'Siap, pesanan diproses.'),
+                $this->sendNode('send-no', 'Boleh saya bantu pertimbangkan lagi?'),
+            ],
+            'edges' => [
+                ['source' => 'trigger-1', 'target' => 'ai-offer'],
+                ['source' => 'ai-offer', 'target' => 'send-offer'],
+                ['source' => 'send-offer', 'target' => 'condition-1'],
+                [
+                    'source' => 'condition-1',
+                    'target' => 'send-yes',
+                    'sourceHandle' => 'true',
+                ],
+                [
+                    'source' => 'condition-1',
+                    'target' => 'send-no',
+                    'sourceHandle' => 'false',
+                ],
+            ],
+        ];
+
+        $workflow = $this->workflow($user, $definition);
+
+        $this->actingAs($user)
+            ->postJson('/api/v1/workflows/'.$workflow->id.'/execute', [
+                'input' => ['message' => 'Saya mau beli PS5'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'success')
+            ->assertJsonPath('data.output.messages', [
+                'Rekomendasi untuk Anda.',
+                'Mau saya proses?',
+                'Siap, pesanan diproses.',
+            ]);
+    }
+
     public function test_resumed_execution_accumulates_tokens(): void
     {
         $this->fakeGemini();

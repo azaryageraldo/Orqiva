@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   CircleDashed,
   LoaderCircle,
-  MessageCircle,
   Pencil,
   Plus,
   Search,
@@ -50,16 +49,12 @@ import { getErrorMessage } from "../services/api";
 
 interface WorkflowsProps {
   onOpenWorkflow: (workflowId: string) => void;
-  onTestWorkflow: (workflowId: string) => void;
 }
 
 const SELECT_CLASS =
   "h-10 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
 
-export default function Workflows({
-  onOpenWorkflow,
-  onTestWorkflow,
-}: WorkflowsProps) {
+export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -559,21 +554,6 @@ export default function Workflows({
                         )}
                         {item.status}
                       </Badge>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-lg"
-                        aria-label={`Uji coba ${item.name}`}
-                        title="Uji coba dengan Chat Widget"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onTestWorkflow(String(item.id));
-                        }}
-                        className="shrink-0 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
-                      >
-                        <MessageCircle />
-                      </Button>
 
                       <Button
                         type="button"

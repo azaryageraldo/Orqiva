@@ -44,6 +44,10 @@ export type ActivityExecution = {
   id: number;
   workflow_id: number;
   workflow_name: string | null;
+  contact_id: string | null;
+  contact_name: string | null;
+  session_id: number | null;
+  session_status: "active" | "human" | "ended" | null;
   status: ExecutionStatus;
   total_tokens: number;
   steps_count: number;
@@ -111,6 +115,8 @@ export async function getActivity(
 export type ExecutionStep = {
   id: number;
   step: number;
+  workflow_id: number | null;
+  workflow_name: string | null;
   node_id: string;
   node_type: string;
   node_name: string | null;
@@ -140,10 +146,27 @@ export type ExecutionLog = {
   branch?: string;
 };
 
+export type ExecutionDiagnostic = {
+  title: string;
+  reason: string;
+  fix: string;
+  example?: string;
+  node_id?: string | null;
+  node_name?: string | null;
+  node_type?: string | null;
+};
+
 export type ExecutionDetail = {
   id: number;
   workflow_id: number;
   workflow_name: string | null;
+  current_workflow_id: number | null;
+  current_workflow_name: string | null;
+  chat_session_id: number | null;
+  session_status: "active" | "human" | "ended" | null;
+  contact_public_id: string | null;
+  contact_name: string | null;
+  diagnostic: ExecutionDiagnostic | null;
   status: ExecutionStatus;
   input: Record<string, unknown> | null;
   output: Record<string, unknown> | null;

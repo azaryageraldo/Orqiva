@@ -37,6 +37,32 @@ class WorkflowController extends Controller
         return response()->json(['data' => $workflows]);
     }
 
+    public function options(Request $request): JsonResponse
+    {
+        $workflows = $request->user()
+            ->workflows()
+            ->orderBy('name')
+            ->get(['id', 'name', 'status', 'definition'])
+            ->map(fn (Workflow $workflow) => [
+                'id' => $workflow->id,
+                'name' => $workflow->name,
+                'status' => $workflow->status,
+                'nodes' => collect(data_get($workflow->definition, 'nodes', []))
+                    ->map(fn ($node) => [
+                        'id' => is_array($node) ? ($node['id'] ?? null) : null,
+                        'type' => is_array($node) ? ($node['type'] ?? null) : null,
+                        'name' => is_array($node)
+                            ? (data_get($node, 'data.nodeName')
+                                ?: data_get($node, 'data.label'))
+                            : null,
+                    ])
+                    ->filter(fn ($node) => is_string($node['id']) && $node['id'] !== '')
+                    ->values(),
+            ]);
+
+        return response()->json(['data' => $workflows]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -46,15 +72,20 @@ class WorkflowController extends Controller
             'definition' => ['nullable', 'array'],
         ]);
 
-        $this->assertDefinitionIsValid($validated['definition'] ?? null);
+        $this->assertDefinitionIsValid(
+            $validated['definition'] ?? null,
+            $request->user()
+        );
 
         $workflow = $request->user()->workflows()->create($validated);
 
         return response()->json(['data' => $workflow], 201);
     }
 
-    public function show(Workflow $workflow): JsonResponse
+    public function show(Request $request, Workflow $workflow): JsonResponse
     {
+        abort_unless($workflow->user_id === $request->user()->id, 404);
+
         return response()->json(['data' => $workflow]);
     }
 
@@ -62,6 +93,8 @@ class WorkflowController extends Controller
         Request $request,
         Workflow $workflow
     ): JsonResponse {
+        abort_unless($workflow->user_id === $request->user()->id, 404);
+
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
@@ -70,7 +103,10 @@ class WorkflowController extends Controller
         ]);
 
         if (array_key_exists('definition', $validated)) {
-            $this->assertDefinitionIsValid($validated['definition']);
+            $this->assertDefinitionIsValid(
+                $validated['definition'],
+                $request->user()
+            );
         }
 
         $workflow->update($validated);
@@ -80,8 +116,10 @@ class WorkflowController extends Controller
         ]);
     }
 
-    public function destroy(Workflow $workflow): JsonResponse
+    public function destroy(Request $request, Workflow $workflow): JsonResponse
     {
+        abort_unless($workflow->user_id === $request->user()->id, 404);
+
         $workflow->delete();
 
         return response()->json([
@@ -94,7 +132,7 @@ class WorkflowController extends Controller
      * (Trigger, Condition, jalur) baru diwajibkan ketika dieksekusi
      * agar draft yang belum selesai tetap bisa disimpan.
      */
-    private function assertDefinitionIsValid(mixed $definition): void
+    private function assertDefinitionIsValid(mixed $definition, $user): void
     {
         if ($definition === null) {
             return;
@@ -116,6 +154,63 @@ class WorkflowController extends Controller
             throw ValidationException::withMessages([
                 'definition' => $exception->getMessage(),
             ]);
+        }
+
+        $this->assertCrossWorkflowTargets($definition, $user);
+    }
+
+    private function assertCrossWorkflowTargets(array $definition, $user): void
+    {
+        $nodes = $definition['nodes'] ?? [];
+
+        if (! is_array($nodes)) {
+            return;
+        }
+
+        foreach ($nodes as $node) {
+            if (! is_array($node)) {
+                continue;
+            }
+
+            $type = $node['type'] ?? null;
+
+            if (! in_array($type, ['Go To', 'go_to'], true)) {
+                continue;
+            }
+
+            $targetWorkflowId = data_get($node, 'data.targetWorkflowId');
+            $targetNodeId = data_get($node, 'data.targetNodeId');
+
+            if ($targetWorkflowId === null || $targetWorkflowId === '') {
+                continue;
+            }
+
+            if (! is_numeric($targetWorkflowId)) {
+                throw ValidationException::withMessages([
+                    'definition' => 'Workflow tujuan Go To tidak valid. Perbaikan: pilih ulang workflow tujuan dari daftar.',
+                ]);
+            }
+
+            $targetWorkflow = $user->workflows()
+                ->whereKey((int) $targetWorkflowId)
+                ->first();
+
+            if ($targetWorkflow === null) {
+                throw ValidationException::withMessages([
+                    'definition' => 'Workflow tujuan Go To tidak ditemukan atau bukan milik akun ini. Perbaikan: pilih workflow lain yang tersedia.',
+                ]);
+            }
+
+            $targetNodes = data_get($targetWorkflow->definition, 'nodes', []);
+            $exists = collect(is_array($targetNodes) ? $targetNodes : [])
+                ->contains(fn ($target) => is_array($target)
+                    && ($target['id'] ?? null) === $targetNodeId);
+
+            if (! is_string($targetNodeId) || ! $exists) {
+                throw ValidationException::withMessages([
+                    'definition' => 'Node tujuan Go To tidak ditemukan di workflow "'.$targetWorkflow->name.'". Perbaikan: buka node Go To lalu pilih ulang node tujuan.',
+                ]);
+            }
         }
     }
 }
