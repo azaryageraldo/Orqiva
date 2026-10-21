@@ -33,10 +33,22 @@ jobs:
             package="$1"
             pattern="$2"
             label="$3"
-            npm pack "$package@$VERSION" --silent > tarball.txt
-            tarball=$(cat tarball.txt | tail -n 1)
+            tarball=""
+            for attempt in 1 2 3 4 5 6; do
+              output=$(npm pack "$package@$VERSION" 2>&1) && {
+                tarball=$(printf '%s\n' "$output" | tail -n 1)
+                break
+              }
+              echo "::notice::npm pack $package@$VERSION gagal (percobaan $attempt): $output"
+              sleep 15
+            done
+            if [ -z "$tarball" ] || [ ! -f "$tarball" ]; then
+              echo "::error::Gagal mengunduh $package@$VERSION"
+              exit 1
+            fi
             tar -xzf "$tarball"
-            file package/frankenphp* | tee "$label.txt"
+            file package/frankenphp* > "$label.txt" 2>&1
+            cat "$label.txt"
             if ! grep -qE "$pattern" "$label.txt"; then
               echo "::error::$label tidak sesuai pola $pattern"
               exit 1
@@ -85,8 +97,10 @@ jobs:
           set +e
           npx --yes "orqiva@$VERSION" doctor > doctor.txt 2>&1
           code=$?
-          cat doctor.txt
-          if ! grep -q "Runtime PHP: FrankenPHP" doctor.txt; then
+          while IFS= read -r line; do
+            echo "::notice::$line"
+          done < doctor.txt
+          if ! grep -qE "Runtime PHP: .*FrankenPHP" doctor.txt; then
             echo "::error::Runtime FrankenPHP tidak terdeteksi di ${{ matrix.os }}"
             exit 1
           fi

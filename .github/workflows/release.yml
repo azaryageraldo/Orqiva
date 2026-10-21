@@ -214,8 +214,10 @@ jobs:
           set +e
           orqiva doctor > doctor.txt 2>&1
           code=$?
-          cat doctor.txt
-          if ! grep -q "Runtime PHP: FrankenPHP" doctor.txt; then
+          while IFS= read -r line; do
+            echo "::notice::$line"
+          done < doctor.txt
+          if ! grep -qE "Runtime PHP: .*FrankenPHP" doctor.txt; then
             echo "::error::Runtime FrankenPHP tidak terdeteksi di ${{ matrix.os }}"
             exit 1
           fi
