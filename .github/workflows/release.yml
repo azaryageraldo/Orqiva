@@ -78,7 +78,21 @@ jobs:
             --arch ${{ matrix.arch }} \
             --url https://github.com/php/frankenphp/releases/download/${{ env.FRANKENPHP_VERSION }}/${{ matrix.asset }} \
             --output build/runtimes
+      - name: Check published version
+        id: check
+        env:
+          VERSION: ${{ github.ref_name }}
+          PACKAGE: orqiva-runtime-${{ matrix.platform }}-${{ matrix.arch }}
+        run: |
+          version="${VERSION#v}"
+          if npm view "$PACKAGE@$version" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE@$version sudah terbit, publish dilewati."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish runtime package
+        if: steps.check.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -128,7 +142,20 @@ jobs:
           do
             npm pkg set "optionalDependencies.$package=$VERSION"
           done
+      - name: Check published version
+        id: check
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          version="${VERSION#v}"
+          if npm view "orqiva@$version" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "orqiva@$version sudah terbit, publish dilewati."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build and publish CLI package
+        if: steps.check.outputs.published != 'true'
         working-directory: packages/cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -142,6 +169,46 @@ jobs:
             echo "::error::npm publish failed: $message"
             exit "$code"
           fi
+
+  smoke:
+    name: Smoke ${{ matrix.os }}
+    needs: publish-cli
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install published package and inspect runtime
+        env:
+          ORQIVA_DATA_DIR: ${{ runner.temp }}/orqiva-data
+          VERSION: ${{ github.ref_name }}
+        run: |
+          version="${VERSION#v}"
+          npm install -g "orqiva@$version"
+          orqiva help
+          set +e
+          orqiva doctor > doctor.txt 2>&1
+          code=$?
+          cat doctor.txt
+          if ! grep -q "Runtime PHP: FrankenPHP" doctor.txt; then
+            echo "::error::Runtime FrankenPHP tidak terdeteksi di ${{ matrix.os }}"
+            exit 1
+          fi
+          if ! grep -q "Runtime aplikasi" doctor.txt; then
+            echo "::error::Runtime aplikasi tidak ditemukan di ${{ matrix.os }}"
+            exit 1
+          fi
+          echo "doctor exit code: $code (kode 1 wajar bila database belum dibuat)"
 
   github-release:
     name: Create GitHub release
