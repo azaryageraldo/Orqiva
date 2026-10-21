@@ -24,6 +24,10 @@ Route::prefix('v1')->group(function () {
 
     Route::prefix('public')->group(function () {
         Route::get('/channels/{token}', [PublicChatController::class, 'showChannel']);
+        Route::get('/channels/{token}/embed-config.js', [PublicChatController::class, 'embedConfig'])
+            ->middleware('throttle:public-poll');
+        Route::get('/channels/{token}/icon/{kind}', [PublicChatController::class, 'icon'])
+            ->middleware('throttle:public-poll');
         Route::post('/channels/{token}/sessions', [PublicChatController::class, 'start'])
             ->middleware('throttle:public-start');
         Route::get('/sessions/{token}', [PublicChatController::class, 'messages'])
@@ -70,6 +74,8 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/channel', [ChannelController::class, 'show']);
         Route::put('/channel', [ChannelController::class, 'update']);
+        Route::post('/channel/icon', [ChannelController::class, 'uploadIcon']);
+        Route::delete('/channel/icon/{kind}', [ChannelController::class, 'deleteIcon']);
         Route::post('/channel/regenerate', [ChannelController::class, 'regenerate']);
 
         Route::get(

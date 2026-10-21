@@ -1,21 +1,24 @@
-import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
 import {
-  Bot,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
+import {
+  Check,
   LoaderCircle,
   Send,
-  ShieldCheck,
   TriangleAlert,
-  UserRound,
+  X,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import OrqivaLogo from "@/components/brand/OrqivaLogo";
-import { Textarea } from "@/components/ui/textarea";
-import { APP_NAME } from "@/lib/constants";
+import orqivaMark from "@/assets/orqiva-mark.png";
 import { useI18n, type Language } from "@/lib/i18n";
-import { getErrorMessage } from "../services/api";
 import {
+  getPublicChannel,
   getPublicSession,
   sendPublicMessage,
   startPublicSession,
@@ -26,9 +29,29 @@ import {
 const CONTACT_KEY = "orqiva_contact_id";
 const LEGACY_CONTACT_KEY = "flowpilot_contact_id";
 
+const DEFAULT_APPEARANCE = {
+  header_color: "#17212b",
+  background_color: "#0e1621",
+  outgoing_color: "#2b5278",
+  accent_color: "#64b5ef",
+};
+
 const TIME_FORMATS: Record<Language, Intl.DateTimeFormat> = {
   id: new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }),
   en: new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit" }),
+};
+
+const DATE_FORMATS: Record<Language, Intl.DateTimeFormat> = {
+  id: new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }),
+  en: new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }),
 };
 
 function readContactId(): string | undefined {
@@ -59,53 +82,100 @@ function formatTime(value: string | null, language: Language): string {
     : TIME_FORMATS[language].format(date);
 }
 
+function dayKey(value: string): string {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function isSameDay(left: string, right: string): boolean {
+  return dayKey(left) === dayKey(right);
+}
+
+function readableText(hex: string): string {
+  const clean = hex.replace("#", "");
+  const value =
+    clean.length === 6 ? Number.parseInt(clean, 16) : 0x2b5278;
+
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+
+  return luminance > 150 ? "#111827" : "#f8fafc";
+}
+
 export default function PublicChatWidget({ token }: { token: string }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [channel, setChannel] = useState<PublicChannel | null>(null);
   const [sessionToken, setSessionToken] = useState("");
-  const [contactId, setContactId] = useState("");
   const [sessionStatus, setSessionStatus] = useState<
     "active" | "human" | "ended"
   >("active");
   const [messages, setMessages] = useState<PublicMessage[]>([]);
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loadingChannel, setLoadingChannel] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [sending, setSending] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const started = useRef(false);
   const pendingClientRef = useRef<{ id: string; text: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const embedded =
+    typeof window !== "undefined" && window.self !== window.top;
+
+  const appearance = channel?.settings.appearance ?? DEFAULT_APPEARANCE;
+  const chatIcon = channel?.icon_urls.chat || orqivaMark;
+
+  const beginSession = useCallback(async () => {
     if (started.current) return;
     started.current = true;
+    setStarting(true);
+    setError("");
 
-    startPublicSession(token, readContactId())
+    try {
+      const result = await startPublicSession(token, readContactId());
+      saveContactId(result.contact_id);
+      setChannel(result.channel);
+      setSessionToken(result.session_token);
+      setSessionStatus(result.status);
+      setMessages(result.messages);
+      setChatOpen(true);
+    } catch {
+      started.current = false;
+      setError(t("public.startError"));
+    } finally {
+      setStarting(false);
+    }
+  }, [token, t]);
+
+  useEffect(() => {
+    let active = true;
+
+    getPublicChannel(token)
       .then((result) => {
-        saveContactId(result.contact_id);
-        setChannel(result.channel);
-        setSessionToken(result.session_token);
-        setContactId(result.contact_id);
-        setSessionStatus(result.status);
-        setMessages(result.messages);
-      })
-      .catch((caught: unknown) => {
-        setError(
-          getErrorMessage(caught, t("public.startError")),
-        );
-      })
-      .finally(() => setLoading(false));
+        if (!active) return;
+        setChannel(result);
 
-    /*
-     * Jangan membatalkan hasil start saat StrictMode melepas effect pertama.
-     * Ref `started` mencegah request kedua; hasil request pertama tetap
-     * dipakai oleh instance komponen yang sama.
-     */
-    return () => undefined;
-    // The session should only restart when the channel token changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+        if (result.is_active && result.settings.open_mode === "always") {
+          void beginSession();
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError(t("public.startError"));
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingChannel(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, beginSession, t]);
 
   useEffect(() => {
     if (!sessionToken) return;
@@ -133,7 +203,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending, notice]);
+  }, [messages, sending]);
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -161,181 +231,355 @@ export default function PublicChatWidget({ token }: { token: string }) {
       setMessages(result.messages);
       setSessionStatus(result.session_status);
       setNotice(result.notice ?? "");
-    } catch (caught) {
+    } catch {
       setDraft(text);
-      setError(
-        getErrorMessage(caught, t("public.sendError")),
-      );
+      setError(t("public.sendError"));
     } finally {
       setSending(false);
     }
   }
 
-  const welcome = channel?.settings.welcome_message?.trim();
+  function closeWidget() {
+    window.parent.postMessage({ type: "orqiva:close" }, "*");
+  }
+
+  const status = useMemo(() => {
+    if (sending) return t("public.typing");
+    if (sessionStatus === "human") return t("public.operatorHandling");
+    return t("public.online");
+  }, [sending, sessionStatus, t]);
+
+  const style = {
+    "--tg-header": appearance.header_color,
+    "--tg-bg": appearance.background_color,
+    "--tg-outgoing": appearance.outgoing_color,
+    "--tg-accent": appearance.accent_color,
+    "--tg-outgoing-text": readableText(appearance.outgoing_color),
+  } as CSSProperties;
+
+  const unavailable =
+    !loadingChannel && (!channel || !channel.is_active || Boolean(error && !chatOpen));
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#080a0e] text-foreground">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(139,92,246,0.12),transparent_34%)]"
-      />
+    <div
+      className="flex h-dvh min-h-dvh flex-col overflow-hidden bg-[var(--tg-bg)] text-[#f5f5f5]"
+      style={style}
+    >
+      {!chatOpen ? (
+        <div className="tg-chat-wallpaper relative flex h-full flex-col">
+          {embedded && (
+            <button
+              type="button"
+              onClick={closeWidget}
+              className="absolute top-3 right-3 z-10 flex size-9 items-center justify-center rounded-full bg-black/25 text-white/80 transition hover:bg-black/40"
+              aria-label={t("public.closeChat")}
+            >
+              <X className="size-4" />
+            </button>
+          )}
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-3 py-4 sm:px-6 sm:py-8">
-        <header className="flex items-center gap-3 rounded-t-2xl border border-b-0 border-border bg-card/90 px-4 py-3.5 backdrop-blur sm:px-5">
-          <OrqivaLogo
-            showWordmark={false}
-            markClassName="size-10"
-            className="shrink-0"
-          />
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold text-foreground">
-              {channel?.name || "Customer Support"}
+          <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+            <div className="relative">
+              <span
+                className="absolute inset-0 -z-10 rounded-full blur-2xl"
+                style={{ backgroundColor: appearance.accent_color, opacity: 0.22 }}
+              />
+              <img
+                src={chatIcon}
+                alt=""
+                className="size-20 rounded-full object-cover shadow-2xl shadow-black/40 ring-1 ring-white/10"
+              />
+            </div>
+
+            <h1 className="mt-6 text-xl font-semibold tracking-tight text-white">
+              {channel?.name || t("public.customerService")}
             </h1>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {sessionStatus === "human"
-                ? t("public.humanHandling")
-                : channel?.workflow_name
-                  ? `AI · ${channel.workflow_name}`
-                  : t("public.aiCustomerService")}
+            <p className="mt-1.5 max-w-xs text-sm leading-6 text-white/55">
+              {channel?.settings.welcome_message ||
+                t("public.welcomeFallback")}
             </p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[10px] text-muted-foreground">
-            <span
-              className={`size-1.5 rounded-full ${
-                sessionStatus === "human" ? "bg-teal-400" : "bg-emerald-400"
-              }`}
-            />
-            {sessionStatus === "human" ? t("public.admin") : "AI"}
-          </span>
-        </header>
 
-        <main className="flex min-h-0 flex-1 flex-col rounded-b-2xl border border-border bg-card/70 backdrop-blur">
-          <div className="min-h-[52dvh] flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:min-h-[58dvh] sm:px-5">
-            {loading ? (
-              <div className="flex h-full min-h-64 items-center justify-center">
-                <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : error && messages.length === 0 ? (
-              <div className="flex h-full min-h-64 flex-col items-center justify-center px-6 text-center">
-                <span className="flex size-12 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/10 text-destructive">
-                  <TriangleAlert className="size-5" />
-                </span>
-                <p className="mt-4 text-sm font-medium text-foreground">
-                  {t("public.unavailableTitle")}
-                </p>
-                <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
-                  {error}
-                </p>
+            {unavailable ? (
+              <div className="mt-8 max-w-sm rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+                <TriangleAlert className="mx-auto mb-2 size-5 text-amber-300" />
+                {error || t("public.unavailableMessage")}
               </div>
             ) : (
-              <>
-                {welcome && messages.length === 0 && (
-                  <Bubble role="assistant" content={welcome} time={null} />
+              <button
+                type="button"
+                onClick={() => void beginSession()}
+                disabled={starting || loadingChannel}
+                className="mt-8 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/30 transition hover:brightness-110 disabled:opacity-60"
+                style={{ backgroundColor: appearance.accent_color }}
+              >
+                {starting ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
                 )}
+                {starting ? t("public.opening") : t("public.startChat")}
+              </button>
+            )}
 
-                {messages.map((message) =>
-                  message.role === "system" ? (
-                    <div key={message.id} className="flex justify-center">
-                      <p
-                        className={`max-w-[88%] rounded-full border px-3 py-1.5 text-center text-[11px] leading-5 ${
-                          message.variant === "escalated"
-                            ? "border-teal-400/25 bg-teal-400/[0.07] text-teal-200"
-                            : "border-border bg-muted/40 text-muted-foreground"
-                        }`}
-                      >
-                        {message.content}
-                      </p>
-                    </div>
-                  ) : (
-                    <Bubble
-                      key={message.id}
-                      role={message.role}
-                      content={message.content}
-                      time={message.created_at}
-                    />
-                  ),
-                )}
-
-                {sending && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Bot className="size-4" />
-                    {t("public.typing")}
-                  </div>
-                )}
-                <div ref={bottomRef} />
-              </>
+            {error && !unavailable && (
+              <p className="mt-3 max-w-xs text-xs leading-5 text-rose-300">
+                {error}
+              </p>
             )}
           </div>
-
-          {notice && (
-            <div className="border-t border-border bg-teal-400/[0.05] px-4 py-2.5 text-center text-xs text-teal-200">
-              {notice}
-            </div>
-          )}
-
-          {error && messages.length > 0 && (
-            <div className="border-t border-destructive/20 bg-destructive/[0.06] px-4 py-2.5 text-center text-xs text-destructive">
-              {error}
-            </div>
-          )}
-
-          <form
-            onSubmit={(event) => void send(event)}
-            className="border-t border-border p-3 sm:p-4"
+        </div>
+      ) : (
+        <>
+          <header
+            className="flex h-14 shrink-0 items-center gap-3 px-3 shadow-sm"
+            style={{ backgroundColor: appearance.header_color }}
           >
-            <div className="flex items-end gap-2">
-              <Textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    event.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                rows={1}
-                maxLength={4000}
-                placeholder={
-                  channel?.settings.placeholder || t("public.inputPlaceholder")
-                }
-                aria-label={t("public.messageLabel")}
-                disabled={loading || !sessionToken || sending}
-                className="max-h-36 min-h-11 resize-none"
-              />
-              <Button
-                type="submit"
-                size="icon-lg"
-                disabled={!draft.trim() || loading || sending || !sessionToken}
-                aria-label={t("public.send")}
-                className="shrink-0"
+            {embedded && (
+              <button
+                type="button"
+                onClick={closeWidget}
+                className="flex size-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10"
+                aria-label={t("public.closeChat")}
               >
-                {sending ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <Send />
-                )}
-              </Button>
+                <X className="size-4" />
+              </button>
+            )}
+
+            <img
+              src={chatIcon}
+              alt=""
+              className="size-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white">
+                {channel?.name || t("public.customerService")}
+              </p>
+              <p
+                className="truncate text-xs"
+                style={{ color: appearance.accent_color }}
+              >
+                {status}
+              </p>
             </div>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground/70">
-              <span className="inline-flex items-center gap-1">
-                <ShieldCheck className="size-3" />
-                {sessionStatus === "human"
-                  ? t("public.humanNote")
-                  : sessionStatus === "ended"
-                    ? t("public.endedNote")
-                    : t("public.aiNote")}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                {contactId && <span className="font-mono">ID {contactId}</span>}
-                <span aria-hidden="true">·</span>
-                <span>
-                  {t("public.poweredBy", { name: APP_NAME })}
-                </span>
-              </span>
+          </header>
+
+          <main className="tg-chat-wallpaper flex min-h-0 flex-1 flex-col">
+            <div className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+              {loadingChannel && !sessionToken ? (
+                <ChatSkeleton />
+              ) : (
+                <>
+                  {channel?.settings.welcome_message &&
+                    messages.length === 0 && (
+                      <Bubble
+                        role="assistant"
+                        content={channel.settings.welcome_message}
+                        time={null}
+                        avatar={chatIcon}
+                        appearance={appearance}
+                        groupEnd
+                      />
+                    )}
+
+                  {messages.map((message, index) => {
+                    const previous = messages[index - 1];
+                    const next = messages[index + 1];
+
+                    if (message.role === "system") {
+                      return (
+                        <div
+                          key={message.id}
+                          className="flex justify-center py-2"
+                        >
+                          <p className="max-w-[86%] rounded-full bg-black/25 px-3 py-1 text-center text-[11px] leading-5 text-white/65">
+                            {message.content}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const groupStart =
+                      !previous ||
+                      previous.role === "system" ||
+                      previous.role !== message.role ||
+                      !message.created_at ||
+                      !previous.created_at ||
+                      !isSameDay(previous.created_at, message.created_at);
+
+                    const groupEnd =
+                      !next ||
+                      next.role === "system" ||
+                      next.role !== message.role ||
+                      !message.created_at ||
+                      !next.created_at ||
+                      !isSameDay(next.created_at, message.created_at);
+
+                    return (
+                      <div key={message.id}>
+                        {groupStart && message.created_at && (
+                          <DayDivider
+                            value={message.created_at}
+                            language={language}
+                            today={t("public.today")}
+                            yesterday={t("public.yesterday")}
+                          />
+                        )}
+                        <Bubble
+                          role={message.role}
+                          content={message.content}
+                          time={message.created_at}
+                          avatar={chatIcon}
+                          appearance={appearance}
+                          groupStart={groupStart}
+                          groupEnd={groupEnd}
+                        />
+                      </div>
+                    );
+                  })}
+
+                  {sending && (
+                    <div className="flex items-end gap-2 py-1">
+                      <img
+                        src={chatIcon}
+                        alt=""
+                        className="size-7 shrink-0 rounded-full object-cover"
+                      />
+                      <div
+                        className="flex items-center gap-1 rounded-2xl rounded-bl-md px-3.5 py-3"
+                        style={{ backgroundColor: "#182533" }}
+                      >
+                        <span className="tg-typing-dot" />
+                        <span className="tg-typing-dot" />
+                        <span className="tg-typing-dot" />
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={bottomRef} />
+                </>
+              )}
             </div>
-          </form>
-        </main>
-      </div>
+
+            {sessionStatus === "ended" && (
+              <div className="mx-3 mb-2 rounded-lg bg-black/25 px-3 py-2 text-center text-xs leading-5 text-white/65">
+                {t("public.endedNote")}
+              </div>
+            )}
+
+            {notice && !error && (
+              <div className="mx-3 mb-2 flex items-center justify-between gap-3 rounded-lg bg-white/[0.06] px-3 py-2 text-xs leading-5 text-white/70">
+                <span className="min-w-0 flex-1">{notice}</span>
+                <button
+                  type="button"
+                  onClick={() => setNotice("")}
+                  className="shrink-0 rounded px-1.5 py-0.5 font-medium text-white/80 hover:bg-white/10"
+                >
+                  {t("common.close")}
+                </button>
+              </div>
+            )}
+
+            {error && sessionToken && (
+              <div className="mx-3 mb-2 flex items-center justify-between gap-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                <span className="min-w-0 flex-1">{error}</span>
+                <button
+                  type="button"
+                  onClick={() => setError("")}
+                  className="shrink-0 rounded px-1.5 py-0.5 font-medium text-rose-100 hover:bg-white/10"
+                >
+                  {t("common.close")}
+                </button>
+              </div>
+            )}
+
+            <form
+              onSubmit={(event) => void send(event)}
+              className="shrink-0 border-t border-white/5 p-3"
+            >
+              <div className="flex items-end gap-2">
+                <input
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                  maxLength={4000}
+                  placeholder={
+                    channel?.settings.placeholder ||
+                    t("public.inputPlaceholder")
+                  }
+                  aria-label={t("public.messageLabel")}
+                  disabled={
+                    loadingChannel ||
+                    !sessionToken ||
+                    sending ||
+                    sessionStatus === "ended"
+                  }
+                  className="h-11 min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.06] px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/20 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={
+                    !draft.trim() ||
+                    loadingChannel ||
+                    sending ||
+                    !sessionToken ||
+                    sessionStatus === "ended"
+                  }
+                  aria-label={t("public.send")}
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full text-white shadow-lg shadow-black/20 transition hover:brightness-110 disabled:opacity-40"
+                  style={{ backgroundColor: appearance.accent_color }}
+                >
+                  {sending ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                </button>
+              </div>
+            </form>
+          </main>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DayDivider({
+  value,
+  language,
+  today,
+  yesterday,
+}: {
+  value: string;
+  language: Language;
+  today: string;
+  yesterday: string;
+}) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  const now = new Date();
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(now.getDate() - 1);
+
+  let label = DATE_FORMATS[language].format(date);
+
+  if (isSameDay(value, now.toISOString())) {
+    label = today;
+  } else if (isSameDay(value, yesterdayDate.toISOString())) {
+    label = yesterday;
+  }
+
+  return (
+    <div className="flex justify-center py-2">
+      <span className="rounded-full bg-black/25 px-2.5 py-1 text-[11px] font-medium text-white/60">
+        {label}
+      </span>
     </div>
   );
 }
@@ -344,68 +588,77 @@ function Bubble({
   role,
   content,
   time,
+  avatar,
+  appearance,
+  groupStart = true,
+  groupEnd = true,
 }: {
   role: PublicMessage["role"];
   content: string;
   time: string | null;
+  avatar: string;
+  appearance: {
+    outgoing_color: string;
+    accent_color: string;
+  };
+  groupStart?: boolean;
+  groupEnd?: boolean;
 }) {
   const { language } = useI18n();
-
-  if (role === "admin") {
-    return (
-      <div className="flex items-end justify-end gap-2">
-        <div className="max-w-[82%] rounded-2xl rounded-br-md border border-teal-400/25 bg-teal-400/[0.08] px-3.5 py-2.5 text-sm leading-6 text-foreground">
-          <p className="mb-1 text-[10px] font-semibold tracking-wide text-teal-300 uppercase">
-            Admin
-          </p>
-          <p className="whitespace-pre-wrap break-words">{content}</p>
-          <p className="mt-1 text-right text-[10px] text-muted-foreground">
-            {formatTime(time, language)}
-          </p>
-        </div>
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-teal-400/25 bg-teal-400/10 text-teal-300">
-          <ShieldCheck className="size-3.5" />
-        </span>
-      </div>
-    );
-  }
-
-  const isAssistant = role === "assistant";
+  const outgoing = role === "customer";
+  const outgoingText = readableText(appearance.outgoing_color);
 
   return (
     <div
-      className={`flex items-end gap-2 ${isAssistant ? "" : "flex-row-reverse"}`}
+      className={`flex items-end gap-2 ${
+        outgoing ? "justify-end" : "justify-start"
+      } ${groupStart ? "pt-2" : "pt-0.5"}`}
     >
-      <span
-        className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${
-          isAssistant
-            ? "border border-primary/25 bg-primary/10 text-primary"
-            : "border border-border bg-muted/50 text-muted-foreground"
-        }`}
-      >
-        {isAssistant ? (
-          <Bot className="size-3.5" />
-        ) : (
-          <UserRound className="size-3.5" />
-        )}
-      </span>
+      {!outgoing && (
+        <span className="w-7 shrink-0">
+          {groupEnd && (
+            <img
+              src={avatar}
+              alt=""
+              className="size-7 rounded-full object-cover"
+            />
+          )}
+        </span>
+      )}
 
       <div
-        className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm leading-6 ${
-          isAssistant
-            ? "rounded-bl-md border border-primary/20 bg-primary/[0.08] text-foreground"
-            : "rounded-br-md border border-border bg-muted/50 text-foreground"
+        className={`max-w-[78%] px-3 py-2 text-sm leading-5 shadow-sm ${
+          outgoing ? "rounded-2xl" : "rounded-2xl"
+        } ${outgoing && groupEnd ? "rounded-br-md" : ""} ${
+          !outgoing && groupEnd ? "rounded-bl-md" : ""
         }`}
+        style={{
+          backgroundColor: outgoing ? appearance.outgoing_color : "#182533",
+          color: outgoing ? outgoingText : "#f1f5f9",
+        }}
       >
         <p className="whitespace-pre-wrap break-words">{content}</p>
-        <p
-          className={`mt-1 text-[10px] text-muted-foreground ${
-            isAssistant ? "" : "text-right"
+        <div
+          className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
+            outgoing ? "opacity-65" : "text-white/45"
           }`}
         >
-          {formatTime(time, language)}
-        </p>
+          <span>{formatTime(time, language)}</span>
+          {outgoing && time && (
+            <Check className="size-3" strokeWidth={2.5} />
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function ChatSkeleton() {
+  return (
+    <div className="space-y-3 pt-2">
+      <div className="h-9 w-2/3 animate-pulse rounded-2xl bg-white/[0.06]" />
+      <div className="ml-auto h-9 w-1/2 animate-pulse rounded-2xl bg-white/[0.06]" />
+      <div className="h-12 w-3/5 animate-pulse rounded-2xl bg-white/[0.06]" />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowSquareOut,
   ArrowsClockwise,
@@ -13,12 +13,16 @@ import {
   WhatsappLogo,
 } from "@phosphor-icons/react";
 import {
+  ImagePlus,
   LoaderCircle,
+  RotateCcw,
   Save,
   ShieldCheck,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 
+import orqivaMark from "@/assets/orqiva-mark.png";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -42,10 +46,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
 import { getErrorMessage } from "../services/api";
 import {
+  deleteChannelIcon,
   getChannel,
   getWorkflowOptions,
   regenerateChannelToken,
   updateChannel,
+  uploadChannelIcon,
+  type ChannelAppearance,
+  type ChannelIconKind,
+  type ChannelOpenMode,
   type WidgetChannel,
   type WorkflowOption,
 } from "../services/channel";
@@ -93,6 +102,13 @@ const CHANNEL_CATALOG = [
   },
 ] as const;
 
+const TELEGRAM_APPEARANCE: ChannelAppearance = {
+  header_color: "#17212b",
+  background_color: "#0e1621",
+  outgoing_color: "#2b5278",
+  accent_color: "#64b5ef",
+};
+
 export default function Channel() {
   const { t } = useI18n();
   const [channel, setChannel] = useState<WidgetChannel | null>(null);
@@ -102,6 +118,18 @@ export default function Channel() {
   const [isActive, setIsActive] = useState(false);
   const [welcome, setWelcome] = useState("");
   const [placeholder, setPlaceholder] = useState("");
+  const [openMode, setOpenMode] = useState<ChannelOpenMode>("manual");
+  const [appearance, setAppearance] =
+    useState<ChannelAppearance>(TELEGRAM_APPEARANCE);
+  const [icons, setIcons] = useState<{
+    chat: string | null;
+    launcher: string | null;
+  }>({ chat: null, launcher: null });
+  const [uploadingIcon, setUploadingIcon] = useState<ChannelIconKind | null>(
+    null,
+  );
+  const chatIconInput = useRef<HTMLInputElement>(null);
+  const launcherIconInput = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -118,6 +146,15 @@ export default function Channel() {
     setIsActive(value.is_active);
     setWelcome(value.settings.welcome_message ?? "");
     setPlaceholder(value.settings.placeholder ?? "");
+    setOpenMode(value.settings.open_mode ?? "manual");
+    setAppearance({
+      ...TELEGRAM_APPEARANCE,
+      ...value.settings.appearance,
+    });
+    setIcons({
+      chat: value.icon_urls?.chat ?? null,
+      launcher: value.icon_urls?.launcher ?? null,
+    });
   }
 
   useEffect(() => {
@@ -177,6 +214,8 @@ export default function Channel() {
         settings: {
           welcome_message: welcome.trim(),
           placeholder: placeholder.trim(),
+          open_mode: openMode,
+          appearance,
         },
       });
 
@@ -241,6 +280,50 @@ export default function Channel() {
   function openEditor() {
     setError("");
     setEditing(true);
+  }
+
+  async function changeIcon(kind: ChannelIconKind, file?: File) {
+    if (!file || uploadingIcon) return;
+
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError(t("channel.iconTypeError"));
+      return;
+    }
+
+    if (file.size > 1024 * 1024) {
+      setError(t("channel.iconSizeError"));
+      return;
+    }
+
+    setUploadingIcon(kind);
+    setError("");
+    setNotice("");
+
+    try {
+      applyChannel(await uploadChannelIcon(kind, file));
+      setNotice(t("channel.iconSaved"));
+    } catch (caught) {
+      setError(getErrorMessage(caught, t("channel.iconError")));
+    } finally {
+      setUploadingIcon(null);
+    }
+  }
+
+  async function removeIcon(kind: ChannelIconKind) {
+    if (uploadingIcon) return;
+
+    setUploadingIcon(kind);
+    setError("");
+    setNotice("");
+
+    try {
+      applyChannel(await deleteChannelIcon(kind));
+      setNotice(t("channel.iconRemoved"));
+    } catch (caught) {
+      setError(getErrorMessage(caught, t("channel.iconError")));
+    } finally {
+      setUploadingIcon(null);
+    }
   }
 
   if (loading) {
@@ -608,6 +691,274 @@ export default function Channel() {
               </p>
             </div>
 
+            <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {t("channel.openModeTitle")}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {t("channel.openModeDescription")}
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label
+                  className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition ${
+                    openMode === "manual"
+                      ? "border-primary/40 bg-primary/[0.06]"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="channel-open-mode"
+                    className="mt-0.5 size-4 accent-primary"
+                    checked={openMode === "manual"}
+                    onChange={() => setOpenMode("manual")}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">
+                      {t("channel.openModeManual")}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {t("channel.openModeManualHint")}
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition ${
+                    openMode === "always"
+                      ? "border-primary/40 bg-primary/[0.06]"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="channel-open-mode"
+                    className="mt-0.5 size-4 accent-primary"
+                    checked={openMode === "always"}
+                    onChange={() => setOpenMode("always")}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">
+                      {t("channel.openModeAlways")}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {t("channel.openModeAlwaysHint")}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t("channel.appearanceTitle")}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {t("channel.appearanceDescription")}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAppearance(TELEGRAM_APPEARANCE)}
+                >
+                  <RotateCcw />
+                  {t("channel.resetColors")}
+                </Button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ColorField
+                  id="channel-header-color"
+                  label={t("channel.headerColor")}
+                  value={appearance.header_color}
+                  onChange={(value) =>
+                    setAppearance((current) => ({
+                      ...current,
+                      header_color: value,
+                    }))
+                  }
+                />
+                <ColorField
+                  id="channel-background-color"
+                  label={t("channel.backgroundColor")}
+                  value={appearance.background_color}
+                  onChange={(value) =>
+                    setAppearance((current) => ({
+                      ...current,
+                      background_color: value,
+                    }))
+                  }
+                />
+                <ColorField
+                  id="channel-outgoing-color"
+                  label={t("channel.outgoingColor")}
+                  value={appearance.outgoing_color}
+                  onChange={(value) =>
+                    setAppearance((current) => ({
+                      ...current,
+                      outgoing_color: value,
+                    }))
+                  }
+                />
+                <ColorField
+                  id="channel-accent-color"
+                  label={t("channel.accentColor")}
+                  value={appearance.accent_color}
+                  onChange={(value) =>
+                    setAppearance((current) => ({
+                      ...current,
+                      accent_color: value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div
+                className="overflow-hidden rounded-lg border border-white/10"
+                style={{ backgroundColor: appearance.background_color }}
+              >
+                <div
+                  className="flex items-center gap-2 px-3 py-2"
+                  style={{ backgroundColor: appearance.header_color }}
+                >
+                  <img
+                    src={icons.chat || orqivaMark}
+                    alt=""
+                    className="size-6 rounded-full object-cover"
+                  />
+                  <span className="text-xs font-medium text-white">
+                    {name || t("channel.namePlaceholder")}
+                  </span>
+                  <span
+                    className="ml-auto size-2 rounded-full"
+                    style={{ backgroundColor: appearance.accent_color }}
+                  />
+                </div>
+                <div className="space-y-2 p-3">
+                  <div
+                    className="max-w-[78%] rounded-lg px-2.5 py-1.5 text-[11px] text-white/90"
+                    style={{ backgroundColor: "#182533" }}
+                  >
+                    {t("channel.previewIncoming")}
+                  </div>
+                  <div
+                    className="ml-auto max-w-[78%] rounded-lg px-2.5 py-1.5 text-[11px] text-white/90"
+                    style={{ backgroundColor: appearance.outgoing_color }}
+                  >
+                    {t("channel.previewOutgoing")}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {t("channel.iconsTitle")}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {t("channel.iconsDescription")}
+                </p>
+              </div>
+
+              <input
+                ref={chatIconInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  void changeIcon("chat", file);
+                }}
+              />
+              <input
+                ref={launcherIconInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  void changeIcon("launcher", file);
+                }}
+              />
+
+              {(
+                [
+                  {
+                    kind: "chat" as const,
+                    label: t("channel.chatIcon"),
+                    hint: t("channel.chatIconHint"),
+                    input: chatIconInput,
+                  },
+                  {
+                    kind: "launcher" as const,
+                    label: t("channel.launcherIcon"),
+                    hint: t("channel.launcherIconHint"),
+                    input: launcherIconInput,
+                  },
+                ] as const
+              ).map((item) => (
+                <div
+                  key={item.kind}
+                  className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background p-3"
+                >
+                  <img
+                    src={icons[item.kind] || orqivaMark}
+                    alt=""
+                    className="size-11 rounded-xl object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {item.label}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                      {item.hint}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadingIcon !== null}
+                      onClick={() => item.input.current?.click()}
+                    >
+                      {uploadingIcon === item.kind ? (
+                        <LoaderCircle className="animate-spin" />
+                      ) : (
+                        <ImagePlus />
+                      )}
+                      {t("channel.uploadIcon")}
+                    </Button>
+                    {icons[item.kind] && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        title={t("channel.removeIcon")}
+                        aria-label={t("channel.removeIcon")}
+                        disabled={uploadingIcon !== null}
+                        onClick={() => void removeIcon(item.kind)}
+                      >
+                        <Trash2 />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <p className="text-xs leading-5 text-muted-foreground">
+                {t("channel.iconHint")}
+              </p>
+            </div>
+
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-4">
               <input
                 type="checkbox"
@@ -643,5 +994,35 @@ export default function Channel() {
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+function ColorField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-background p-2">
+        <input
+          id={id}
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="size-8 cursor-pointer rounded-md border-0 bg-transparent p-0"
+        />
+        <span className="font-mono text-xs text-muted-foreground uppercase">
+          {value}
+        </span>
+      </div>
+    </div>
   );
 }

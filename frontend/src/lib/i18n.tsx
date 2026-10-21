@@ -649,6 +649,42 @@ const ID: Dictionary = {
   "channel.placeholderPlaceholder": "Tulis pesan...",
   "channel.placeholderHint":
     "Kosongkan untuk memakai placeholder default.",
+  "channel.openModeTitle": "Cara membuka widget",
+  "channel.openModeDescription":
+    "Tentukan apakah pengunjung harus menekan tombol atau chat langsung terbuka.",
+  "channel.openModeManual": "Buka manual",
+  "channel.openModeManualHint":
+    "Widget tersembunyi sampai pengunjung menekan tombol chat.",
+  "channel.openModeAlways": "Selalu terbuka",
+  "channel.openModeAlwaysHint":
+    "Chat langsung terbuka saat halaman atau tautan dibuka.",
+  "channel.appearanceTitle": "Warna widget",
+  "channel.appearanceDescription":
+    "Default mengikuti Telegram dark. Ubah warna sesuai brand Anda.",
+  "channel.resetColors": "Reset Telegram",
+  "channel.headerColor": "Warna header",
+  "channel.backgroundColor": "Warna latar chat",
+  "channel.outgoingColor": "Bubble pelanggan",
+  "channel.accentColor": "Warna aksen",
+  "channel.previewIncoming": "Halo, ada yang bisa dibantu?",
+  "channel.previewOutgoing": "Saya ingin bertanya.",
+  "channel.iconsTitle": "Ikon widget",
+  "channel.iconsDescription":
+    "Gunakan logo Orqiva atau unggah ikon sendiri.",
+  "channel.chatIcon": "Ikon chat",
+  "channel.chatIconHint": "Tampil sebagai avatar di header chat.",
+  "channel.launcherIcon": "Ikon toggle",
+  "channel.launcherIconHint":
+    "Tampil pada tombol pembuka di situs Anda.",
+  "channel.uploadIcon": "Unggah",
+  "channel.removeIcon": "Hapus ikon",
+  "channel.iconHint":
+    "PNG, JPG, atau WebP. Persegi, maksimal 1 MB. Ikon akan dipotong otomatis.",
+  "channel.iconSaved": "Ikon widget berhasil diperbarui.",
+  "channel.iconRemoved": "Ikon dikembalikan ke logo Orqiva.",
+  "channel.iconError": "Ikon gagal diperbarui. Coba lagi.",
+  "channel.iconTypeError": "Format ikon harus PNG, JPG, atau WebP.",
+  "channel.iconSizeError": "Ukuran ikon maksimal 1 MB.",
   "channel.activateLabel": "Aktifkan widget publik",
   "channel.activateHint":
     "Widget hanya menerima pesan jika aktif dan sudah memiliki workflow entry.",
@@ -886,20 +922,25 @@ const ID: Dictionary = {
   "help.faq.reset.answer":
     "Belum ada alur reset password publik. Jalankan seeder admin atau perbarui password melalui tinker/Artisan di server.",
   "help.noResults": "Tidak ada bagian yang cocok dengan pencarian.",
-  "public.humanHandling": "Admin sedang menangani percakapan",
-  "public.aiCustomerService": "AI customer service",
-  "public.unavailableTitle": "Widget tidak tersedia",
-  "public.typing": "AI sedang mengetik...",
-  "public.inputPlaceholder": "Tulis pesan...",
+  "public.customerService": "Customer Service",
+  "public.welcomeFallback": "Ada yang bisa kami bantu?",
+  "public.startChat": "Mulai chat",
+  "public.opening": "Membuka chat…",
+  "public.closeChat": "Tutup chat",
+  "public.online": "online",
+  "public.operatorHandling": "sedang membalas…",
+  "public.typing": "sedang mengetik…",
+  "public.today": "Hari ini",
+  "public.yesterday": "Kemarin",
+  "public.inputPlaceholder": "Tulis pesan",
   "public.messageLabel": "Pesan",
   "public.send": "Kirim pesan",
-  "public.humanNote": "Admin sedang menangani percakapan ini.",
-  "public.endedNote": "Sesi telah berakhir. Muat ulang widget untuk memulai lagi.",
-  "public.aiNote": "Percakapan ini dilayani AI dan dapat diambil alih admin.",
-  "public.startError": "Widget tidak dapat dibuka. Periksa tautan atau hubungi admin.",
-  "public.sendError": "Pesan gagal dikirim. Periksa koneksi lalu coba lagi.",
-  "public.poweredBy": "Didukung oleh {name}",
-  "public.admin": "Admin",
+  "public.endedNote":
+    "Percakapan ini telah berakhir. Muat ulang untuk memulai lagi.",
+  "public.unavailableMessage": "Chat belum tersedia saat ini.",
+  "public.startError":
+    "Chat belum bisa dibuka. Coba muat ulang halaman.",
+  "public.sendError": "Pesan gagal dikirim. Coba lagi.",
 };
 
 const EN: Dictionary = {
@@ -1534,6 +1575,42 @@ const EN: Dictionary = {
   "channel.placeholderPlaceholder": "Type a message...",
   "channel.placeholderHint":
     "Leave this empty to use the default placeholder.",
+  "channel.openModeTitle": "Widget open behavior",
+  "channel.openModeDescription":
+    "Choose whether visitors must press the button or the chat opens automatically.",
+  "channel.openModeManual": "Open manually",
+  "channel.openModeManualHint":
+    "The widget stays hidden until the visitor presses the chat button.",
+  "channel.openModeAlways": "Always open",
+  "channel.openModeAlwaysHint":
+    "The chat opens automatically when the page or link is opened.",
+  "channel.appearanceTitle": "Widget colors",
+  "channel.appearanceDescription":
+    "Defaults follow Telegram dark. Adjust the colors to match your brand.",
+  "channel.resetColors": "Reset to Telegram",
+  "channel.headerColor": "Header color",
+  "channel.backgroundColor": "Chat background",
+  "channel.outgoingColor": "Customer bubble",
+  "channel.accentColor": "Accent color",
+  "channel.previewIncoming": "Hi, how can we help?",
+  "channel.previewOutgoing": "I have a question.",
+  "channel.iconsTitle": "Widget icons",
+  "channel.iconsDescription":
+    "Use the Orqiva logo or upload your own icon.",
+  "channel.chatIcon": "Chat icon",
+  "channel.chatIconHint": "Shown as the avatar in the chat header.",
+  "channel.launcherIcon": "Toggle icon",
+  "channel.launcherIconHint":
+    "Shown on the launcher button on your website.",
+  "channel.uploadIcon": "Upload",
+  "channel.removeIcon": "Remove icon",
+  "channel.iconHint":
+    "PNG, JPG, or WebP. Square, up to 1 MB. Icons are cropped automatically.",
+  "channel.iconSaved": "Widget icon updated.",
+  "channel.iconRemoved": "Icon restored to the Orqiva logo.",
+  "channel.iconError": "The icon could not be updated. Try again.",
+  "channel.iconTypeError": "The icon must be a PNG, JPG, or WebP file.",
+  "channel.iconSizeError": "The icon must be 1 MB or smaller.",
   "channel.activateLabel": "Enable the public widget",
   "channel.activateHint":
     "The widget only accepts messages when it is active and has an entry workflow.",
@@ -1771,20 +1848,24 @@ const EN: Dictionary = {
   "help.faq.reset.answer":
     "There is no public password reset flow yet. Run the admin seeder or update the password through tinker/Artisan on the server.",
   "help.noResults": "No sections match your search.",
-  "public.humanHandling": "An admin is handling this conversation",
-  "public.aiCustomerService": "AI customer service",
-  "public.unavailableTitle": "Widget unavailable",
-  "public.typing": "AI is typing...",
-  "public.inputPlaceholder": "Type a message...",
+  "public.customerService": "Customer Service",
+  "public.welcomeFallback": "How can we help?",
+  "public.startChat": "Start chat",
+  "public.opening": "Opening chat…",
+  "public.closeChat": "Close chat",
+  "public.online": "online",
+  "public.operatorHandling": "replying…",
+  "public.typing": "typing…",
+  "public.today": "Today",
+  "public.yesterday": "Yesterday",
+  "public.inputPlaceholder": "Type a message",
   "public.messageLabel": "Message",
   "public.send": "Send message",
-  "public.humanNote": "An admin is handling this conversation.",
-  "public.endedNote": "This session has ended. Reload the widget to start again.",
-  "public.aiNote": "This conversation is handled by AI and can be taken over by an admin.",
-  "public.startError": "The widget could not be opened. Check the link or contact an admin.",
-  "public.sendError": "The message could not be sent. Check your connection and try again.",
-  "public.poweredBy": "Powered by {name}",
-  "public.admin": "Admin",
+  "public.endedNote":
+    "This conversation has ended. Reload to start again.",
+  "public.unavailableMessage": "Chat is not available right now.",
+  "public.startError": "The chat could not be opened. Try reloading the page.",
+  "public.sendError": "The message could not be sent. Try again.",
 };
 
 const DICTIONARIES: Record<Language, Dictionary> = { id: ID, en: EN };

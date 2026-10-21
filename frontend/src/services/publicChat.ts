@@ -1,5 +1,5 @@
 import api from "./api";
-import type { ChannelSettings } from "./channel";
+import type { ChannelAppearance, ChannelOpenMode } from "./channel";
 
 export type PublicMessage = {
   id: number;
@@ -9,11 +9,21 @@ export type PublicMessage = {
   created_at: string | null;
 };
 
+export type PublicChannelSettings = {
+  welcome_message: string;
+  placeholder: string;
+  open_mode: ChannelOpenMode;
+  appearance: ChannelAppearance;
+};
+
 export type PublicChannel = {
   name: string;
-  workflow_name: string | null;
   is_active: boolean;
-  settings: ChannelSettings;
+  settings: PublicChannelSettings;
+  icon_urls: {
+    chat: string | null;
+    launcher: string | null;
+  };
 };
 
 export type PublicSession = {

@@ -146,3 +146,38 @@
   background-size: 56px 56px;
   mask-image: radial-gradient(ellipse at 50% 40%, black 10%, transparent 72%);
 }
+
+.tg-chat-wallpaper {
+  background-color: var(--tg-bg, #0e1621);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.045' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M26 42l22-9-7 24-8-8z'/%3E%3Cpath d='M122 30c-5-5-13-1-13 5 0 7 9 11 13 16 4-5 13-9 13-16 0-6-8-10-13-5z'/%3E%3Ccircle cx='54' cy='126' r='12'/%3E%3Cpath d='M136 98l6 13 13 6-13 6-6 13-6-13-13-6 13-6z'/%3E%3Cpath d='M88 66c7 0 12 5 12 11s-5 11-12 11-12-5-12-11 5-11 12-11z'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.tg-typing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  animation: tg-typing 1.15s infinite ease-in-out;
+}
+
+.tg-typing-dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.tg-typing-dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes tg-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}

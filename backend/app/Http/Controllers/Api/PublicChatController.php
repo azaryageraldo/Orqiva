@@ -12,17 +12,78 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PublicChatController extends Controller
 {
+    private const DEFAULT_APPEARANCE = [
+        'header_color' => '#17212b',
+        'background_color' => '#0e1621',
+        'outgoing_color' => '#2b5278',
+        'accent_color' => '#64b5ef',
+    ];
+
     public function showChannel(string $token): JsonResponse
     {
         $channel = $this->resolveChannel($token);
 
         return response()->json([
             'data' => $this->channelPayload($channel),
+        ]);
+    }
+
+    public function embedConfig(string $token)
+    {
+        $channel = $this->resolveChannel($token);
+        $settings = $this->publicSettings($channel);
+        $config = [
+            'mode' => $settings['open_mode'],
+            'name' => $channel->name,
+            'accent' => $settings['appearance']['accent_color'],
+            'icon' => $this->iconUrl($channel, 'launcher'),
+            'active' => (bool) $channel->is_active,
+        ];
+
+        $json = json_encode(
+            $config,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        ) ?: '{}';
+        $key = json_encode($token) ?: '""';
+        $script = 'window.OrqivaEmbedConfig=window.OrqivaEmbedConfig||{};'
+            .'window.OrqivaEmbedConfig['.$key.']='.$json.';';
+
+        return response($script, 200, [
+            'Content-Type' => 'application/javascript; charset=utf-8',
+            'Cache-Control' => 'public, max-age=60',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function icon(string $token, string $kind)
+    {
+        abort_unless(in_array($kind, ['chat', 'launcher'], true), 404);
+
+        $channel = Channel::query()
+            ->where('public_token', $token)
+            ->first();
+
+        abort_if($channel === null, 404);
+
+        $settings = $this->normalizeSettings($channel->settings ?? []);
+        $path = $settings['icons'][$kind] ?? null;
+
+        abort_unless(is_string($path) && $path !== '', 404);
+
+        $disk = Storage::disk('public');
+
+        abort_unless($disk->exists($path), 404);
+
+        return response()->file($disk->path($path), [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'public, max-age=86400',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -375,14 +436,89 @@ class PublicChatController extends Controller
             return [];
         }
 
-        $channel->loadMissing('workflow:id,name');
-
         return [
             'name' => $channel->name,
-            'workflow_name' => $channel->workflow?->name,
             'is_active' => (bool) $channel->is_active,
-            'settings' => $channel->settings ?? [],
+            'settings' => $this->publicSettings($channel),
+            'icon_urls' => [
+                'chat' => $this->iconUrl($channel, 'chat'),
+                'launcher' => $this->iconUrl($channel, 'launcher'),
+            ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function publicSettings(Channel $channel): array
+    {
+        $settings = $this->normalizeSettings($channel->settings ?? []);
+
+        return [
+            'welcome_message' => $settings['welcome_message'],
+            'placeholder' => $settings['placeholder'],
+            'open_mode' => $settings['open_mode'],
+            'appearance' => $settings['appearance'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeSettings(array $settings): array
+    {
+        $appearance = is_array($settings['appearance'] ?? null)
+            ? $settings['appearance']
+            : [];
+        $icons = is_array($settings['icons'] ?? null)
+            ? $settings['icons']
+            : [];
+
+        foreach (self::DEFAULT_APPEARANCE as $key => $default) {
+            if (
+                ! isset($appearance[$key])
+                || ! is_string($appearance[$key])
+                || preg_match('/^#[0-9a-fA-F]{6}$/', $appearance[$key]) !== 1
+            ) {
+                $appearance[$key] = $default;
+            }
+        }
+
+        return [
+            'welcome_message' => (string) ($settings['welcome_message'] ?? ''),
+            'placeholder' => (string) ($settings['placeholder'] ?? ''),
+            'open_mode' => in_array(
+                $settings['open_mode'] ?? null,
+                ['manual', 'always'],
+                true
+            ) ? $settings['open_mode'] : 'manual',
+            'appearance' => $appearance,
+            'icons' => [
+                'chat' => is_string($icons['chat'] ?? null)
+                    ? $icons['chat']
+                    : null,
+                'launcher' => is_string($icons['launcher'] ?? null)
+                    ? $icons['launcher']
+                    : null,
+            ],
+        ];
+    }
+
+    private function iconUrl(Channel $channel, string $kind): ?string
+    {
+        $settings = $this->normalizeSettings($channel->settings ?? []);
+        $path = $settings['icons'][$kind] ?? null;
+
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        return '/api/v1/public/channels/'
+            .$channel->public_token
+            .'/icon/'
+            .$kind
+            .'?v='
+            .($channel->updated_at?->timestamp ?? time());
     }
 
     /**
