@@ -13,8 +13,33 @@ env:
   FRANKENPHP_VERSION: v1.13.1
 
 jobs:
+  preflight:
+    name: Check npm token
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - name: Verify NPM_TOKEN
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::NPM_TOKEN secret is missing or empty."
+            exit 1
+          fi
+          if user=$(npm whoami 2>&1); then
+            echo "::notice::npm authenticated as $user"
+          else
+            message=$(printf '%s' "$user" | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]+/npm_***/g' | cut -c1-300)
+            echo "::error::npm auth failed: $message"
+            exit 1
+          fi
+
   publish-runtimes:
     name: Publish ${{ matrix.package }}
+    needs: preflight
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
