@@ -12,6 +12,38 @@ permissions:
   contents: read
 
 jobs:
+  artifacts:
+    name: Verifikasi binary runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Unduh paket runtime dan periksa format binary
+        run: |
+          set -euo pipefail
+          mkdir -p runtime-check
+          cd runtime-check
+          check() {
+            package="$1"
+            pattern="$2"
+            label="$3"
+            npm pack "$package@0.1.0" --silent > tarball.txt
+            tarball=$(cat tarball.txt | tail -n 1)
+            tar -xzf "$tarball"
+            file package/frankenphp* | tee "$label.txt"
+            if ! grep -qE "$pattern" "$label.txt"; then
+              echo "::error::$label tidak sesuai pola $pattern"
+              exit 1
+            fi
+            rm -rf package "$tarball"
+          }
+          check orqiva-runtime-linux-x64 "ELF 64-bit.*x86-64" linux-x64
+          check orqiva-runtime-linux-arm64 "ELF 64-bit.*ARM aarch64" linux-arm64
+          check orqiva-runtime-darwin-arm64 "Mach-O 64-bit.*arm64" darwin-arm64
+          check orqiva-runtime-darwin-x64 "Mach-O 64-bit.*x86_64" darwin-x64
+          check orqiva-runtime-win32-x64 "PE32\+ executable" win32-x64
+
   smoke:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -21,7 +53,6 @@ jobs:
         include:
           - os: ubuntu-latest
           - os: macos-latest
-          - os: macos-13
           - os: windows-latest
     defaults:
       run:
