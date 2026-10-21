@@ -32,6 +32,8 @@ export type PublicSession = {
   status: "active" | "human" | "ended";
   channel: PublicChannel;
   messages: PublicMessage[];
+  notice: string | null;
+  processing: boolean;
 };
 
 export async function getPublicChannel(token: string): Promise<PublicChannel> {
@@ -66,6 +68,7 @@ export type SendPublicResult = {
   session_status: "active" | "human" | "ended";
   messages: PublicMessage[];
   notice: string | null;
+  processing: boolean;
 };
 
 export async function sendPublicMessage(

@@ -116,6 +116,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
   const [loadingChannel, setLoadingChannel] = useState(true);
   const [starting, setStarting] = useState(false);
   const [sending, setSending] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -142,6 +143,8 @@ export default function PublicChatWidget({ token }: { token: string }) {
       setSessionToken(result.session_token);
       setSessionStatus(result.status);
       setMessages(result.messages);
+      setProcessing(result.processing);
+      setNotice(result.notice ?? "");
       setChatOpen(true);
     } catch {
       started.current = false;
@@ -188,6 +191,8 @@ export default function PublicChatWidget({ token }: { token: string }) {
         setMessages(result.messages);
         setSessionStatus(result.status);
         setChannel(result.channel);
+        setProcessing(result.processing);
+        setNotice(result.notice ?? "");
       } catch {
         // Polling errors are recoverable; the next interval retries.
       }
@@ -203,13 +208,13 @@ export default function PublicChatWidget({ token }: { token: string }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending]);
+  }, [messages, sending, processing]);
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
 
-    if (!sessionToken || !text || sending) return;
+    if (!sessionToken || !text || sending || processing) return;
 
     setSending(true);
     setError("");
@@ -230,9 +235,11 @@ export default function PublicChatWidget({ token }: { token: string }) {
       pendingClientRef.current = null;
       setMessages(result.messages);
       setSessionStatus(result.session_status);
+      setProcessing(result.processing);
       setNotice(result.notice ?? "");
     } catch {
       setDraft(text);
+      setProcessing(false);
       setError(t("public.sendError"));
     } finally {
       setSending(false);
@@ -243,11 +250,13 @@ export default function PublicChatWidget({ token }: { token: string }) {
     window.parent.postMessage({ type: "orqiva:close" }, "*");
   }
 
+  const typing = sending || processing;
+
   const status = useMemo(() => {
-    if (sending) return t("public.typing");
+    if (typing) return t("public.typing");
     if (sessionStatus === "human") return t("public.operatorHandling");
     return t("public.online");
-  }, [sending, sessionStatus, t]);
+  }, [typing, sessionStatus, t]);
 
   const style = {
     "--tg-header": appearance.header_color,
@@ -398,13 +407,16 @@ export default function PublicChatWidget({ token }: { token: string }) {
                       );
                     }
 
-                    const groupStart =
+                    const dayStart =
                       !previous ||
                       previous.role === "system" ||
-                      previous.role !== message.role ||
                       !message.created_at ||
                       !previous.created_at ||
                       !isSameDay(previous.created_at, message.created_at);
+
+                    const groupStart =
+                      dayStart ||
+                      previous.role !== message.role;
 
                     const groupEnd =
                       !next ||
@@ -416,7 +428,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
 
                     return (
                       <div key={message.id}>
-                        {groupStart && message.created_at && (
+                        {dayStart && message.created_at && (
                           <DayDivider
                             value={message.created_at}
                             language={language}
@@ -437,7 +449,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                     );
                   })}
 
-                  {sending && (
+                  {typing && (
                     <div className="flex items-end gap-2 py-1">
                       <img
                         src={chatIcon}
@@ -516,6 +528,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                     loadingChannel ||
                     !sessionToken ||
                     sending ||
+                    processing ||
                     sessionStatus === "ended"
                   }
                   className="h-11 min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.06] px-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/20 disabled:opacity-50"
@@ -526,6 +539,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                     !draft.trim() ||
                     loadingChannel ||
                     sending ||
+                    processing ||
                     !sessionToken ||
                     sessionStatus === "ended"
                   }
@@ -533,7 +547,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                   className="flex size-11 shrink-0 items-center justify-center rounded-full text-white shadow-lg shadow-black/20 transition hover:brightness-110 disabled:opacity-40"
                   style={{ backgroundColor: appearance.accent_color }}
                 >
-                  {sending ? (
+                  {typing ? (
                     <LoaderCircle className="size-4 animate-spin" />
                   ) : (
                     <Send className="size-4" />

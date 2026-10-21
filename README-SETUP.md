@@ -63,7 +63,14 @@ cd frontend
 npm run dev
 ```
 
-The frontend runs at `http://127.0.0.1:5173` and proxies `/api` to `http://127.0.0.1:8000`. Health endpoints: `GET /up` and `GET /api/v1/health`.
+Run a queue worker in a third terminal so widget replies are processed in the background:
+
+```sh
+cd backend
+php artisan queue:work --sleep=1 --tries=2 --timeout=240
+```
+
+The frontend runs at `http://127.0.0.1:5173` and proxies `/api` to `http://127.0.0.1:8000`. Health endpoints: `GET /up` and `GET /api/v1/health`. Messages are queued in the `jobs` table (`QUEUE_CONNECTION=database`); the widget shows a typing indicator while a job is pending or processing.
 
 For a production build:
 
@@ -106,7 +113,7 @@ npm run build
 - Use a strong `APP_KEY` and back it up securely.
 - Change the default admin email and password.
 - Serve the app over HTTPS and set `CORS_ALLOWED_ORIGINS` to trusted frontend origins.
-- Use a production database and queue/scheduler setup appropriate to your traffic.
+- Use a production database and run supervised queue workers (`php artisan queue:work`) with a process monitor so widget replies keep flowing after worker restarts.
 - Back up the database regularly.
 
 ## License
