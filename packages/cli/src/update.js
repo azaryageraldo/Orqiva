@@ -10,18 +10,23 @@ const packageJson = JSON.parse(
   ),
 );
 
+const REGISTRY_URL = "https://registry.npmjs.org";
+
 export function currentVersion() {
   return packageJson.version;
 }
 
-export async function checkForUpdate() {
+export async function checkForUpdate({ fetcher = fetch } = {}) {
   let response;
 
   try {
-    response = await fetch("https://registry.npmjs.org/orqiva/latest", {
-      headers: { Accept: "application/vnd.npm.install-v1+json" },
-      signal: AbortSignal.timeout(8000),
-    });
+    response = await fetcher(
+      `${REGISTRY_URL}/-/package/${packageJson.name}/dist-tags`,
+      {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+      },
+    );
   } catch {
     throw new Error("Tidak dapat menghubungi npm registry. Periksa koneksi internet.");
   }
@@ -30,7 +35,7 @@ export async function checkForUpdate() {
     throw new Error(`npm registry mengembalikan HTTP ${response.status}.`);
   }
 
-  const latest = (await response.json()).version;
+  const latest = (await response.json()).latest;
 
   return {
     current: currentVersion(),

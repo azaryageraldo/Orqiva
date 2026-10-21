@@ -117,6 +117,30 @@ The first run opens the browser setup wizard and creates the first admin account
 - `ORQIVA_BIND_HOST=0.0.0.0` binds to all interfaces behind a reverse proxy or firewall.
 - Published npm packages: `orqiva` plus the matching `orqiva-runtime-*` optional dependency.
 
+### Verify the install
+
+```sh
+orqiva doctor
+```
+
+`orqiva doctor` checks the bundled runtime, the PHP extensions, the data directory, and the port. A fresh install reports `1 pemeriksaan perlu diperbaiki` because the SQLite database is created during the first run.
+
+### Unsigned runtime notices
+
+The bundled FrankenPHP runtime ships without a code signature:
+
+- macOS may show "cannot be opened because the developer cannot be verified". Open **System Settings → Privacy & Security** and confirm **Open Anyway**, or clear the flag with `xattr -dr com.apple.quarantine "$(npm root -g)/orqiva-runtime-darwin-arm64"`.
+- Windows SmartScreen may warn that the app is unrecognized because the CLI is not signed. Choose **More info → Run anyway**, or clear the mark with `Unblock-File (Get-ChildItem "$env:APPDATA\npm\node_modules\orqiva-runtime-win32-x64" -Recurse)`.
+
+### Publish a release
+
+1. Create a granular access token on npm with **Read and write (publish and stage)** and **Bypass two-factor authentication**, then store it as the `NPM_TOKEN` repository secret.
+2. Bump the version in `packages/cli/package.json` and keep the `optionalDependencies` versions in sync.
+3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
+4. The `Release` workflow publishes the runtime packages and the CLI, runs a smoke test on Linux, macOS, and Windows, then creates the GitHub release.
+
+The workflow is idempotent: re-running a tag skips packages that are already published.
+
 ## Server mode (MySQL + public URL)
 
 Run MySQL from the repository root:
