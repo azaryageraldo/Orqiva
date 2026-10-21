@@ -6,9 +6,6 @@ export const APP_LICENSE = "MIT";
 export const REPOSITORY_URL =
   "https://github.com/azaryageraldo/AI-Automation-Project";
 
-export const DEFAULT_ADMIN_EMAIL = "admin@gmail.com";
-export const DEFAULT_ADMIN_PASSWORD = "dsadsadsa";
-
 export const DEVELOPER_GITHUB = REPOSITORY_URL;
 export const DEVELOPER_TIKTOK = "https://www.tiktok.com/@azaryaageraldoo";
 export const DEVELOPER_LINKEDIN =

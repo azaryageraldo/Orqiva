@@ -22,7 +22,16 @@ Orqiva is an open-source, self-hostable AI customer service automation workspace
 
 ## Quick start
 
-Requirements: PHP 8.3+, Composer, Node.js/npm, and MySQL 8.
+Install as a local app (once published to npm):
+
+```sh
+npm install -g orqiva
+orqiva
+```
+
+The `orqiva` command starts the bundled FrankenPHP runtime with SQLite, runs migrations, starts a queue worker, and opens the browser setup wizard.
+
+From source, requirements are PHP 8.3+, Composer, and Node.js/npm. SQLite is the default database; MySQL 8 is optional.
 
 ```sh
 # Backend
@@ -30,9 +39,7 @@ cd backend
 composer install
 cp .env.example .env
 php artisan key:generate
-# Configure the database in .env
 php artisan migrate
-php artisan db:seed --class=AdminUserSeeder
 php artisan serve
 
 # Frontend, in another terminal
@@ -43,12 +50,9 @@ npm run dev
 
 The API runs at `http://127.0.0.1:8000`. Vite serves the frontend at `http://127.0.0.1:5173` and proxies `/api` to the backend.
 
-### Default local account
+### First account
 
-- Email: `admin@gmail.com`
-- Password: `dsadsadsa`
-
-The account is created by `AdminUserSeeder` for local development. Change the credentials before deploying Orqiva.
+Open the frontend and complete the setup form. Orqiva creates the first admin account locally; there is no default email or password. To create an account non-interactively, set `ORQIVA_ADMIN_EMAIL` and `ORQIVA_ADMIN_PASSWORD` and run `php artisan db:seed --class=AdminUserSeeder`.
 
 AI provider keys are managed from **API Keys** inside the app; they are encrypted at rest and are never returned to the browser.
 
@@ -73,7 +77,7 @@ See [`README-SETUP.md`](README-SETUP.md) for detailed setup and operations. In t
 
 - Keep backend credentials in environment configuration and never commit real secrets.
 - Store AI keys through the app so they are encrypted in the database.
-- Use HTTPS, restrict CORS, disable debug mode, and change the default admin credentials before production.
+- Use HTTPS, restrict CORS, disable debug mode, and complete the first-run setup with a strong account before production. There is no default account.
 - Back up the database and `APP_KEY`; encrypted provider keys cannot be recovered without the same application key.
 
 ## License

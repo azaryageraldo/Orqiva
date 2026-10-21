@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ChannelController;
 use App\Http\Controllers\Api\InboxController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PublicChatController;
+use App\Http\Controllers\Api\SetupController;
 use App\Http\Controllers\Api\UsageStatsController;
 use App\Http\Controllers\Api\WorkflowController;
 use App\Http\Controllers\Api\WorkflowExecutionController;
@@ -18,6 +19,12 @@ Route::prefix('v1')->group(function () {
             'service' => 'orqiva-api',
         ],
     ]));
+
+    Route::get('/setup/status', [SetupController::class, 'status'])
+        ->middleware('throttle:setup');
+
+    Route::post('/setup', [SetupController::class, 'store'])
+        ->middleware('throttle:setup');
 
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:login');

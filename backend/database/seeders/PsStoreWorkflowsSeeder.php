@@ -22,11 +22,14 @@ class PsStoreWorkflowsSeeder extends Seeder
 {
     public function run(): void
     {
-        $user = User::query()->where('email', 'admin@gmail.com')->first();
+        $email = env('ORQIVA_ADMIN_EMAIL');
+        $user = is_string($email) && $email !== ''
+            ? User::query()->where('email', strtolower(trim($email)))->first()
+            : User::query()->orderBy('id')->first();
 
         if ($user === null) {
             throw new RuntimeException(
-                'Akun admin@gmail.com tidak ditemukan. Jalankan AdminUserSeeder terlebih dahulu.'
+                'Belum ada akun Orqiva. Selesaikan setup atau jalankan AdminUserSeeder terlebih dahulu.'
             );
         }
 

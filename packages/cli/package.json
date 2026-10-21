@@ -1,0 +1,44 @@
+{
+  "name": "orqiva",
+  "version": "0.1.0",
+  "description": "Local-first AI customer service automation for Orqiva.",
+  "type": "module",
+  "bin": {
+    "orqiva": "bin/orqiva.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "app",
+    "runtime",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "optionalDependencies": {
+    "orqiva-runtime-darwin-arm64": "0.1.0",
+    "orqiva-runtime-darwin-x64": "0.1.0",
+    "orqiva-runtime-linux-arm64": "0.1.0",
+    "orqiva-runtime-linux-x64": "0.1.0",
+    "orqiva-runtime-win32-x64": "0.1.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepare:package": "node scripts/prepare-package.mjs",
+    "prepack": "node scripts/prepare-package.mjs"
+  },
+  "keywords": [
+    "orqiva",
+    "ai",
+    "customer-service",
+    "workflow",
+    "self-hosted"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/azaryageraldo/AI-Automation-Project.git",
+    "directory": "packages/cli"
+  }
+}

@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-The repository contains a working MVP: `README.md` defines the product requirements, `backend/` contains the Laravel API (Sanctum session auth, workflow CRUD with per-user ownership, execution engine, Gemini integration, usage stats), and `frontend/` contains the React/Vite app (dashboard, workflow list with pagination, visual editor, chat tester). Workflow validation lives in `backend/app/Services/Workflows/`; keep future domain code there and in `backend/app/Services/AI/`, with tests in `backend/tests/Feature/` and `backend/tests/Unit/`. Organize React code under `frontend/src/` by pages, reusable components, and domain features such as `workflows/`, `workflow-editor/`, and `executions/`.
+The repository contains a working MVP: `README.md` defines the product requirements, `backend/` contains the Laravel API (Sanctum session auth, workflow CRUD with per-user ownership, execution engine, Gemini integration, usage stats), and `frontend/` contains the React/Vite app (dashboard, workflow list with pagination, visual editor, chat tester). Workflow validation lives in `backend/app/Services/Workflows/`; keep future domain code there and in `backend/app/Services/AI/`, with tests in `backend/tests/Feature/` and `backend/tests/Unit/`. Organize React code under `frontend/src/` by pages, reusable components, and domain features such as `workflows/`, `workflow-editor/`, and `executions/`. The `packages/cli/` npm package (`orqiva`) runs the app as a local service with a bundled FrankenPHP runtime, per-platform `orqiva-runtime-*` packages, and shared data under `ORQIVA_DATA_DIR`; keep runtime and packaging scripts there.
 
 ## Build, Test, and Development Commands
 

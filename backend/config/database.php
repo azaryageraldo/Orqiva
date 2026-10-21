@@ -1,8 +1,38 @@
 <?php
 
+use Pdo\Mysql;
+
+$mysqlSslCa = null;
+
+if (class_exists(Mysql::class)) {
+    $mysqlSslCa = Mysql::ATTR_SSL_CA;
+} elseif (defined('PDO::MYSQL_ATTR_SSL_CA')) {
+    $mysqlSslCa = constant('PDO::MYSQL_ATTR_SSL_CA');
+}
+
+$dataDir = getenv('ORQIVA_DATA_DIR') ?: env('ORQIVA_DATA_DIR');
+$sqliteDatabase = env('DB_DATABASE');
+
+if (! is_string($sqliteDatabase) || $sqliteDatabase === '' || $sqliteDatabase === 'orqiva') {
+    $sqliteDatabase = is_string($dataDir) && $dataDir !== ''
+        ? rtrim($dataDir, '/\\').DIRECTORY_SEPARATOR.'data'.DIRECTORY_SEPARATOR.'orqiva.sqlite'
+        : database_path('database.sqlite');
+}
+
 return [
-    'default' => env('DB_CONNECTION', 'mysql'),
+    'default' => env('DB_CONNECTION', 'sqlite'),
     'connections' => [
+        'sqlite' => [
+            'driver' => 'sqlite',
+            'url' => env('DB_URL'),
+            'database' => $sqliteDatabase,
+            'prefix' => '',
+            'prefix_indexes' => null,
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+            'busy_timeout' => 5000,
+            'journal_mode' => 'WAL',
+            'synchronous' => 'NORMAL',
+        ],
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
@@ -18,9 +48,9 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-            PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                ]) : [],
+            'options' => extension_loaded('pdo_mysql') && $mysqlSslCa !== null ? array_filter([
+                $mysqlSslCa => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
         ],
     ],
     'migrations' => [

@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: orqiva
+      MYSQL_USER: orqiva
+      MYSQL_PASSWORD: ${ORQIVA_MYSQL_PASSWORD:-orqiva-secret}
+      MYSQL_ROOT_PASSWORD: ${ORQIVA_MYSQL_ROOT_PASSWORD:-root-secret}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - orqiva-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uorqiva", "-p${ORQIVA_MYSQL_PASSWORD:-orqiva-secret}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  orqiva-mysql:

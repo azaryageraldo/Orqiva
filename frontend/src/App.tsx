@@ -199,7 +199,8 @@ export default function App() {
   if (!authenticated) {
     return (
       <Login
-        onLogin={() => {
+        onLogin={(currentUser) => {
+          setUser(currentUser);
           setAuthenticated(true);
         }}
       />

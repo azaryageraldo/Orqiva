@@ -46,3 +46,23 @@ jobs:
         run: npm run lint
       - name: Build
         run: npm run build
+
+  cli:
+    name: CLI checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check syntax
+        run: |
+          node --check bin/orqiva.js
+          node --check src/cli.js
+          node --check scripts/prepare-package.mjs
+          node --check scripts/build-runtime-package.mjs
+      - name: Run tests
+        run: npm test

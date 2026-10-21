@@ -11,6 +11,20 @@
 /frontend/dist/
 /frontend/.vite/
 
+# Frontend build copied into Laravel for single-origin production serving
+/backend/public/app.html
+/backend/public/assets/
+/backend/public/favicon.png
+/backend/public/icons.svg
+/backend/public/orqiva-mark.png
+/backend/public/orqiva-widget.js
+
+# Generated npm CLI payload
+/packages/cli/app/
+/packages/cli/build/
+/packages/cli/node_modules/
+/packages/*/*.tgz
+
 # Laravel runtime files
 /backend/storage/*.key
 /backend/storage/logs/*.log

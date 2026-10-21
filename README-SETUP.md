@@ -24,22 +24,16 @@ cd ../frontend
 npm install
 ```
 
-Configure the database in `backend/.env`. AI provider keys are not required in `.env`; add them from **API Keys** after signing in.
+The default database is SQLite at `backend/database/database.sqlite`. Set `DB_CONNECTION=mysql` and the other `DB_*` values in `backend/.env` for a MySQL setup. AI provider keys are not required in `.env`; add them from **API Keys** after signing in.
 
 ## Prepare the database
 
 ```sh
 cd backend
 php artisan migrate
-php artisan db:seed --class=AdminUserSeeder
 ```
 
-Default local account:
-
-- Email: `admin@gmail.com`
-- Password: `dsadsadsa`
-
-There is no public registration or password reset flow. Change the default credentials before using Orqiva outside local development.
+Open the frontend and complete the setup form to create the first admin account. There is no default email or password and no public registration after setup. To create the account non-interactively, set `ORQIVA_ADMIN_EMAIL` and `ORQIVA_ADMIN_PASSWORD`, then run `php artisan db:seed --class=AdminUserSeeder`.
 
 Optional demo data for a PlayStation store workflow:
 
@@ -107,14 +101,55 @@ npm run lint
 npm run build
 ```
 
+## Install as a local app (npm CLI)
+
+The `packages/cli` npm package (`orqiva`) runs the app as a local service with a bundled FrankenPHP runtime, SQLite storage, migrations, and a queue worker:
+
+```sh
+npm install -g orqiva
+orqiva
+```
+
+The first run opens the browser setup wizard and creates the first admin account. Data lives in the Orqiva data directory (`orqiva data` prints it). Useful commands: `orqiva status`, `orqiva stop`, `orqiva logs`, `orqiva doctor`, `orqiva backup`, `orqiva update`.
+
+- `ORQIVA_DATA_DIR` moves the data directory.
+- `ORQIVA_PUBLIC_URL=https://cs.example.com` sets the public origin used for links, CORS, and Sanctum sessions.
+- `ORQIVA_BIND_HOST=0.0.0.0` binds to all interfaces behind a reverse proxy or firewall.
+- Published npm packages: `orqiva` plus the matching `orqiva-runtime-*` optional dependency.
+
+## Server mode (MySQL + public URL)
+
+Run MySQL from the repository root:
+
+```sh
+docker compose up -d mysql
+```
+
+Point the CLI at MySQL and a public origin, then start it behind a reverse proxy or a tunnel such as Cloudflare Tunnel:
+
+```sh
+export ORQIVA_DB_CONNECTION=mysql
+export ORQIVA_DB_HOST=127.0.0.1
+export ORQIVA_DB_PORT=3306
+export ORQIVA_DB_DATABASE=orqiva
+export ORQIVA_DB_USERNAME=orqiva
+export ORQIVA_DB_PASSWORD=change-me
+export ORQIVA_PUBLIC_URL=https://cs.example.com
+export ORQIVA_BIND_HOST=127.0.0.1
+
+orqiva
+```
+
+The proxy must forward the public host and HTTPS scheme to `http://127.0.0.1:20129`. Set `ORQIVA_BIND_HOST=0.0.0.0` only when the port is protected by a firewall or a reverse proxy. In MySQL mode, `orqiva backup` only copies `.env` and storage; export the database with `mysqldump`.
+
 ## Production checklist
 
 - Set `APP_ENV=production` and `APP_DEBUG=false`.
 - Use a strong `APP_KEY` and back it up securely.
-- Change the default admin email and password.
-- Serve the app over HTTPS and set `CORS_ALLOWED_ORIGINS` to trusted frontend origins.
-- Use a production database and run supervised queue workers (`php artisan queue:work`) with a process monitor so widget replies keep flowing after worker restarts.
-- Back up the database regularly.
+- Complete the first-run setup wizard; do not reuse a demo account.
+- Serve the app over HTTPS and set `ORQIVA_PUBLIC_URL` (or `CORS_ALLOWED_ORIGINS`) to trusted origins.
+- Use a production database and supervised queue workers with a process monitor so widget replies keep flowing after worker restarts.
+- Back up the database and `ORQIVA_DATA_DIR` regularly.
 
 ## License
 
