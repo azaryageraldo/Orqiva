@@ -83,7 +83,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set +e
-          output=$(npm publish "build/runtimes/orqiva-runtime-${{ matrix.platform }}-${{ matrix.arch }}" --provenance 2>&1)
+          output=$(npm publish "build/runtimes/orqiva-runtime-${{ matrix.platform }}-${{ matrix.arch }}" --provenance --access public 2>&1)
           code=$?
           printf '%s\n' "$output"
           if [ "$code" -ne 0 ]; then
@@ -134,7 +134,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set +e
-          output=$(npm publish --provenance 2>&1)
+          output=$(npm publish --provenance --access public 2>&1)
           code=$?
           printf '%s\n' "$output"
           if [ "$code" -ne 0 ]; then
