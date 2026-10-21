@@ -138,3 +138,11 @@
 .flow-edge-dash {
   animation: flow-dash 1.15s linear infinite;
 }
+
+.login-grid {
+  background-image:
+    linear-gradient(to right, oklch(1 0 0 / 4%) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 4%) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 10%, transparent 72%);
+}
