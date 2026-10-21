@@ -79,9 +79,18 @@ jobs:
             --url https://github.com/php/frankenphp/releases/download/${{ env.FRANKENPHP_VERSION }}/${{ matrix.asset }} \
             --output build/runtimes
       - name: Publish runtime package
-        run: npm publish "build/runtimes/orqiva-runtime-${{ matrix.platform }}-${{ matrix.arch }}" --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set +e
+          output=$(npm publish "build/runtimes/orqiva-runtime-${{ matrix.platform }}-${{ matrix.arch }}" --provenance 2>&1)
+          code=$?
+          printf '%s\n' "$output"
+          if [ "$code" -ne 0 ]; then
+            message=$(printf '%s' "$output" | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-900)
+            echo "::error::npm publish failed: $message"
+            exit "$code"
+          fi
 
   publish-cli:
     name: Publish orqiva
@@ -121,9 +130,18 @@ jobs:
           done
       - name: Build and publish CLI package
         working-directory: packages/cli
-        run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set +e
+          output=$(npm publish --provenance 2>&1)
+          code=$?
+          printf '%s\n' "$output"
+          if [ "$code" -ne 0 ]; then
+            message=$(printf '%s' "$output" | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-900)
+            echo "::error::npm publish failed: $message"
+            exit "$code"
+          fi
 
   github-release:
     name: Create GitHub release
