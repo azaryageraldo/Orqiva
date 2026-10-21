@@ -1,0 +1,50 @@
+name: Runtime smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: macos-13
+          - os: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install and inspect published package
+        env:
+          ORQIVA_DATA_DIR: ${{ runner.temp }}/orqiva-data
+        run: |
+          npx --yes orqiva@0.1.0 help
+          set +e
+          npx --yes orqiva@0.1.0 doctor > doctor.txt 2>&1
+          code=$?
+          cat doctor.txt
+          if ! grep -q "Runtime PHP: FrankenPHP" doctor.txt; then
+            echo "::error::Runtime FrankenPHP tidak terdeteksi di ${{ matrix.os }}"
+            exit 1
+          fi
+          if ! grep -q "Runtime aplikasi" doctor.txt; then
+            echo "::error::Runtime aplikasi tidak ditemukan di ${{ matrix.os }}"
+            exit 1
+          fi
+          echo "doctor exit code: $code (kode 1 wajar bila database belum dibuat)"
