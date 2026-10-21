@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
+import { formatLocale, useI18n } from "@/lib/i18n";
 import { getErrorMessage } from "../services/api";
 import {
   getExecution,
@@ -35,54 +36,65 @@ interface ExecutionDetailProps {
   onBack: () => void;
 }
 
-const dateFormat = new Intl.DateTimeFormat("id-ID", {
-  dateStyle: "medium",
-  timeStyle: "medium",
-});
-
 const NODE_TYPE_LABELS: Record<string, string> = {
-  trigger: "Trigger",
-  ai_agent: "AI Agent",
-  output: "Send Message",
-  if_else: "Condition",
-  relocate: "Relocate",
-  go_to: "Go To",
-  stopper: "Stopper",
+  trigger: "execution.node.trigger",
+  ai_agent: "execution.node.aiAgent",
+  output: "execution.node.output",
+  if_else: "execution.node.condition",
+  relocate: "execution.node.relocate",
+  go_to: "execution.node.goTo",
+  stopper: "execution.node.stopper",
 };
 
-const stepStatusLabel = (value: string | null) => {
-  if (value === "success") return "Sukses";
-  if (value === "error") return "Gagal";
-  return "Semua status";
-};
+function stepStatusLabel(
+  value: string | null,
+  t: (key: string) => string,
+) {
+  if (value === "success") return t("execution.success");
+  if (value === "error") return t("execution.error");
+  return t("execution.allStatuses");
+}
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, locale: string): string {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(date);
 }
 
-function formatDuration(ms: number): string {
+function formatDuration(ms: number, t: (key: string) => string): string {
   if (ms < 1000) return `${ms} ms`;
-  return `${(ms / 1000).toFixed(1)} dtk`;
+  return `${(ms / 1000).toFixed(1)}${t("execution.secondsShort")}`;
 }
 
-function stepNodeLabel(step: ExecutionStep): string {
+function stepNodeLabel(
+  step: ExecutionStep,
+  t: (key: string) => string,
+): string {
   const name = step.node_name?.trim();
 
   if (
     !name ||
     name.toLowerCase().replaceAll(" ", "_") === step.node_type.toLowerCase()
   ) {
-    return NODE_TYPE_LABELS[step.node_type] ?? step.node_type;
+    const key = NODE_TYPE_LABELS[step.node_type];
+    return key ? t(key) : step.node_type;
   }
 
   return name;
 }
 
-function formatValue(value: unknown): string {
+function formatValue(
+  value: unknown,
+  yes: string,
+  no: string,
+): string {
   if (value === null || value === undefined) return "—";
-  if (typeof value === "boolean") return value ? "Ya" : "Tidak";
+  if (typeof value === "boolean") return value ? yes : no;
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
   return JSON.stringify(value, null, 2);
@@ -99,8 +111,11 @@ function JsonBlock({ value }: { value: unknown }) {
 }
 
 function StepCard({ step }: { step: ExecutionStep }) {
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
   const variables = step.variables ? Object.entries(step.variables) : [];
-  const typeLabel = NODE_TYPE_LABELS[step.node_type] ?? step.node_type;
+  const typeKey = NODE_TYPE_LABELS[step.node_type];
+  const typeLabel = typeKey ? t(typeKey) : step.node_type;
 
   return (
     <li className="relative pl-8">
@@ -119,9 +134,9 @@ function StepCard({ step }: { step: ExecutionStep }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="truncate text-sm font-medium text-foreground">
-                {stepNodeLabel(step)}
+                {stepNodeLabel(step, t)}
               </p>
-              {typeLabel !== stepNodeLabel(step) && (
+              {typeLabel !== stepNodeLabel(step, t) && (
                 <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                   {typeLabel}
                 </span>
@@ -134,17 +149,17 @@ function StepCard({ step }: { step: ExecutionStep }) {
               )}
               {step.status === "error" && (
                 <span className="rounded-md border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
-                  Gagal
+                  {t("execution.error")}
                 </span>
               )}
               {step.branch && (
                 <span className="rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-                  {step.branch === "true" ? "If match" : "Else"}
+                  {step.branch === "true" ? t("execution.branchIf") : t("execution.branchElse")}
                 </span>
               )}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              {formatDate(step.executed_at)}
+              {formatDate(step.executed_at, locale)}
               {step.node_id ? ` · ${step.node_id}` : ""}
             </p>
           </div>
@@ -152,12 +167,12 @@ function StepCard({ step }: { step: ExecutionStep }) {
           <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <Timer className="size-3.5" />
-              {formatDuration(step.duration_ms)}
+              {formatDuration(step.duration_ms, t)}
             </span>
             {step.total_tokens > 0 && (
               <span className="inline-flex items-center gap-1">
                 <Coins className="size-3.5" />
-                {step.total_tokens.toLocaleString("id-ID")} token
+                {t("execution.stepTokens", { count: step.total_tokens.toLocaleString(locale) })}
               </span>
             )}
           </div>
@@ -172,7 +187,7 @@ function StepCard({ step }: { step: ExecutionStep }) {
         {step.messages && step.messages.length > 0 && (
           <div className="mt-4 space-y-2">
             <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              Pesan terkirim
+              {t("execution.sentMessages")}
             </p>
             {step.messages.map((message, index) => (
               <p
@@ -188,7 +203,7 @@ function StepCard({ step }: { step: ExecutionStep }) {
         {variables.length > 0 && (
           <div className="mt-4 space-y-2">
             <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              Variabel
+              {t("execution.variables")}
             </p>
             <dl className="grid gap-2 sm:grid-cols-2">
               {variables.map(([name, value]) => (
@@ -200,7 +215,7 @@ function StepCard({ step }: { step: ExecutionStep }) {
                     {name}
                   </dt>
                   <dd className="mt-0.5 text-xs leading-5 whitespace-pre-wrap text-foreground">
-                    {formatValue(value)}
+                    {formatValue(value, t("execution.yes"), t("execution.no"))}
                   </dd>
                 </div>
               ))}
@@ -212,7 +227,7 @@ function StepCard({ step }: { step: ExecutionStep }) {
           {step.input && (
             <details className="group">
               <summary className="cursor-pointer text-xs font-medium text-muted-foreground select-none hover:text-foreground">
-                Input langkah
+                {t("execution.stepInput")}
               </summary>
               <div className="mt-2">
                 <JsonBlock value={step.input} />
@@ -222,7 +237,7 @@ function StepCard({ step }: { step: ExecutionStep }) {
           {step.output && (
             <details className="group">
               <summary className="cursor-pointer text-xs font-medium text-muted-foreground select-none hover:text-foreground">
-                Output langkah
+                {t("execution.stepOutput")}
               </summary>
               <div className="mt-2">
                 <JsonBlock value={step.output} />
@@ -240,6 +255,8 @@ export default function ExecutionDetail({
   executionId,
   onBack,
 }: ExecutionDetailProps) {
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
   const [detail, setDetail] = useState<ExecutionDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -258,7 +275,7 @@ export default function ExecutionDetail({
       setError(
         getErrorMessage(
           caught,
-          "Detail eksekusi gagal dimuat. Periksa koneksi backend.",
+          t("execution.loadError"),
         ),
       );
     } finally {
@@ -278,7 +295,7 @@ export default function ExecutionDetail({
           setError(
             getErrorMessage(
               caught,
-              "Detail eksekusi gagal dimuat. Periksa koneksi backend.",
+              t("execution.loadError"),
             ),
           );
         }
@@ -290,19 +307,19 @@ export default function ExecutionDetail({
     return () => {
       active = false;
     };
-  }, [workflowId, executionId]);
+  }, [workflowId, executionId, t]);
 
   const nodes = useMemo(() => {
     const unique = new Map<string, string>();
 
     for (const step of detail?.steps ?? []) {
       if (!unique.has(step.node_id)) {
-        unique.set(step.node_id, stepNodeLabel(step));
+        unique.set(step.node_id, stepNodeLabel(step, t));
       }
     }
 
     return Array.from(unique, ([id, name]) => ({ id, name }));
-  }, [detail]);
+  }, [detail, t]);
 
   const steps = useMemo(
     () =>
@@ -343,32 +360,35 @@ export default function ExecutionDetail({
               className="mb-4 -ml-2 text-muted-foreground"
             >
               <ArrowLeft />
-              Kembali ke Audit Log
+              {t("execution.back")}
             </Button>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                 {detail?.chat_session_id
-                  ? `Audit session #${detail.chat_session_id}`
-                  : `Audit eksekusi #${executionId}`}
+                  ? t("execution.titleSession", {
+                      id: detail.chat_session_id,
+                    })
+                  : t("execution.titleExecution", { id: executionId })}
               </h1>
               {detail && <ExecutionStatusBadge status={detail.status} />}
             </div>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {detail?.workflow_name || "Memuat workflow…"} · Audit setiap
-              langkah, perpindahan workflow, input, output, dan konsumsi token.
+              {t("execution.subtitle", {
+                name: detail?.workflow_name || t("execution.loadingWorkflow"),
+              })}
             </p>
             {detail && (
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span>
-                  Contact{" "}
+                  {t("execution.contact")}{" "}
                   <span className="font-mono text-foreground">
-                    {detail.contact_public_id || "tidak tercatat"}
+                    {detail.contact_public_id || t("execution.contactMissing")}
                   </span>
                 </span>
-                <span>Session {detail.chat_session_id ?? "—"}</span>
+                <span>{t("execution.session")} {detail.chat_session_id ?? "—"}</span>
                 {detail.current_workflow_name && (
                   <span>
-                    Workflow aktif:{" "}
+                    {t("execution.activeWorkflow")}{" "}
                     <span className="text-foreground">
                       {detail.current_workflow_name}
                     </span>
@@ -386,7 +406,7 @@ export default function ExecutionDetail({
             className="h-10 px-4"
           >
             <RefreshCw className={loading ? "animate-spin" : undefined} />
-            Segarkan
+            {t("execution.refresh")}
           </Button>
         </div>
 
@@ -402,7 +422,7 @@ export default function ExecutionDetail({
               size="sm"
               onClick={() => void refresh()}
             >
-              Coba lagi
+              {t("common.retry")}
             </Button>
           </div>
         )}
@@ -413,48 +433,55 @@ export default function ExecutionDetail({
           </div>
         ) : !detail ? (
           <Card className="p-8 text-center text-sm text-muted-foreground">
-            Detail eksekusi tidak tersedia.
+            {t("execution.detailUnavailable")}
           </Card>
         ) : (
           <>
             <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
               <div className="bg-card p-5">
-                <p className="text-sm text-muted-foreground">Durasi</p>
+                <p className="text-sm text-muted-foreground">{t("execution.duration")}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                  {formatDuration(totalDuration)}
+                  {formatDuration(totalDuration, t)}
                 </p>
               </div>
               <div className="bg-card p-5">
-                <p className="text-sm text-muted-foreground">Total token</p>
+                <p className="text-sm text-muted-foreground">{t("execution.totalTokens")}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                  {detail.total_tokens.toLocaleString("id-ID")}
+                  {detail.total_tokens.toLocaleString(locale)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {detail.prompt_tokens.toLocaleString("id-ID")} prompt ·{" "}
-                  {detail.completion_tokens.toLocaleString("id-ID")} completion
+                  {t("execution.promptCompletion", {
+                    prompt: detail.prompt_tokens.toLocaleString(locale),
+                    completion: detail.completion_tokens.toLocaleString(locale),
+                  })}
                 </p>
               </div>
               <div className="bg-card p-5">
-                <p className="text-sm text-muted-foreground">Langkah</p>
+                <p className="text-sm text-muted-foreground">{t("execution.steps")}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
                   {detail.steps.length}
                 </p>
                 <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <Layers className="size-3" />
-                  {detail.steps.filter((step) => step.status === "error").length}{" "}
-                  gagal
+                  {t("execution.failedCount", {
+                    count: detail.steps.filter(
+                      (step) => step.status === "error",
+                    ).length,
+                  })}
                 </p>
               </div>
               <div className="bg-card p-5">
-                <p className="text-sm text-muted-foreground">Waktu</p>
+                <p className="text-sm text-muted-foreground">{t("execution.time")}</p>
                 <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-foreground">
                   <Clock className="size-4 text-muted-foreground" />
-                  {formatDate(detail.started_at)}
+                  {formatDate(detail.started_at, locale)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {detail.finished_at
-                    ? `Selesai ${formatDate(detail.finished_at)}`
-                    : "Belum selesai"}
+                    ? t("execution.finished", {
+                        date: formatDate(detail.finished_at, locale),
+                      })
+                    : t("execution.notFinished")}
                 </p>
               </div>
             </div>
@@ -480,7 +507,7 @@ export default function ExecutionDetail({
                     </h2>
                     {detail.diagnostic.node_name && (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Node: {detail.diagnostic.node_name}
+                        {t("execution.nodeLabel")} {detail.diagnostic.node_name}
                         {detail.diagnostic.node_id
                           ? ` · ${detail.diagnostic.node_id}`
                           : ""}
@@ -491,7 +518,7 @@ export default function ExecutionDetail({
                     </p>
                     <div className="mt-3 rounded-lg border border-border bg-background/60 p-3">
                       <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-                        Cara memperbaiki
+                        {t("execution.fixTitle")}
                       </p>
                       <p className="mt-1 text-sm leading-6 text-foreground">
                         {detail.diagnostic.fix}
@@ -511,11 +538,13 @@ export default function ExecutionDetail({
               <div className="flex flex-col gap-3 border-b border-border px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-foreground">
-                    Timeline langkah
+                    {t("execution.timeline")}
                   </h2>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    {steps.length} dari {detail.steps.length} langkah
-                    ditampilkan.
+                    {t("execution.stepsShown", {
+                      shown: steps.length,
+                      total: detail.steps.length,
+                    })}
                   </p>
                 </div>
 
@@ -525,7 +554,7 @@ export default function ExecutionDetail({
                       htmlFor="step-node-filter"
                       className="text-xs font-normal text-muted-foreground"
                     >
-                      Node
+                      {t("execution.nodeFilter")}
                     </Label>
                     <Select
                       value={nodeFilter}
@@ -540,14 +569,14 @@ export default function ExecutionDetail({
                         <SelectValue>
                           {(value) =>
                             !value || value === "all"
-                              ? "Semua node"
+                              ? t("execution.allNodes")
                               : (nodes.find((node) => node.id === value)
                                   ?.name ?? value)
                           }
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua node</SelectItem>
+                        <SelectItem value="all">{t("execution.allNodes")}</SelectItem>
                         {nodes.map((node) => (
                           <SelectItem key={node.id} value={node.id}>
                             {node.name}
@@ -562,7 +591,7 @@ export default function ExecutionDetail({
                       htmlFor="step-status-filter"
                       className="text-xs font-normal text-muted-foreground"
                     >
-                      Status langkah
+                      {t("execution.stepStatus")}
                     </Label>
                     <Select
                       value={stepStatus}
@@ -577,13 +606,13 @@ export default function ExecutionDetail({
                         className="h-9 w-full dark:bg-input/30"
                       >
                         <SelectValue>
-                          {(value) => stepStatusLabel(value)}
+                          {(value) => stepStatusLabel(value, t)}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua status</SelectItem>
-                        <SelectItem value="success">Sukses</SelectItem>
-                        <SelectItem value="error">Gagal</SelectItem>
+                        <SelectItem value="all">{t("execution.allStatuses")}</SelectItem>
+                        <SelectItem value="success">{t("execution.success")}</SelectItem>
+                        <SelectItem value="error">{t("execution.error")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -599,7 +628,7 @@ export default function ExecutionDetail({
                       setStepStatus("all");
                     }}
                   >
-                    Reset
+                    {t("execution.reset")}
                   </Button>
                 </div>
               </div>
@@ -607,11 +636,10 @@ export default function ExecutionDetail({
               {detail.steps.length === 0 ? (
                 <div className="p-6">
                   <p className="text-sm font-medium text-foreground">
-                    Audit langkah belum tersedia
+                    {t("execution.auditUnavailable")}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Eksekusi ini dibuat sebelum audit per langkah aktif. Log
-                    ringkas di bawah tetap dapat dilihat.
+                    {t("execution.auditUnavailableHint")}
                   </p>
 
                   {detail.logs && detail.logs.length > 0 ? (
@@ -623,11 +651,11 @@ export default function ExecutionDetail({
                         >
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span className="font-medium text-foreground">
-                              {log.name || log.node || "Langkah"}
+                              {log.name || log.node || t("execution.stepFallback")}
                             </span>
-                            <span>{formatDate(log.timestamp ?? null)}</span>
+                            <span>{formatDate(log.timestamp ?? null, locale)}</span>
                             {typeof log.duration_ms === "number" && (
-                              <span>{formatDuration(log.duration_ms)}</span>
+                              <span>{formatDuration(log.duration_ms, t)}</span>
                             )}
                           </div>
                           <p className="mt-1 text-sm text-foreground">
@@ -638,13 +666,13 @@ export default function ExecutionDetail({
                     </ul>
                   ) : (
                     <p className="mt-4 text-sm text-muted-foreground">
-                      Tidak ada log ringkas untuk eksekusi ini.
+                      {t("execution.noSummaryLogs")}
                     </p>
                   )}
                 </div>
               ) : steps.length === 0 ? (
                 <p className="p-6 text-sm text-muted-foreground">
-                  Tidak ada langkah yang cocok dengan filter.
+                  {t("execution.noMatchingSteps")}
                 </p>
               ) : (
                 <ol className="space-y-4 p-5">
@@ -657,14 +685,16 @@ export default function ExecutionDetail({
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
-                <h2 className="text-sm font-semibold text-foreground">Input</h2>
+                <h2 className="text-sm font-semibold text-foreground">
+                  {t("execution.input")}
+                </h2>
                 <div className="mt-3">
                   <JsonBlock value={detail.input} />
                 </div>
               </Card>
               <Card className="p-5">
                 <h2 className="text-sm font-semibold text-foreground">
-                  Output akhir
+                  {t("execution.finalOutput")}
                 </h2>
                 <div className="mt-3">
                   {detail.output ? (
@@ -672,8 +702,8 @@ export default function ExecutionDetail({
                     detail.output.messages.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
                         {detail.status === "escalated"
-                          ? "Percakapan dialihkan ke admin; AI tidak membalas."
-                          : "Workflow selesai tanpa pesan."}
+                          ? t("execution.escalatedNoReply")
+                          : t("execution.finishedNoMessage")}
                       </p>
                     ) : (
                       <JsonBlock
@@ -686,7 +716,7 @@ export default function ExecutionDetail({
                     )
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Tidak ada output.
+                      {t("execution.noOutput")}
                     </p>
                   )}
                 </div>

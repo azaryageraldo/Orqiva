@@ -1,9 +1,9 @@
 {
   "$schema": "https://getcomposer.org/schema.json",
-  "name": "flowpilot/backend",
+  "name": "orqiva/backend",
   "type": "project",
-  "description": "FlowPilot AI workflow automation API",
-  "keywords": ["laravel", "workflow", "api"],
+  "description": "Orqiva AI customer service workflow automation API",
+  "keywords": ["laravel", "workflow", "automation", "ai", "customer-service"],
   "license": "MIT",
   "require": {
     "php": "^8.3",

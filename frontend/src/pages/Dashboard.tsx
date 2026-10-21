@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useI18n, type Language } from "@/lib/i18n";
 import { getWorkflows } from "../services/workflow";
 import {
   getActivity,
@@ -44,20 +45,20 @@ interface DashboardProps {
 
 const HEALTH_STYLES: Record<
   Health,
-  { label: string; dot: string; text: string }
+  { labelKey: string; dot: string; text: string }
 > = {
   online: {
-    label: "Operational",
+    labelKey: "health.operational",
     dot: "bg-emerald-400",
     text: "text-emerald-400",
   },
   offline: {
-    label: "Offline",
+    labelKey: "health.offline",
     dot: "bg-destructive",
     text: "text-destructive",
   },
   checking: {
-    label: "Memeriksa",
+    labelKey: "health.checking",
     dot: "bg-amber-400 animate-pulse",
     text: "text-amber-400",
   },
@@ -65,10 +66,10 @@ const HEALTH_STYLES: Record<
 
 const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-const PERIODS: Array<{ key: TokenUsagePeriod; label: string }> = [
-  { key: "daily", label: "Harian" },
-  { key: "monthly", label: "Bulanan" },
-  { key: "yearly", label: "Tahunan" },
+const PERIODS: Array<{ key: TokenUsagePeriod; labelKey: string }> = [
+  { key: "daily", labelKey: "dashboard.period.daily" },
+  { key: "monthly", labelKey: "dashboard.period.monthly" },
+  { key: "yearly", labelKey: "dashboard.period.yearly" },
 ];
 
 const OPENROUTER_FREE_COLLECTION =
@@ -123,55 +124,74 @@ const FREE_MODELS: Array<{
 
 const STATUS_META: Record<
   ExecutionStatus,
-  { label: string; dot: string; badge: string }
+  { labelKey: string; dot: string; badge: string }
 > = {
   success: {
-    label: "Sukses",
+    labelKey: "dashboard.status.success",
     dot: "bg-emerald-400",
     badge: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
   },
   failed: {
-    label: "Gagal",
+    labelKey: "dashboard.status.failed",
     dot: "bg-destructive",
     badge: "border-destructive/30 bg-destructive/10 text-destructive",
   },
   waiting: {
-    label: "Menunggu",
+    labelKey: "dashboard.status.waiting",
     dot: "bg-amber-400",
     badge: "border-amber-400/30 bg-amber-400/10 text-amber-300",
   },
   running: {
-    label: "Berjalan",
+    labelKey: "dashboard.status.running",
     dot: "bg-primary",
     badge: "border-primary/30 bg-primary/10 text-primary",
   },
   escalated: {
-    label: "Ke admin",
+    labelKey: "dashboard.status.escalated",
     dot: "bg-teal-400",
     badge: "border-teal-400/30 bg-teal-400/10 text-teal-300",
   },
 };
 
-const numberFormat = new Intl.NumberFormat("id-ID");
-const dateFormat = new Intl.DateTimeFormat("id-ID", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+const NUMBER_FORMATS: Record<Language, Intl.NumberFormat> = {
+  id: new Intl.NumberFormat("id-ID"),
+  en: new Intl.NumberFormat("en-US"),
+};
 
-function compactNumber(value: number): string {
-  return new Intl.NumberFormat("id-ID", {
+const COMPACT_FORMATS: Record<Language, Intl.NumberFormat> = {
+  id: new Intl.NumberFormat("id-ID", {
     notation: "compact",
     maximumFractionDigits: 1,
-  }).format(value);
+  }),
+  en: new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }),
+};
+
+const DATE_FORMATS: Record<Language, Intl.DateTimeFormat> = {
+  id: new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }),
+  en: new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }),
+};
+
+function compactNumber(value: number, language: Language): string {
+  return COMPACT_FORMATS[language].format(value);
 }
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, language: Language): string {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
+  return Number.isNaN(date.getTime()) ? "—" : DATE_FORMATS[language].format(date);
 }
 
 export default function Dashboard({ health, onViewActivity }: DashboardProps) {
+  const { language, t } = useI18n();
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [activity, setActivity] = useState<ActivityStats | null>(null);
   const [usage, setUsage] = useState<TokenUsageStats | null>(null);
@@ -191,9 +211,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
         if (workflowsResult.status === "fulfilled") {
           setWorkflows(workflowsResult.value.data);
         } else {
-          setError(
-            "Sebagian data dashboard gagal dimuat. Periksa koneksi API.",
-          );
+          setError(t("dashboard.errorLoad"));
         }
 
         if (activityResult.status === "fulfilled") {
@@ -207,6 +225,8 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
     return () => {
       active = false;
     };
+    // Dashboard data should only load once per page visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -299,14 +319,13 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
               <ActivityIcon className="size-4" />
-              Ringkasan workspace
+              {t("dashboard.eyebrow")}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Dashboard
             </h1>
             <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              Pantau otomatisasi, konsumsi token AI, dan kesehatan eksekusi
-              dalam satu layar.
+              {t("dashboard.subtitle")}
             </p>
           </div>
 
@@ -319,7 +338,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
               className="h-10 px-4"
             >
               <RefreshCw className={loading ? "animate-spin" : undefined} />
-              Segarkan
+              {t("dashboard.refresh")}
             </Button>
             {onViewActivity && (
               <Button
@@ -328,7 +347,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                 className="h-10 px-4"
               >
                 <ActivityIcon />
-                Lihat audit log
+                {t("dashboard.viewAudit")}
               </Button>
             )}
           </div>
@@ -350,7 +369,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
               onClick={() => void reload()}
               className="text-destructive hover:text-destructive"
             >
-              Coba lagi
+              {t("dashboard.retry")}
             </Button>
           </div>
         )}
@@ -361,29 +380,31 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard
             icon={WorkflowIcon}
-            label="Total workflow"
+            label={t("dashboard.totalWorkflows")}
             value={stats.total}
-            caption="Seluruh alur di workspace"
+            caption={t("dashboard.allFlows")}
             tone="primary"
             loading={loading}
           />
           <StatCard
             icon={CheckCircle2}
-            label="Aktif"
+            label={t("dashboard.active")}
             value={stats.active}
             caption={
               stats.total > 0
-                ? `${Math.round((stats.active / stats.total) * 100)}% siap dijalankan`
-                : "Belum ada workflow"
+                ? t("dashboard.readyPercent", {
+                    percent: Math.round((stats.active / stats.total) * 100),
+                  })
+                : t("dashboard.noWorkflows")
             }
             tone="emerald"
             loading={loading}
           />
           <StatCard
             icon={CircleDashed}
-            label="Draft"
+            label={t("dashboard.draft")}
             value={stats.draft}
-            caption="Perlu ditinjau sebelum aktif"
+            caption={t("dashboard.reviewBeforeActive")}
             tone="amber"
             loading={loading}
           />
@@ -393,30 +414,38 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
         <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
           <MetricTile
             icon={Coins}
-            label="Total token"
-            value={compactNumber(usage?.totals.total_tokens ?? 0)}
-            hint={`${PERIODS.find((p) => p.key === period)?.label ?? ""} ini`}
+            label={t("dashboard.totalTokens")}
+            value={compactNumber(usage?.totals.total_tokens ?? 0, language)}
+            hint={t("dashboard.thisPeriod", {
+              period: t(
+                PERIODS.find((p) => p.key === period)?.labelKey ??
+                  "dashboard.period.daily",
+              ).toLowerCase(),
+            })}
             loading={usageLoading}
           />
           <MetricTile
             icon={ActivityIcon}
-            label="Eksekusi"
-            value={compactNumber(usage?.totals.executions ?? 0)}
-            hint="Dijalankan pada periode"
+            label={t("dashboard.executions")}
+            value={compactNumber(usage?.totals.executions ?? 0, language)}
+            hint={t("dashboard.runInPeriod")}
             loading={usageLoading}
           />
           <MetricTile
             icon={TrendingUp}
-            label="Rata-rata token"
-            value={compactNumber(tokensPerRun)}
-            hint="Per eksekusi"
+            label={t("dashboard.avgTokens")}
+            value={compactNumber(tokensPerRun, language)}
+            hint={t("dashboard.perExecution")}
             loading={usageLoading}
           />
           <MetricTile
             icon={Percent}
-            label="Tingkat keberhasilan"
+            label={t("dashboard.successRate")}
             value={`${successRate}%`}
-            hint={`${summary.success} sukses dari ${summary.total}`}
+            hint={t("dashboard.successOfTotal", {
+              success: summary.success,
+              total: summary.total,
+            })}
             loading={loading}
           />
         </div>
@@ -427,10 +456,10 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-foreground">
-                  Penggunaan token
+                  {t("dashboard.tokenUsage")}
                 </h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Distribusi token input dan output AI Agent.
+                  {t("dashboard.tokenUsageDescription")}
                 </p>
               </div>
 
@@ -447,7 +476,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </button>
                 ))}
               </div>
@@ -456,27 +485,30 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             <div className="p-5">
               <div className="mb-5 flex flex-wrap items-end gap-x-8 gap-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total token</p>
+                  <p className="text-sm text-muted-foreground">{t("dashboard.totalTokens")}</p>
                   <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
                     {usageLoading
                       ? "—"
-                      : compactNumber(usage?.totals.total_tokens ?? 0)}
+                      : compactNumber(
+                          usage?.totals.total_tokens ?? 0,
+                          language,
+                        )}
                   </p>
                 </div>
 
                 <Legend
                   color="bg-primary"
-                  label="Input"
+                  label={t("dashboard.input")}
                   value={usage?.totals.prompt_tokens ?? 0}
                 />
                 <Legend
                   color="bg-primary/40"
-                  label="Output"
+                  label={t("dashboard.output")}
                   value={usage?.totals.completion_tokens ?? 0}
                 />
                 <Legend
                   color="bg-muted-foreground/40"
-                  label="Eksekusi"
+                  label={t("dashboard.executions")}
                   value={usage?.totals.executions ?? 0}
                   raw
                 />
@@ -497,10 +529,10 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border p-5">
               <h2 className="text-base font-semibold text-foreground">
-                Hasil eksekusi
+                {t("dashboard.executionResults")}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Komposisi status dari seluruh riwayat.
+                {t("dashboard.executionResultsDescription")}
               </p>
             </div>
             <div className="p-5">
@@ -521,10 +553,10 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             <div className="flex items-center justify-between gap-4 border-b border-border p-5">
               <div>
                 <h2 className="text-base font-semibold text-foreground">
-                  Eksekusi terbaru
+                  {t("dashboard.recentExecutions")}
                 </h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Delapan session terakhir dari seluruh workflow.
+                  {t("dashboard.recentDescription")}
                 </p>
               </div>
               {onViewActivity && (
@@ -535,7 +567,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   onClick={onViewActivity}
                   className="shrink-0 text-muted-foreground"
                 >
-                  Semua
+                  {t("dashboard.all")}
                   <ArrowUpRight />
                 </Button>
               )}
@@ -551,10 +583,10 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   <ActivityIcon className="size-5" />
                 </span>
                 <p className="text-sm font-medium text-foreground">
-                  Belum ada session
+                  {t("dashboard.noSessions")}
                 </p>
                 <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                  Mulai percakapan lewat widget Channel untuk melihat audit log di sini.
+                  {t("dashboard.noSessionsDescription")}
                 </p>
               </div>
             ) : (
@@ -572,21 +604,27 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">
                           {execution.workflow_name ||
-                            `Workflow #${execution.workflow_id}`}
+                            t("dashboard.workflowFallback", {
+                              id: execution.workflow_id,
+                            })}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          Eksekusi #{execution.id} ·{" "}
-                          {formatDate(execution.started_at)}
+                          {t("dashboard.executionHash", {
+                            id: execution.id,
+                          })}{" "}
+                          · {formatDate(execution.started_at, language)}
                         </p>
                       </div>
                       <span
                         className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${meta.badge}`}
                       >
-                        {meta.label}
+                        {t(meta.labelKey)}
                       </span>
                       <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground md:block">
                         {execution.total_tokens > 0
-                          ? `${numberFormat.format(execution.total_tokens)} token`
+                          ? `${NUMBER_FORMATS[language].format(
+                              execution.total_tokens,
+                            )} token`
                           : "—"}
                       </span>
                     </li>
@@ -599,38 +637,38 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border p-5">
               <h2 className="text-base font-semibold text-foreground">
-                Perlu perhatian
+                {t("dashboard.needsAttention")}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Sinyal yang bisa ditindaklanjuti.
+                {t("dashboard.attentionDescription")}
               </p>
             </div>
             <div className="space-y-3 p-5">
               <AttentionRow
                 icon={XCircle}
                 tone="destructive"
-                label="Eksekusi gagal"
+                label={t("dashboard.failedExecutions")}
                 value={summary.failed}
-                hint="Periksa log dan konfigurasi node"
+                hint={t("dashboard.checkLogs")}
               />
               <AttentionRow
                 icon={Clock}
                 tone="amber"
-                label="Menunggu pesan"
+                label={t("dashboard.waitingMessages")}
                 value={summary.waiting}
-                hint="Workflow menunggu pesan pelanggan berikutnya"
+                hint={t("dashboard.waitingMessagesHint")}
               />
               <AttentionRow
                 icon={CircleDashed}
                 tone="muted"
-                label="Workflow draft"
+                label={t("dashboard.draftWorkflows")}
                 value={stats.draft}
-                hint="Belum diaktifkan untuk otomasi"
+                hint={t("dashboard.notActivated")}
               />
               <AttentionRow
                 icon={Layers}
                 tone="primary"
-                label="Rata-rata node"
+                label={t("dashboard.avgNodes")}
                 value={
                   stats.total > 0
                     ? Math.round(
@@ -642,25 +680,29 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                       )
                     : 0
                 }
-                hint="Per workflow"
+                hint={t("dashboard.perWorkflow")}
               />
             </div>
 
             <div className="border-t border-border p-5">
               <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-                Status sistem
+                {t("dashboard.systemStatus")}
               </p>
 
               <div className="mt-3 space-y-2">
                 <SystemRow
-                  label="Backend API"
-                  value={HEALTH_STYLES[health].label}
+                  label={t("settings.backend")}
+                  value={t(HEALTH_STYLES[health].labelKey)}
                   dot={HEALTH_STYLES[health].dot}
                   text={HEALTH_STYLES[health].text}
                 />
                 <SystemRow
-                  label="Pencatatan token"
-                  value={summary.total > 0 ? "Aktif" : "Menunggu data"}
+                  label={t("dashboard.tokenTracking")}
+                  value={
+                    summary.total > 0
+                      ? t("common.active")
+                      : t("dashboard.awaitingData")
+                  }
                   dot={
                     summary.total > 0
                       ? "bg-emerald-400"
@@ -673,7 +715,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   }
                 />
                 <SystemRow
-                  label="Zona waktu"
+                  label={t("dashboard.timezone")}
                   value={TIME_ZONE}
                   dot="bg-muted-foreground/40"
                   text="text-muted-foreground"
@@ -688,11 +730,10 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                Model AI gratis
+                {t("dashboard.freeModels")}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Pilihan model $0 dari OpenRouter untuk prototipe dan produksi
-                ringan.
+                {t("dashboard.freeModelsDescription")}
               </p>
             </div>
 
@@ -710,7 +751,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                 }
               >
                 <BookOpen />
-                Dokumentasi
+                {t("dashboard.docs")}
               </Button>
               <Button
                 variant="outline"
@@ -724,7 +765,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   />
                 }
               >
-                Koleksi gratis
+                {t("dashboard.freeCollection")}
                 <ArrowUpRight />
               </Button>
             </div>
@@ -905,6 +946,8 @@ function SystemRow({
 }
 
 function AutomationPipeline() {
+  const { t } = useI18n();
+
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8">
       <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-[30rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
@@ -912,16 +955,29 @@ function AutomationPipeline() {
       <div className="relative">
         <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
           <Sparkles className="size-4 text-primary" />
-          Alur otomasi
+          {t("dashboard.pipelineTitle")}
         </div>
 
         <div className="mt-6 overflow-x-auto pb-1">
           <div className="flex min-w-[520px] items-center gap-4">
-            <PipelineNode icon={Zap} label="Trigger" hint="Pesan masuk" />
+            <PipelineNode
+              icon={Zap}
+              label={t("dashboard.pipelineTrigger")}
+              hint={t("dashboard.pipelineIncoming")}
+            />
             <PipelineConnector />
-            <PipelineNode icon={Bot} label="AI Agent" hint="Gemini" active />
+            <PipelineNode
+              icon={Bot}
+              label={t("dashboard.pipelineAI")}
+              hint="Gemini"
+              active
+            />
             <PipelineConnector />
-            <PipelineNode icon={Send} label="Send Message" hint="Balasan" />
+            <PipelineNode
+              icon={Send}
+              label={t("dashboard.pipelineSend")}
+              hint={t("dashboard.pipelineReply")}
+            />
           </div>
         </div>
       </div>
@@ -986,6 +1042,8 @@ function Legend({
   value: number;
   raw?: boolean;
 }) {
+  const { language } = useI18n();
+
   return (
     <div>
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -993,26 +1051,31 @@ function Legend({
         {label}
       </p>
       <p className="mt-1 text-lg font-semibold text-foreground">
-        {raw ? numberFormat.format(value) : compactNumber(value)}
+        {raw
+          ? NUMBER_FORMATS[language].format(value)
+          : compactNumber(value, language)}
       </p>
     </div>
   );
 }
 
 function EmptyChart() {
+  const { t } = useI18n();
+
   return (
     <div className="flex h-52 flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
       <p className="text-sm font-medium text-foreground">
-        Belum ada token tercatat
+        {t("dashboard.emptyTokens")}
       </p>
       <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-        Token akan terhitung otomatis setiap kali AI Agent dijalankan.
+        {t("dashboard.emptyTokensDescription")}
       </p>
     </div>
   );
 }
 
 function TokenAreaChart({ series }: { series: TokenUsageBucket[] }) {
+  const { language, t } = useI18n();
   const count = series.length;
   const max = Math.max(1, ...series.map((bucket) => bucket.total_tokens));
   const width = Math.max(560, count * 46);
@@ -1056,7 +1119,7 @@ function TokenAreaChart({ series }: { series: TokenUsageBucket[] }) {
           preserveAspectRatio="none"
           className="h-52 w-full"
           role="img"
-          aria-label="Grafik penggunaan token"
+          aria-label={t("dashboard.chartAria")}
         >
           <defs>
             <linearGradient id="token-prompt" x1="0" y1="0" x2="0" y2="1">
@@ -1117,7 +1180,11 @@ function TokenAreaChart({ series }: { series: TokenUsageBucket[] }) {
               fill="transparent"
             >
               <title>
-                {`${bucket.label} · ${numberFormat.format(bucket.total_tokens)} token · ${bucket.executions} eksekusi`}
+                {t("dashboard.tokenTooltip", {
+                  label: bucket.label,
+                  tokens: NUMBER_FORMATS[language].format(bucket.total_tokens),
+                  executions: bucket.executions,
+                })}
               </title>
             </rect>
           ))}
@@ -1145,6 +1212,7 @@ function StatusDonut({
   summary: ActivityStats["summary"];
   rate: number;
 }) {
+  const { t } = useI18n();
   const segments = (
     [
       { key: "success", value: summary.success, className: "text-emerald-400" },
@@ -1200,7 +1268,9 @@ function StatusDonut({
           <span className="text-3xl font-semibold tracking-tight text-foreground">
             {rate}%
           </span>
-          <span className="text-xs text-muted-foreground">berhasil</span>
+          <span className="text-xs text-muted-foreground">
+            {t("dashboard.successShort")}
+          </span>
         </div>
       </div>
 
@@ -1212,7 +1282,7 @@ function StatusDonut({
           return (
             <li key={key} className="flex items-center gap-3 text-sm">
               <span className={`size-2.5 rounded-full ${meta.dot}`} />
-              <span className="flex-1 text-muted-foreground">{meta.label}</span>
+              <span className="flex-1 text-muted-foreground">{t(meta.labelKey)}</span>
               <span className="font-medium text-foreground">
                 {summary[key]}
               </span>

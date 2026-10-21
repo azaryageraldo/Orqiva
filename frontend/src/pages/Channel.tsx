@@ -39,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/lib/i18n";
 import { getErrorMessage } from "../services/api";
 import {
   getChannel,
@@ -52,40 +53,40 @@ import {
 const CHANNEL_CATALOG = [
   {
     id: "widget",
-    name: "Website Chat Widget",
-    description: "Pasang widget langsung di website dan hubungkan ke workflow entry.",
+    nameKey: "channel.widgetName",
+    descriptionKey: "channel.widgetDescription",
     icon: ChatCircleDots,
     tile: "border-primary/25 bg-primary/10 text-primary",
     active: true,
   },
   {
     id: "telegram",
-    name: "Telegram",
-    description: "Hubungkan bot Telegram untuk menerima pesan pelanggan.",
+    nameKey: "channel.telegram",
+    descriptionKey: "channel.telegramDescription",
     icon: TelegramLogo,
     tile: "border-sky-400/25 bg-sky-400/10 text-sky-400",
     active: false,
   },
   {
     id: "whatsapp",
-    name: "WhatsApp",
-    description: "Balas chat WhatsApp Business langsung dari FlowPilot.",
+    nameKey: "channel.whatsapp",
+    descriptionKey: "channel.whatsappDescription",
     icon: WhatsappLogo,
     tile: "border-emerald-400/25 bg-emerald-400/10 text-emerald-400",
     active: false,
   },
   {
     id: "instagram",
-    name: "Instagram DM",
-    description: "Tangani pesan langsung Instagram dalam satu inbox.",
+    nameKey: "channel.instagram",
+    descriptionKey: "channel.instagramDescription",
     icon: InstagramLogo,
     tile: "border-pink-400/25 bg-pink-400/10 text-pink-400",
     active: false,
   },
   {
     id: "messenger",
-    name: "Messenger",
-    description: "Hubungkan Facebook Messenger untuk percakapan pelanggan.",
+    nameKey: "channel.messenger",
+    descriptionKey: "channel.messengerDescription",
     icon: MessengerLogo,
     tile: "border-blue-400/25 bg-blue-400/10 text-blue-400",
     active: false,
@@ -93,6 +94,7 @@ const CHANNEL_CATALOG = [
 ] as const;
 
 export default function Channel() {
+  const { t } = useI18n();
   const [channel, setChannel] = useState<WidgetChannel | null>(null);
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [name, setName] = useState("");
@@ -107,6 +109,7 @@ export default function Channel() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState(false);
+  const [snippetCopied, setSnippetCopied] = useState(false);
 
   function applyChannel(value: WidgetChannel) {
     setChannel(value);
@@ -128,12 +131,7 @@ export default function Channel() {
       })
       .catch((caught: unknown) => {
         if (active) {
-          setError(
-            getErrorMessage(
-              caught,
-              "Channel gagal dimuat. Periksa koneksi backend.",
-            ),
-          );
+          setError(getErrorMessage(caught, t("channel.errorLoad")));
         }
       })
       .finally(() => {
@@ -143,6 +141,8 @@ export default function Channel() {
     return () => {
       active = false;
     };
+    // Channel data should only load once per page visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const entryWorkflows = useMemo(
@@ -157,6 +157,10 @@ export default function Channel() {
 
   const widgetUrl = channel
     ? `${window.location.origin}/widget/${channel.public_token}`
+    : "";
+
+  const widgetSnippet = channel
+    ? `<script src="${window.location.origin}/orqiva-widget.js" data-orqiva-token="${channel.public_token}" async></script>`
     : "";
 
   async function save() {
@@ -178,11 +182,9 @@ export default function Channel() {
 
       applyChannel(updated);
       setEditing(false);
-      setNotice("Pengaturan widget berhasil diperbarui.");
+      setNotice(t("channel.noticeSaved"));
     } catch (caught) {
-      setError(
-        getErrorMessage(caught, "Channel gagal disimpan. Periksa pengaturan."),
-      );
+      setError(getErrorMessage(caught, t("channel.errorSave")));
     } finally {
       setSaving(false);
     }
@@ -192,7 +194,7 @@ export default function Channel() {
     if (!channel || regenerating) return;
     if (
       !window.confirm(
-        "Ganti token widget? Tautan lama langsung berhenti bekerja dan perlu dipasang ulang.",
+        t("channel.confirmRegenerate"),
       )
     ) {
       return;
@@ -204,9 +206,9 @@ export default function Channel() {
 
     try {
       applyChannel(await regenerateChannelToken());
-      setNotice("Token widget berhasil diperbarui.");
+      setNotice(t("channel.noticeRegenerated"));
     } catch (caught) {
-      setError(getErrorMessage(caught, "Token widget gagal diperbarui."));
+      setError(getErrorMessage(caught, t("channel.errorToken")));
     } finally {
       setRegenerating(false);
     }
@@ -220,7 +222,19 @@ export default function Channel() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      setError("Tautan gagal disalin. Salin URL secara manual.");
+      setError(t("channel.errorCopyUrl"));
+    }
+  }
+
+  async function copyWidgetSnippet() {
+    if (!widgetSnippet) return;
+
+    try {
+      await navigator.clipboard.writeText(widgetSnippet);
+      setSnippetCopied(true);
+      window.setTimeout(() => setSnippetCopied(false), 1800);
+    } catch {
+      setError(t("channel.errorCopySnippet"));
     }
   }
 
@@ -244,14 +258,13 @@ export default function Channel() {
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
               <Globe className="size-4" weight="duotone" />
-              Workspace
+              {t("channel.eyebrow")}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Channel
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Satu widget per akun. Widget memakai workflow entry sebagai titik
-              awal, lalu alur lanjutan dijalankan lewat Go To.
+              {t("channel.subtitle")}
             </p>
           </div>
 
@@ -265,7 +278,7 @@ export default function Channel() {
             <span
               className={`size-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-amber-400"}`}
             />
-            {isActive ? "Widget aktif" : "Widget nonaktif"}
+            {isActive ? t("channel.widgetActive") : t("channel.widgetInactive")}
           </span>
         </div>
 
@@ -281,7 +294,7 @@ export default function Channel() {
               size="sm"
               onClick={() => setError("")}
             >
-              Tutup
+              {t("common.close")}
             </Button>
           </div>
         )}
@@ -302,7 +315,7 @@ export default function Channel() {
               onClick={() => setNotice("")}
               className="text-emerald-200 hover:text-emerald-100"
             >
-              Tutup
+              {t("common.close")}
             </Button>
           </div>
         )}
@@ -311,14 +324,17 @@ export default function Channel() {
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                Saluran yang tersedia
+                {t("channel.catalogTitle")}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Widget website siap dipakai. Kanal lain segera hadir.
+                {t("channel.catalogDescription")}
               </p>
             </div>
             <span className="text-xs text-muted-foreground">
-              1 aktif · 4 coming soon
+              {t("channel.catalogCount", {
+                active: CHANNEL_CATALOG.filter((item) => item.active).length,
+                soon: CHANNEL_CATALOG.filter((item) => !item.active).length,
+              })}
             </span>
           </div>
 
@@ -350,18 +366,18 @@ export default function Channel() {
                     >
                       {item.active
                         ? isActive
-                          ? "Aktif"
-                          : "Nonaktif"
-                        : "Coming soon"}
+                          ? t("channel.cardActive")
+                          : t("channel.cardInactive")
+                        : t("channel.cardComingSoon")}
                     </span>
                   </div>
 
                   <div className="mt-4 min-h-0 flex-1">
                     <h3 className="text-sm font-semibold text-foreground">
-                      {item.name}
+                      {t(item.nameKey)}
                     </h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {item.description}
+                      {t(item.descriptionKey)}
                     </p>
                   </div>
 
@@ -371,8 +387,8 @@ export default function Channel() {
                         type="button"
                         variant="outline"
                         size="icon-sm"
-                        title="Edit widget"
-                        aria-label="Edit website widget"
+                        title={t("channel.editWidgetTitle")}
+                        aria-label={t("channel.editWidgetTitle")}
                         onClick={openEditor}
                       >
                         <PencilSimple size={15} weight="bold" />
@@ -381,8 +397,8 @@ export default function Channel() {
                         type="button"
                         variant="outline"
                         size="icon-sm"
-                        title="Buka widget"
-                        aria-label="Buka widget di tab baru"
+                        title={t("channel.openWidgetTitle")}
+                        aria-label={t("channel.openWidgetTitle")}
                         onClick={() =>
                           window.open(widgetUrl, "_blank", "noopener,noreferrer")
                         }
@@ -394,8 +410,8 @@ export default function Channel() {
                         type="button"
                         variant="outline"
                         size="icon-sm"
-                        title="Ganti token widget"
-                        aria-label="Ganti token widget"
+                        title={t("channel.regenerateTitle")}
+                        aria-label={t("channel.regenerateTitle")}
                         onClick={() => void regenerate()}
                         disabled={regenerating}
                       >
@@ -414,7 +430,7 @@ export default function Channel() {
                       disabled
                       className="mt-4 w-full"
                     >
-                      Coming soon
+                      {t("channel.cardComingSoon")}
                     </Button>
                   )}
                 </div>
@@ -427,16 +443,16 @@ export default function Channel() {
           <Card className="gap-0 py-0">
             <div className="border-b border-border px-5 py-4">
               <h2 className="text-base font-semibold text-foreground">
-                Tautan widget
+                {t("channel.linkTitle")}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Salin URL untuk dipasang atau dibagikan ke pelanggan.
+                {t("channel.linkDescription")}
               </p>
             </div>
             <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3">
                 <p className="break-all font-mono text-xs leading-5 text-muted-foreground">
-                  {widgetUrl || "Token belum tersedia"}
+                  {widgetUrl || t("channel.tokenUnavailable")}
                 </p>
               </div>
               <Button
@@ -447,7 +463,7 @@ export default function Channel() {
                 className="shrink-0"
               >
                 {copied ? <Check /> : <Copy />}
-                {copied ? "Tersalin" : "Salin URL"}
+                {copied ? t("channel.copiedUrl") : t("channel.copyUrl")}
               </Button>
             </div>
           </Card>
@@ -455,41 +471,69 @@ export default function Channel() {
           <Card className="border-primary/20 bg-primary/[0.04] p-5">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <ShieldCheck className="size-4 text-primary" />
-              Alur lintas workflow
+              {t("channel.crossTitle")}
             </div>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Workflow entry dapat memakai Go To untuk berpindah ke workflow
-              lanjutan. Workflow lanjutan tidak perlu Trigger dan tetap berada
-              dalam audit log session yang sama.
+              {t("channel.crossDescription")}
             </p>
           </Card>
         </div>
+
+        <Card className="gap-0 py-0">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                {t("channel.widgetSnippet")}
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {t("channel.widgetSnippetDescription")}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void copyWidgetSnippet()}
+              disabled={!widgetSnippet}
+            >
+              {snippetCopied ? <Check /> : <Copy />}
+              {snippetCopied
+                ? t("channel.snippetCopied")
+                : t("channel.copySnippet")}
+            </Button>
+          </div>
+          <div className="p-5">
+            <pre className="overflow-x-auto rounded-lg border border-border bg-background p-4 font-mono text-xs leading-6 text-muted-foreground">
+              <code>{widgetSnippet || t("channel.tokenUnavailable")}</code>
+            </pre>
+          </div>
+        </Card>
       </div>
 
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit website widget</DialogTitle>
+            <DialogTitle>{t("channel.dialogTitle")}</DialogTitle>
             <DialogDescription>
-              Atur nama, workflow entry, pesan pembuka, dan placeholder widget.
+              {t("channel.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="channel-name">Nama channel</Label>
+                <Label htmlFor="channel-name">{t("channel.nameLabel")}</Label>
                 <Input
                   id="channel-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={120}
-                  placeholder="Website Chat Widget"
+                  placeholder={t("channel.namePlaceholder")}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="channel-workflow">Workflow entry</Label>
+                <Label htmlFor="channel-workflow">{t("channel.workflowLabel")}</Label>
                 <Select
                   value={workflowId || "none"}
                   onValueChange={(value) =>
@@ -500,15 +544,15 @@ export default function Channel() {
                     <SelectValue>
                       {(value) =>
                         !value || value === "none"
-                          ? "Pilih workflow..."
+                          ? t("channel.selectWorkflow")
                           : (entryWorkflows.find(
                               (workflow) => String(workflow.id) === value,
-                            )?.name ?? "Workflow")
+                            )?.name ?? t("channel.workflowFallback"))
                       }
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Belum dipilih</SelectItem>
+                    <SelectItem value="none">{t("channel.noneSelected")}</SelectItem>
                     {entryWorkflows.map((workflow) => (
                       <SelectItem key={workflow.id} value={String(workflow.id)}>
                         {workflow.name}
@@ -519,8 +563,7 @@ export default function Channel() {
                 {entryWorkflows.length === 0 && (
                   <p className="flex items-start gap-2 text-xs leading-5 text-amber-300">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                    Belum ada workflow dengan node Trigger. Tambahkan Trigger
-                    pada workflow entry terlebih dahulu.
+                    {t("channel.noTriggerWarning")}
                   </p>
                 )}
               </div>
@@ -528,9 +571,9 @@ export default function Channel() {
 
             <div className="space-y-2">
               <Label htmlFor="channel-welcome">
-                Pesan pembuka{" "}
+                {t("channel.welcomeLabel")}{" "}
                 <span className="font-normal text-muted-foreground">
-                  (opsional)
+                  {t("channel.optional")}
                 </span>
               </Label>
               <Textarea
@@ -539,18 +582,18 @@ export default function Channel() {
                 value={welcome}
                 onChange={(event) => setWelcome(event.target.value)}
                 maxLength={1000}
-                placeholder="Halo! Ada yang bisa kami bantu?"
+                placeholder={t("channel.welcomePlaceholder")}
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                Kosongkan jika tidak ingin menampilkan pesan pembuka.
+                {t("channel.welcomeHint")}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="channel-placeholder">
-                Placeholder input{" "}
+                {t("channel.placeholderLabel")}{" "}
                 <span className="font-normal text-muted-foreground">
-                  (opsional)
+                  {t("channel.optional")}
                 </span>
               </Label>
               <Input
@@ -558,10 +601,10 @@ export default function Channel() {
                 value={placeholder}
                 onChange={(event) => setPlaceholder(event.target.value)}
                 maxLength={160}
-                placeholder="Tulis pesan..."
+                placeholder={t("channel.placeholderPlaceholder")}
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                Kosongkan untuk memakai placeholder default.
+                {t("channel.placeholderHint")}
               </p>
             </div>
 
@@ -574,11 +617,10 @@ export default function Channel() {
               />
               <span>
                 <span className="block text-sm font-medium text-foreground">
-                  Aktifkan widget publik
+                  {t("channel.activateLabel")}
                 </span>
                 <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                  Widget hanya menerima pesan jika aktif dan sudah memiliki
-                  workflow entry.
+                  {t("channel.activateHint")}
                 </span>
               </span>
             </label>
@@ -591,11 +633,11 @@ export default function Channel() {
               onClick={() => setEditing(false)}
               disabled={saving}
             >
-              Batal
+              {t("common.cancel")}
             </Button>
             <Button type="button" onClick={() => void save()} disabled={saving}>
               {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
-              Update widget
+              {t("channel.updateWidget")}
             </Button>
           </DialogFooter>
         </DialogContent>

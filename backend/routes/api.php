@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiSettingsController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChannelController;
 use App\Http\Controllers\Api\InboxController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PublicChatController;
 use App\Http\Controllers\Api\UsageStatsController;
 use App\Http\Controllers\Api\WorkflowController;
@@ -14,7 +15,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/health', static fn () => response()->json([
         'data' => [
             'status' => 'ok',
-            'service' => 'flowpilot-api',
+            'service' => 'orqiva-api',
         ],
     ]));
 
@@ -34,6 +35,8 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/profile', [ProfileController::class, 'show']);
+        Route::put('/profile', [ProfileController::class, 'update']);
 
         Route::get('/ai-settings', [AiSettingsController::class, 'show']);
         Route::put('/ai-settings', [AiSettingsController::class, 'update']);

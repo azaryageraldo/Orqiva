@@ -25,7 +25,9 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-import flowPilotLogo from "../../assets/flowpilot-logo.png";
+import OrqivaLogo from "@/components/brand/OrqivaLogo";
+import { useI18n } from "@/lib/i18n";
+import { APP_VERSION } from "@/lib/constants";
 
 export type Health = "checking" | "online" | "offline";
 export type NavKey =
@@ -35,7 +37,8 @@ export type NavKey =
   | "channel"
   | "activity"
   | "ai-providers"
-  | "settings";
+  | "settings"
+  | "help";
 
 interface SidebarProps {
   health: Health;
@@ -50,10 +53,10 @@ interface SidebarProps {
   onSettingsClick: () => void;
 }
 
-const HEALTH_STYLES: Record<Health, { dot: string; label: string; text: string }> = {
-  online: { dot: "bg-emerald-400", label: "Operational", text: "text-emerald-400" },
-  offline: { dot: "bg-destructive", label: "Offline", text: "text-destructive" },
-  checking: { dot: "bg-amber-400 animate-pulse", label: "Checking", text: "text-amber-400" },
+const HEALTH_STYLES: Record<Health, { dot: string; text: string }> = {
+  online: { dot: "bg-emerald-400", text: "text-emerald-400" },
+  offline: { dot: "bg-destructive", text: "text-destructive" },
+  checking: { dot: "bg-amber-400 animate-pulse", text: "text-amber-400" },
 };
 
 const MENU_BUTTON =
@@ -61,11 +64,11 @@ const MENU_BUTTON =
 
 const NAV_ITEMS: Array<{
   key: NavKey;
-  label: string;
+  labelKey: string;
   icon: LucideIcon;
 }> = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "workflows", label: "Workflows", icon: Workflow },
+  { key: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { key: "workflows", labelKey: "nav.workflows", icon: Workflow },
 ];
 
 export default function Sidebar({
@@ -80,8 +83,14 @@ export default function Sidebar({
   onHelpClick,
   onSettingsClick,
 }: SidebarProps) {
+  const { t } = useI18n();
   const { isMobile, setOpenMobile } = useSidebar();
   const status = HEALTH_STYLES[health];
+  const statusLabel = {
+    online: t("health.operational"),
+    offline: t("health.offline"),
+    checking: t("health.checking"),
+  }[health];
   const navHandlers: Record<NavKey, () => void> = {
     dashboard: onDashboardClick,
     workflows: onWorkflowsClick,
@@ -90,6 +99,7 @@ export default function Sidebar({
     activity: onActivityClick,
     "ai-providers": onAiProvidersClick,
     settings: onSettingsClick,
+    help: onHelpClick,
   };
   const runNav = (handler: () => void) => () => {
     handler();
@@ -100,16 +110,7 @@ export default function Sidebar({
     <SidebarRoot collapsible="offcanvas">
       <SidebarHeader className="h-16 justify-center border-b border-sidebar-border px-3">
         <a href="/" className="flex items-center gap-3 overflow-hidden">
-          <span className="flex size-9 shrink-0 items-center justify-center">
-            <img
-              src={flowPilotLogo}
-              alt="FlowPilot AI"
-              className="size-9 object-contain"
-            />
-          </span>
-          <span className="truncate text-base font-semibold tracking-tight">
-            FlowPilot<span className="text-sidebar-primary"> AI</span>
-          </span>
+          <OrqivaLogo wordmarkClassName="text-base" />
         </a>
       </SidebarHeader>
 
@@ -125,7 +126,7 @@ export default function Sidebar({
                     className={MENU_BUTTON}
                   >
                     <item.icon />
-                    <span>{item.label}</span>
+                    <span>{t(item.labelKey)}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -137,7 +138,7 @@ export default function Sidebar({
 
         <SidebarGroup className="px-3 py-3">
           <SidebarGroupLabel className="mb-1 h-7 px-3 text-[11px] font-semibold uppercase tracking-[0.12em]">
-            Workspace
+            {t("nav.workspace")}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
@@ -149,7 +150,7 @@ export default function Sidebar({
                     className={MENU_BUTTON}
                   >
                     <item.icon />
-                    <span>{item.label}</span>
+                    <span>{t(item.labelKey)}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -161,7 +162,7 @@ export default function Sidebar({
                   className={MENU_BUTTON}
                 >
                   <Inbox />
-                  <span>Inbox</span>
+                  <span>{t("nav.inbox")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -172,7 +173,7 @@ export default function Sidebar({
                   className={MENU_BUTTON}
                 >
                   <Globe2 />
-                  <span>Channel</span>
+                  <span>{t("nav.channel")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -183,7 +184,7 @@ export default function Sidebar({
                   className={MENU_BUTTON}
                 >
                   <Activity />
-                  <span>Audit Log</span>
+                  <span>{t("nav.activity")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -194,7 +195,7 @@ export default function Sidebar({
 
         <SidebarGroup className="px-3 py-3">
           <SidebarGroupLabel className="mb-1 h-7 px-3 text-[11px] font-semibold uppercase tracking-[0.12em]">
-            Preferences
+            {t("nav.preferences")}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
@@ -205,7 +206,7 @@ export default function Sidebar({
                   className={MENU_BUTTON}
                 >
                   <KeyRound />
-                  <span>API Keys</span>
+                  <span>{t("nav.apiKeys")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -216,14 +217,18 @@ export default function Sidebar({
                   className={MENU_BUTTON}
                 >
                   <Settings />
-                  <span>Settings</span>
+                  <span>{t("nav.settings")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={runNav(onHelpClick)} className={MENU_BUTTON}>
+                <SidebarMenuButton
+                  isActive={activeNav === "help"}
+                  onClick={runNav(onHelpClick)}
+                  className={MENU_BUTTON}
+                >
                   <LifeBuoy />
-                  <span>Help &amp; Support</span>
+                  <span>{t("nav.help")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -240,12 +245,15 @@ export default function Sidebar({
             <span className="flex items-center gap-1.5">
               <span className={`size-1.5 rounded-full ${status.dot}`} />
               <span className={`text-xs font-medium ${status.text}`}>
-                {status.label}
+                {statusLabel}
               </span>
             </span>
           </div>
           <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-            FlowPilot AI · MVP
+            Orqiva v{APP_VERSION}
+          </p>
+          <p className="mt-1 text-[10px] leading-4 text-muted-foreground/60">
+            {t("footer.tagline")}
           </p>
         </div>
       </SidebarFooter>

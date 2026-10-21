@@ -75,6 +75,7 @@ import {
 } from "../services/workflow";
 import type { WorkflowOption } from "../services/channel";
 import { getErrorMessage } from "../services/api";
+import { useI18n } from "@/lib/i18n";
 import {
   getAiSettings,
   type AiModelOption,
@@ -170,41 +171,44 @@ const buttonClass =
 
 const nodeOptions: {
   label: NodeKind;
-  description: string;
+  descriptionKey: string;
   icon: PhosphorIcon;
 }[] = [
-  { label: "Trigger", description: "Start from a chat message", icon: Lightning },
-  { label: "AI Agent", description: "Generate replies and decisions", icon: Robot },
+  { label: "Trigger", descriptionKey: "editor.node.triggerDesc", icon: Lightning },
+  { label: "AI Agent", descriptionKey: "editor.node.agentDesc", icon: Robot },
   {
     label: "Send Message",
-    description: "Reply with one or more bubbles",
+    descriptionKey: "editor.node.outputDesc",
     icon: ChatCircleDots,
   },
   {
     label: "Condition",
-    description: "Branch on a yes/no variable",
+    descriptionKey: "editor.node.conditionDesc",
     icon: GitFork,
   },
   {
     label: "Go To",
-    description: "Jump to another step",
+    descriptionKey: "editor.node.goToDesc",
     icon: ArrowBendUpRight,
   },
   {
     label: "Relocate",
-    description: "Hand the chat to a human admin",
+    descriptionKey: "editor.node.relocateDesc",
     icon: Handshake,
   },
   {
     label: "Stopper",
-    description: "Pause until the next customer message",
+    descriptionKey: "editor.node.stopperDesc",
     icon: PauseCircle,
   },
 ];
 
 const PROMPT_BUILTINS = [
-  { token: "customer_message", description: "Pesan terakhir pelanggan" },
-  { token: "customer_name", description: "Nama pelanggan" },
+  {
+    token: "customer_message",
+    descriptionKey: "editor.token.customerMessage",
+  },
+  { token: "customer_name", descriptionKey: "editor.token.customerName" },
 ];
 
 const geminiModels = [
@@ -338,13 +342,14 @@ const NODE_TONES: Record<NodeKind, { tile: string; glow: string }> = {
 };
 
 function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
+  const { t } = useI18n();
   const deleteNode = useContext(NodeActionsContext);
   const Icon = NODE_ICONS[data.label] ?? WorkflowIcon;
   const tone = NODE_TONES[data.label] ?? NODE_TONES["Send Message"];
   const isCondition = data.label === "Condition";
   const isAgent = data.label === "AI Agent";
   const hasSourceHandle = !["Relocate", "Go To"].includes(data.label);
-  const nodeTitle = data.nodeName?.trim() || "Untitled step";
+  const nodeTitle = data.nodeName?.trim() || t("editor.untitledStep");
   const conditionVariable = data.conditionVariable?.trim();
 
   return (
@@ -361,8 +366,8 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
     >
       <button
         type="button"
-        aria-label={`Delete ${nodeTitle}`}
-        title="Delete node"
+        aria-label={t("editor.deleteNodeNamed", { name: nodeTitle })}
+        title={t("editor.deleteNode")}
         onClick={(event) => {
           event.stopPropagation();
           deleteNode?.(id);
@@ -405,12 +410,12 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
               title={
                 conditionVariable
                   ? `{{${conditionVariable}}}`
-                  : "Pilih variabel boolean"
+                  : t("editor.chooseBoolean")
               }
             >
               {conditionVariable
                 ? `{{${conditionVariable}}}`
-                : "Pilih variabel"}
+                : t("editor.chooseVariable")}
             </p>
           )}
         </div>
@@ -426,7 +431,7 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
             id="true"
             type="source"
             position={Position.Right}
-            title="If match"
+            title={t("editor.ifMatch")}
             style={{ top: "50%", background: "#34d399" }}
             className="!size-2.5 !rounded-full !border-2 !border-background"
           />
@@ -434,7 +439,7 @@ function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
             id="false"
             type="source"
             position={Position.Bottom}
-            title="Else"
+            title={t("editor.else")}
             style={{ left: "50%", background: "#fb7185" }}
             className="!size-2.5 !rounded-full !border-2 !border-background"
           />
@@ -456,8 +461,8 @@ const EDGE_CHIPS: Record<string, string> = {
 };
 
 const EDGE_LABELS: Record<string, string> = {
-  true: "If match",
-  false: "Else",
+  true: "editor.ifMatch",
+  false: "editor.else",
 };
 
 function FlowEdge({
@@ -469,6 +474,7 @@ function FlowEdge({
   targetPosition,
   sourceHandleId,
 }: EdgeProps) {
+  const { t } = useI18n();
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -486,7 +492,8 @@ function FlowEdge({
       : branch === "false"
         ? "#fb7185"
         : "var(--primary)";
-  const label = EDGE_LABELS[branch];
+  const labelKey = EDGE_LABELS[branch];
+  const label = labelKey ? t(labelKey) : undefined;
 
   return (
     <>
@@ -649,6 +656,7 @@ function SmartValueTextarea({
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   showVariables?: boolean;
 }) {
+  const { t } = useI18n();
   const localRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = textareaRef ?? localRef;
   const highlightRef = useRef<HTMLPreElement>(null);
@@ -705,7 +713,7 @@ function SmartValueTextarea({
       {showVariables &&
         (variables.length > 0 ? (
           <div className="mt-3">
-            <p className="text-xs font-medium text-muted-foreground">Available values</p>
+            <p className="text-xs font-medium text-muted-foreground">{t("editor.availableValues")}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {variables.map((variable) => (
                 <button
@@ -722,7 +730,7 @@ function SmartValueTextarea({
           </div>
         ) : (
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            Connect an AI Agent before this step and define its variables to see suggestions.
+            {t("editor.noVariablesSuggestion")}
           </p>
         ))}
     </div>
@@ -733,6 +741,11 @@ export default function WorkflowEditor({
   workflowId,
   onBack,
 }: WorkflowEditorProps) {
+  const { language, t } = useI18n();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const [nodes, setNodes] = useState<FlowNode[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -859,7 +872,7 @@ export default function WorkflowEditor({
 
         console.error("Failed to load workflow:", error);
         setNoticeTone("error");
-        setNotice(getErrorMessage(error, "Workflow gagal dimuat. Coba lagi."));
+        setNotice(getErrorMessage(error, tRef.current("editor.loadError")));
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -900,7 +913,10 @@ export default function WorkflowEditor({
   );
   const promptVariables = useMemo(() => {
     const values = [
-      ...PROMPT_BUILTINS,
+      ...PROMPT_BUILTINS.map((item) => ({
+        token: item.token,
+        description: t(item.descriptionKey),
+      })),
       ...upstreamVariables.map((variable) => ({
         token: variable.token,
         description: variable.description,
@@ -911,7 +927,7 @@ export default function WorkflowEditor({
       (value, index) =>
         values.findIndex((item) => item.token === value.token) === index,
     );
-  }, [upstreamVariables]);
+  }, [upstreamVariables, t]);
   const booleanVariables = upstreamVariables.filter(
     (variable) => variable.type === "boolean",
   );
@@ -926,7 +942,7 @@ export default function WorkflowEditor({
   const goToWorkflowOptions = useMemo<WorkflowOption[]>(() => {
     const currentOption: WorkflowOption = {
       id: currentWorkflowId ?? 0,
-      name: workflowName || "Workflow ini",
+      name: workflowName || t("editor.currentWorkflowName"),
       status: "draft",
       nodes: nodes.map((node) => ({
         id: node.id,
@@ -943,7 +959,7 @@ export default function WorkflowEditor({
         (option) => option.id !== currentWorkflowId,
       ),
     ];
-  }, [currentWorkflowId, nodes, workflowName, workflowOptions]);
+  }, [currentWorkflowId, nodes, workflowName, workflowOptions, t]);
 
   const selectedGoToWorkflowId = Number(
     inspectorData?.targetWorkflowId || currentWorkflowId || 0,
@@ -1028,21 +1044,21 @@ export default function WorkflowEditor({
     const defaults: Record<NodeKind, AutomationNodeData> = {
       Trigger: {
         label,
-        nodeName: "Incoming message",
-        description: "Start when a visitor sends a message",
+        nodeName: t("editor.default.triggerName"),
+        description: t("editor.default.triggerDescription"),
         triggerType: "chat_message",
       },
       "AI Agent": {
         label,
-        nodeName: "AI response",
-        description: "Generate an AI response",
-        systemMessage: "You are a helpful assistant.",
+        nodeName: t("editor.default.agentName"),
+        description: t("editor.default.agentDescription"),
+        systemMessage: t("editor.default.agentSystem"),
         variables: "customer_message",
         variableDefinitions: [
           {
             name: "customer_message",
             type: "string",
-            description: "Message sent by the visitor",
+            description: t("editor.default.customerMessageDescription"),
             sourceValue: "input.message",
           },
         ],
@@ -1051,7 +1067,7 @@ export default function WorkflowEditor({
             name: "respond",
             type: "array",
             itemField: "replies",
-            description: "Balasan AI; setiap item dikirim sebagai bubble",
+            description: t("editor.default.outputDescription"),
           },
         ],
         provider: defaultAiModel.provider,
@@ -1062,34 +1078,34 @@ export default function WorkflowEditor({
       },
       "Send Message": {
         label,
-        nodeName: "Send message",
-        description: "Send a message to the visitor",
+        nodeName: t("editor.default.sendName"),
+        description: t("editor.default.sendDescription"),
         messageMode: "template",
         messageTemplate: "{{ai-response.respond.replies}}",
       },
       Condition: {
         label,
-        nodeName: "Check condition",
-        description: "Branch on a yes/no variable",
+        nodeName: t("editor.default.conditionName"),
+        description: t("editor.default.conditionDescription"),
         conditionVariable: "",
       },
       "Go To": {
         label,
-        nodeName: "Go to step",
-        description: "Jump to another step",
+        nodeName: t("editor.default.goToName"),
+        description: t("editor.default.goToDescription"),
         targetNodeId: "",
         endFlow: false,
         setStartingPoint: false,
       },
       Relocate: {
         label,
-        nodeName: "Handoff to admin",
-        description: "Escalate the conversation to a human",
+        nodeName: t("editor.default.relocateName"),
+        description: t("editor.default.relocateDescription"),
       },
       Stopper: {
         label,
-        nodeName: "Wait for next message",
-        description: "Wait for the next customer message",
+        nodeName: t("editor.default.stopperName"),
+        description: t("editor.default.stopperDescription"),
       },
     };
 
@@ -1193,7 +1209,7 @@ export default function WorkflowEditor({
     setDraftData(null);
     setShowLibrary(false);
     setNoticeTone("success");
-    setNotice("Changes applied to the canvas. Save the workflow to keep them.");
+    setNotice(t("editor.changesApplied"));
   }
 
   function cancelNodeChanges() {
@@ -1224,9 +1240,11 @@ export default function WorkflowEditor({
 
     if (triggerNodes.length > 1) {
       issues.push({
-        title: "Trigger lebih dari satu",
-        message: `Workflow ini memiliki ${triggerNodes.length} Trigger. Hanya workflow entry yang boleh memiliki satu Trigger.`,
-        fix: "Hapus Trigger tambahan. Workflow lanjutan cukup dimasuki lewat Go To dan tidak perlu Trigger.",
+        title: t("editor.validation.multipleTrigger.title"),
+        message: t("editor.validation.multipleTrigger.message", {
+          count: triggerNodes.length,
+        }),
+        fix: t("editor.validation.multipleTrigger.fix"),
       });
     }
 
@@ -1234,9 +1252,11 @@ export default function WorkflowEditor({
       if (!edges.some((edge) => edge.source === node.id)) {
         issues.push({
           nodeId: node.id,
-          title: "Trigger belum tersambung",
-          message: `Node "${node.data.nodeName || "Trigger"}" tidak memiliki koneksi keluar.`,
-          fix: "Hubungkan port Trigger ke node pertama, misalnya AI Agent.",
+          title: t("editor.validation.triggerUnconnected.title"),
+          message: t("editor.validation.triggerUnconnected.message", {
+            name: node.data.nodeName || "Trigger",
+          }),
+          fix: t("editor.validation.triggerUnconnected.fix"),
         });
       }
     }
@@ -1252,9 +1272,13 @@ export default function WorkflowEditor({
         if (existingAgent) {
           issues.push({
             nodeId: node.id,
-            title: "Nama AI Agent bentrok",
-            message: `Namespace "${namespace}" dipakai oleh "${existingAgent}" dan "${nodeName}".`,
-            fix: "Beri nama unik pada setiap AI Agent agar smart value tidak tercampur.",
+            title: t("editor.validation.agentConflict.title"),
+            message: t("editor.validation.agentConflict.message", {
+              namespace,
+              first: existingAgent,
+              second: nodeName,
+            }),
+            fix: t("editor.validation.agentConflict.fix"),
           });
         } else {
           agentNamespaces.set(namespace, nodeName);
@@ -1263,9 +1287,11 @@ export default function WorkflowEditor({
         if (!String(node.data.systemMessage ?? "").trim()) {
           issues.push({
             nodeId: node.id,
-            title: "Prompt AI Agent kosong",
-            message: `AI Agent "${nodeName}" belum memiliki system prompt.`,
-            fix: "Isi prompt dengan peran, tujuan, gaya bahasa, dan aturan kapan harus mengisi variabel.",
+            title: t("editor.validation.emptyPrompt.title"),
+            message: t("editor.validation.emptyPrompt.message", {
+              name: nodeName,
+            }),
+            fix: t("editor.validation.emptyPrompt.fix"),
           });
         }
 
@@ -1278,9 +1304,12 @@ export default function WorkflowEditor({
           if (!VARIABLE_NAME_PATTERN.test(name)) {
             issues.push({
               nodeId: node.id,
-              title: "Nama variabel tidak valid",
-              message: `Variabel "${name}" pada "${nodeName}" mengandung spasi atau karakter yang tidak didukung.`,
-              fix: "Gunakan huruf, angka, dan underscore tanpa spasi. Contoh: mau_beli. Samakan nama di prompt AI dan Condition.",
+              title: t("editor.validation.invalidVariable.title"),
+              message: t("editor.validation.invalidVariable.message", {
+                name,
+                node: nodeName,
+              }),
+              fix: t("editor.validation.invalidVariable.fix"),
             });
             continue;
           }
@@ -1288,9 +1317,12 @@ export default function WorkflowEditor({
           if (seen.has(name)) {
             issues.push({
               nodeId: node.id,
-              title: "Nama variabel duplikat",
-              message: `Variabel "${name}" muncul lebih dari sekali pada "${nodeName}".`,
-              fix: "Ganti salah satu nama agar setiap variabel memiliki nama unik.",
+              title: t("editor.validation.duplicateVariable.title"),
+              message: t("editor.validation.duplicateVariable.message", {
+                name,
+                node: nodeName,
+              }),
+              fix: t("editor.validation.duplicateVariable.fix"),
             });
           }
 
@@ -1303,9 +1335,12 @@ export default function WorkflowEditor({
           ) {
             issues.push({
               nodeId: node.id,
-              title: "Nama item list tidak valid",
-              message: `Item field "${variable.itemField}" pada variabel "${name}" mengandung karakter yang tidak didukung.`,
-              fix: "Gunakan nama tanpa spasi, misalnya replies atau daftar_produk.",
+              title: t("editor.validation.invalidItemField.title"),
+              message: t("editor.validation.invalidItemField.message", {
+                field: variable.itemField,
+                name,
+              }),
+              fix: t("editor.validation.invalidItemField.fix"),
             });
           }
         }
@@ -1317,16 +1352,21 @@ export default function WorkflowEditor({
         if (!field) {
           issues.push({
             nodeId: node.id,
-            title: "Condition belum memilih variabel",
-            message: `Condition "${nodeName}" tidak memiliki variabel boolean.`,
-            fix: "Pilih variabel bertipe Yes-No dari AI Agent yang terhubung sebelum Condition.",
+            title: t("editor.validation.conditionNoVariable.title"),
+            message: t("editor.validation.conditionNoVariable.message", {
+              name: nodeName,
+            }),
+            fix: t("editor.validation.conditionNoVariable.fix"),
           });
         } else if (!SMART_PATH_PATTERN.test(field)) {
           issues.push({
             nodeId: node.id,
-            title: "Condition memakai smart value tidak valid",
-            message: `Condition "${nodeName}" memakai "${field}". Gunakan format {{nama-agent.variabel}}.`,
-            fix: "Pilih smart value dari daftar AI Agent terdekat, misalnya rekomendasi-penawaran.mau_beli.",
+            title: t("editor.validation.conditionInvalidSmart.title"),
+            message: t("editor.validation.conditionInvalidSmart.message", {
+              name: nodeName,
+              field,
+            }),
+            fix: t("editor.validation.conditionInvalidSmart.fix"),
           });
         } else {
           const available = getUpstreamAgentVariables(candidates, edges, node.id)
@@ -1336,9 +1376,15 @@ export default function WorkflowEditor({
           if (available.length > 0 && !available.includes(field)) {
             issues.push({
               nodeId: node.id,
-              title: "Condition memakai variabel yang tidak tersedia",
-              message: `Variabel "${field}" tidak dihasilkan AI Agent sebelum Condition "${nodeName}".`,
-              fix: `Hubungkan AI Agent yang menghasilkan ${field}, atau pilih salah satu smart value: ${available.join(", ")}.`,
+              title: t("editor.validation.conditionUnavailable.title"),
+              message: t("editor.validation.conditionUnavailable.message", {
+                field,
+                name: nodeName,
+              }),
+              fix: t("editor.validation.conditionUnavailable.fix", {
+                field,
+                values: available.join(", "),
+              }),
             });
           }
         }
@@ -1348,9 +1394,11 @@ export default function WorkflowEditor({
         if (!String(node.data.messageTemplate ?? "").trim()) {
           issues.push({
             nodeId: node.id,
-            title: "Pesan kosong",
-            message: `Send Message "${nodeName}" belum memiliki isi pesan.`,
-            fix: "Tulis pesan, atau sisipkan variabel seperti {{respond.replies}} dari AI Agent.",
+            title: t("editor.validation.emptyMessage.title"),
+            message: t("editor.validation.emptyMessage.message", {
+              name: nodeName,
+            }),
+            fix: t("editor.validation.emptyMessage.fix"),
           });
         }
       }
@@ -1364,9 +1412,11 @@ export default function WorkflowEditor({
         if (!targetNodeId) {
           issues.push({
             nodeId: node.id,
-            title: "Go To belum memilih tujuan",
-            message: `Node Go To "${nodeName}" belum memiliki node tujuan.`,
-            fix: "Pilih workflow dan node tujuan, lalu simpan kembali.",
+            title: t("editor.validation.goToNoTarget.title"),
+            message: t("editor.validation.goToNoTarget.message", {
+              name: nodeName,
+            }),
+            fix: t("editor.validation.goToNoTarget.fix"),
           });
           continue;
         }
@@ -1378,9 +1428,11 @@ export default function WorkflowEditor({
         if (!targetWorkflow) {
           issues.push({
             nodeId: node.id,
-            title: "Workflow tujuan tidak ditemukan",
-            message: `Go To "${nodeName}" menunjuk workflow yang tidak tersedia di akun ini.`,
-            fix: "Pilih ulang workflow tujuan. Pastikan workflow tersebut masih ada dan milik akun yang sama.",
+            title: t("editor.validation.goToWorkflowMissing.title"),
+            message: t("editor.validation.goToWorkflowMissing.message", {
+              name: nodeName,
+            }),
+            fix: t("editor.validation.goToWorkflowMissing.fix"),
           });
           continue;
         }
@@ -1394,9 +1446,12 @@ export default function WorkflowEditor({
         if (!targetNodes.some((target) => target.id === targetNodeId)) {
           issues.push({
             nodeId: node.id,
-            title: "Node tujuan Go To tidak ditemukan",
-            message: `Node "${targetNodeId}" tidak ada di workflow "${targetWorkflow.name}".`,
-            fix: "Pilih ulang node tujuan. Jika node diganti nama atau dihapus, perbarui Go To.",
+            title: t("editor.validation.goToNodeMissing.title"),
+            message: t("editor.validation.goToNodeMissing.message", {
+              node: targetNodeId,
+              workflow: targetWorkflow.name,
+            }),
+            fix: t("editor.validation.goToNodeMissing.fix"),
           });
         }
 
@@ -1406,9 +1461,11 @@ export default function WorkflowEditor({
         ) {
           issues.push({
             nodeId: node.id,
-            title: "Go To menunjuk dirinya sendiri",
-            message: `Node Go To "${nodeName}" akan berulang tanpa kemajuan.`,
-            fix: "Pilih node lain setelah Go To, atau pindah ke workflow lain.",
+            title: t("editor.validation.goToSelf.title"),
+            message: t("editor.validation.goToSelf.message", {
+              name: nodeName,
+            }),
+            fix: t("editor.validation.goToSelf.fix"),
           });
         }
       }
@@ -1420,7 +1477,7 @@ export default function WorkflowEditor({
   async function saveWorkflow(): Promise<boolean> {
     if (!workflowId) {
       setNoticeTone("error");
-      setNotice("Simpan workflow melalui halaman Workflows terlebih dahulu.");
+      setNotice(t("editor.saveFirst"));
       return false;
     }
 
@@ -1458,12 +1515,12 @@ export default function WorkflowEditor({
       setShowLibrary(false);
       setValidationIssues([]);
       setNoticeTone("success");
-      setNotice("Workflow saved.");
+      setNotice(t("editor.savedNotice"));
       return true;
     } catch (error) {
       console.error("Failed to save workflow:", error);
       setNoticeTone("error");
-      setNotice(getErrorMessage(error, "Workflow gagal disimpan. Coba lagi."));
+      setNotice(getErrorMessage(error, t("editor.saveError")));
       return false;
     } finally {
       setIsSaving(false);
@@ -1489,24 +1546,24 @@ export default function WorkflowEditor({
             className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}
           >
             <ArrowLeft size={16} />
-            <span className="hidden sm:inline">All workflows</span>
+            <span className="hidden sm:inline">{t("editor.backAll")}</span>
           </button>
 
           <div className="h-8 w-px bg-muted" />
 
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-foreground">
-              {workflowName || "Workflow editor"}
+              {workflowName || t("editor.title")}
             </h1>
             <p className="mt-1 truncate text-xs text-muted-foreground">
-              Workflow canvas · {nodes.length} steps
+              {t("editor.canvasMeta", { count: nodes.length })}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
             <span className={`size-1.5 rounded-full ${isDirty ? "bg-amber-400" : "bg-emerald-400"}`} />
-            {isLoading ? "Loading" : isDirty ? "Unsaved changes" : "Saved"}
+            {isLoading ? t("editor.loading") : isDirty ? t("editor.unsaved") : t("editor.saved")}
           </span>
           <button
             type="button"
@@ -1515,7 +1572,7 @@ export default function WorkflowEditor({
             className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}
           >
             <Save size={16} />
-            {isSaving ? "Saving..." : "Save workflow"}
+            {isSaving ? t("editor.saving") : t("editor.save")}
           </button>
         </div>
       </header>
@@ -1532,14 +1589,13 @@ export default function WorkflowEditor({
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-destructive">
-                  {validationIssues.length} masalah perlu diperbaiki sebelum
-                  menyimpan
+                  {t("editor.issues", { count: validationIssues.length })}
                 </p>
                 <button
                   type="button"
                   onClick={() => setValidationIssues([])}
                   className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Tutup daftar masalah"
+                  aria-label={t("editor.closeIssues")}
                 >
                   <X size={14} />
                 </button>
@@ -1582,20 +1638,20 @@ export default function WorkflowEditor({
             }}
             className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-lg border border-border bg-card/95 px-3 py-2 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur transition hover:border-ring/50 hover:bg-muted hover:text-foreground"
             aria-expanded={showLibrary}
-            aria-label={showLibrary ? "Close node library" : "Open node library"}
+            aria-label={showLibrary ? t("editor.closeLibrary") : t("editor.openLibrary")}
           >
             {showLibrary ? <X size={15} /> : <ListPlus size={15} />}
-            {showLibrary ? "Close library" : "Node library"}
+            {showLibrary ? t("editor.closeLibraryShort") : t("editor.nodeLibrary")}
           </button>
           {isLoading && (
             <div role="status" className="absolute left-4 top-4 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">
-              Loading workflow...
+              {t("editor.loadingWorkflow")}
             </div>
           )}
           {!isLoading && !selectedNode && (
             <div className="pointer-events-none absolute left-4 top-4 z-10 hidden items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground shadow-lg sm:flex">
               <MousePointer2 size={14} className="text-muted-foreground" />
-              Drag between ports to connect steps · Select a node to configure it
+              {t("editor.canvasHint")}
             </div>
           )}
 
@@ -1652,17 +1708,17 @@ export default function WorkflowEditor({
           <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-border bg-card p-4">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Builder</p>
-                <h2 className="mt-2 text-base font-semibold text-foreground">Node library</h2>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose a step to add to your workflow.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("editor.builder")}</p>
+                <h2 className="mt-2 text-base font-semibold text-foreground">{t("editor.nodeLibrary")}</h2>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("editor.chooseStep")}</p>
               </div>
-              <button type="button" onClick={() => setShowLibrary(false)} aria-label="Close node library" className="rounded-lg p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground">
+              <button type="button" onClick={() => setShowLibrary(false)} aria-label={t("editor.closeLibrary")} className="rounded-lg p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground">
                 <X size={16} />
               </button>
             </div>
 
             <div className="grid gap-2">
-              {nodeOptions.map(({ label, description, icon: Icon }) => (
+              {nodeOptions.map(({ label, descriptionKey, icon: Icon }) => (
                 <button
                   type="button"
                   key={label}
@@ -1678,7 +1734,7 @@ export default function WorkflowEditor({
                       {label}
                     </span>
                     <span className="mt-1 block truncate text-[10px] leading-4 text-muted-foreground">
-                      {description}
+                      {t(descriptionKey)}
                     </span>
                   </span>
 
@@ -1690,11 +1746,10 @@ export default function WorkflowEditor({
             <div className="mt-5 rounded-xl border border-border bg-muted/40 p-3">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Webhook size={14} className="text-primary" />
-                Chat Widget
+                {t("editor.chatWidget")}
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                The Trigger starts the workflow when a customer message arrives
-                from the chat widget.
+                {t("editor.triggerWidgetHint")}
               </p>
             </div>
           </aside>
@@ -1710,7 +1765,7 @@ export default function WorkflowEditor({
                 </span>
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">
-                    Node settings
+                    {t("editor.nodeSettings")}
                   </h2>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {inspectorData?.label}
@@ -1721,7 +1776,7 @@ export default function WorkflowEditor({
               <button
                 type="button"
                 onClick={saveNodeChanges}
-                aria-label="Close node settings"
+                aria-label={t("editor.closeNodeSettings")}
                 className="rounded-lg p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               >
                 <X size={16} />
@@ -1731,17 +1786,17 @@ export default function WorkflowEditor({
               {inspectorData?.label !== "AI Agent" && (
                 <>
                   <label className="block">
-                    <span className={labelClass}>Node name</span>
+                    <span className={labelClass}>{t("editor.nodeName")}</span>
                     <input
                       className={inputClass}
                       value={String(inspectorData?.nodeName ?? inspectorData?.label ?? "")}
                       onChange={(event) => updateNode({ nodeName: event.target.value })}
-                      placeholder="Give this node a name"
-                      aria-label="Node name"
+                      placeholder={t("editor.giveName")}
+                      aria-label={t("editor.nodeName")}
                     />
                   </label>
                   <label className="block">
-                    <span className={labelClass}>Description</span>
+                    <span className={labelClass}>{t("editor.description")}</span>
                     <textarea
                       rows={2}
                       maxLength={500}
@@ -1756,47 +1811,40 @@ export default function WorkflowEditor({
                 <div className="space-y-5">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Incoming chat message
+                      {t("editor.triggerTitle")}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Workflow dimulai saat pelanggan mengirim pesan.
+                      {t("editor.triggerDescription")}
                     </p>
                   </div>
 
                   <div className={`${panelClass} p-3.5`}>
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <ChatCircleDots size={16} className="text-primary" />
-                      Customer message
+                      {t("editor.customerMessage")}
                     </div>
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      Pesan pelanggan otomatis tersedia di AI Agent sebagai{" "}
-                      <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
-                        {"{{customer_message}}"}
-                      </code>{" "}
-                      dan nama pengunjung sebagai{" "}
-                      <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
-                        {"{{customer_name}}"}
-                      </code>
-                      .
+                      {t("editor.triggerTokenHint", {
+                        message: "{{customer_message}}",
+                        name: "{{customer_name}}",
+                      })}
                     </p>
                   </div>
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Trigger hanya dipakai workflow entry. Workflow lanjutan
-                    tidak perlu Trigger dan dimasuki lewat Go To lintas
-                    workflow.
+                    {t("editor.triggerNote")}
                   </p>
                 </div>
               )}
               {inspectorData?.label === "AI Agent" && (
                 <div className="space-y-5">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">AI Agent settings</p>
+                    <p className="text-sm font-semibold text-foreground">{t("editor.aiSettings")}</p>
                     <div className="mt-4 grid grid-cols-3 rounded-lg border border-border bg-muted/40 p-1">
                       {([
-                        ["node", "Node"],
-                        ["prompt", "Prompt"],
-                        ["variables", "Variables"],
+                        ["node", t("editor.tabNode")],
+                        ["prompt", t("editor.tabPrompt")],
+                        ["variables", t("editor.tabVariables")],
                       ] as const).map(([tab, label]) => (
                         <button
                           key={tab}
@@ -1821,15 +1869,18 @@ export default function WorkflowEditor({
                                 weight="duotone"
                                 className="text-violet-300"
                               />
-                              System prompt
+                              {t("editor.systemPrompt")}
                             </p>
                             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              Tetapkan peran, gaya bahasa, dan batasan AI.
+                              {t("editor.systemPromptHint")}
                             </p>
                           </div>
                           <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2 py-1 text-[10px] text-muted-foreground">
-                            {String(inspectorData?.systemMessage ?? "").length.toLocaleString("id-ID")}{" "}
-                            karakter
+                            {t("editor.characters", {
+                              count: String(
+                                inspectorData?.systemMessage ?? "",
+                              ).length.toLocaleString(language === "en" ? "en-US" : "id-ID"),
+                            })}
                           </span>
                         </div>
 
@@ -1843,14 +1894,14 @@ export default function WorkflowEditor({
                             }
                             variables={promptVariables}
                             showVariables={false}
-                            placeholder="You are a helpful assistant. Answer clearly, stay on brand, and ask a follow-up question when needed..."
+                            placeholder={t("editor.systemPromptPlaceholder")}
                           />
                         </div>
                       </div>
 
                       <div className={`${panelClass} p-3.5`}>
                         <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-                          Sisipkan nilai dinamis
+                          {t("editor.insertDynamic")}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {promptVariables.map((variable) => (
@@ -1866,7 +1917,7 @@ export default function WorkflowEditor({
                           ))}
                         </div>
                         <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                          Klik token untuk menyisipkannya di posisi kursor.
+                          {t("editor.clickToken")}
                         </p>
                       </div>
 
@@ -1877,9 +1928,7 @@ export default function WorkflowEditor({
                           className="mt-0.5 shrink-0 text-primary"
                         />
                         <p>
-                          Sebutkan tujuan, nada bicara, dan hal yang harus
-                          dihindari. Prompt panjang tetap nyaman dibaca karena
-                          panel bisa digulir.
+                          {t("editor.promptTip")}
                         </p>
                       </div>
                     </div>
@@ -1891,14 +1940,13 @@ export default function WorkflowEditor({
                         <div>
                           <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
                             <Variable size={15} className="text-primary" />
-                            Output variables
+                            {t("editor.outputVariables")}
                             <span className="rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                               {(inspectorData?.outputVariables ?? []).length}
                             </span>
                           </p>
                           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            Nilai yang diisi AI otomatis untuk dipakai node
-                            berikutnya.
+                            {t("editor.outputVariablesHint")}
                           </p>
                         </div>
                         <button
@@ -1907,7 +1955,7 @@ export default function WorkflowEditor({
                           onClick={addOutputVariable}
                         >
                           <Plus size={13} />
-                          Add
+                          {t("editor.add")}
                         </button>
                       </div>
 
@@ -1940,7 +1988,7 @@ export default function WorkflowEditor({
                                 </div>
                                 <button
                                   type="button"
-                                  aria-label="Remove variable"
+                                  aria-label={t("editor.removeVariable")}
                                   onClick={() => removeOutputVariable(index)}
                                   className="rounded p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
                                 >
@@ -1966,8 +2014,7 @@ export default function WorkflowEditor({
                                     />
                                     {name && !VARIABLE_NAME_PATTERN.test(name) && (
                                       <span className="mt-1 block text-[10px] leading-4 text-destructive">
-                                        Tanpa spasi. Gunakan huruf, angka, dan
-                                        underscore, misalnya mau_beli.
+                                        {t("editor.variableNameError")}
                                       </span>
                                     )}
                                   </label>
@@ -1992,12 +2039,12 @@ export default function WorkflowEditor({
                                         });
                                       }}
                                     >
-                                      <option value="string">Text</option>
+                                      <option value="string">{t("editor.typeText")}</option>
                                       <option value="boolean">
-                                        Yes-No (Condition)
+                                        {t("editor.typeBoolean")}
                                       </option>
                                       <option value="array">
-                                        List (bubbles)
+                                        {t("editor.typeArray")}
                                       </option>
                                     </select>
                                   </label>
@@ -2048,7 +2095,7 @@ export default function WorkflowEditor({
                                         description: event.target.value,
                                       })
                                     }
-                                    placeholder="Jawaban AI untuk pelanggan"
+                                    placeholder={t("editor.variableDescriptionPlaceholder")}
                                   />
                                 </label>
                               </div>
@@ -2064,11 +2111,10 @@ export default function WorkflowEditor({
                             className="mx-auto text-muted-foreground"
                           />
                           <p className="mt-2 text-sm font-medium text-foreground">
-                            Belum ada variabel
+                            {t("editor.noVariables")}
                           </p>
                           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            Tambahkan variabel agar AI bisa mengisi nilai untuk
-                            node berikutnya.
+                            {t("editor.noVariablesHint")}
                           </p>
                           <button
                             type="button"
@@ -2076,35 +2122,34 @@ export default function WorkflowEditor({
                             className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-muted/60"
                           >
                             <Plus size={13} />
-                            Add variable
+                            {t("editor.addVariable")}
                           </button>
                         </div>
                       )}
 
                       <p className="text-[11px] leading-5 text-muted-foreground">
-                        Gunakan tipe List untuk membalas dengan beberapa bubble
-                        chat sekaligus.
+                        {t("editor.listHint")}
                       </p>
                     </div>
                   )}
 
                   {agentTab === "node" && <div className="space-y-5">
                     <label className="block">
-                      <span className={labelClass}>Node name</span>
+                      <span className={labelClass}>{t("editor.nodeName")}</span>
                       <input
                         className={inputClass}
                         value={String(inspectorData?.nodeName ?? "")}
                         onChange={(event) => updateNode({ nodeName: event.target.value })}
-                        placeholder="e.g. Answer customer questions"
+                        placeholder={t("editor.nodeNameExample")}
                       />
                     </label>
 
                     <div className={`${panelClass} p-4`}>
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium text-foreground">AI model</p>
+                          <p className="text-sm font-medium text-foreground">{t("editor.aiModel")}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Model mengikuti API key yang tersimpan di menu API Keys.
+                            {t("editor.aiModelHint")}
                           </p>
                         </div>
                         <span className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 text-xs font-medium text-primary">
@@ -2145,15 +2190,14 @@ export default function WorkflowEditor({
                       </select>
                       {aiModels.length === 0 && (
                         <p className="mt-2 text-xs leading-5 text-amber-300/90">
-                          Belum ada API key tersimpan. Daftar default Gemini
-                          masih bisa dipakai, atau atur provider di menu API Keys.
+                          {t("editor.noApiKey")}
                         </p>
                       )}
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block">
-                        <span className={labelClass}>Verbosity</span>
+                        <span className={labelClass}>{t("editor.verbosity")}</span>
                         <select
                           className={inputClass}
                           value={String(inspectorData?.verbosity ?? "concise")}
@@ -2164,17 +2208,17 @@ export default function WorkflowEditor({
                             })
                           }
                         >
-                          <option value="concise">Concise · singkat</option>
-                          <option value="balanced">Balanced · seimbang</option>
-                          <option value="detailed">Detailed · detail</option>
+                          <option value="concise">{t("editor.verbosityConcise")}</option>
+                          <option value="balanced">{t("editor.verbosityBalanced")}</option>
+                          <option value="detailed">{t("editor.verbosityDetailed")}</option>
                         </select>
                         <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                          Concise membatasi jawaban agar tidak bertele-tele.
+                          {t("editor.verbosityHint")}
                         </span>
                       </label>
 
                       <label className="block">
-                        <span className={labelClass}>Context memory</span>
+                        <span className={labelClass}>{t("editor.contextMemory")}</span>
                         <select
                           className={inputClass}
                           value={String(inspectorData?.contextMessages ?? 10)}
@@ -2184,22 +2228,25 @@ export default function WorkflowEditor({
                             })
                           }
                         >
-                          <option value="0">Tanpa riwayat</option>
-                          <option value="4">4 pesan terakhir</option>
-                          <option value="8">8 pesan terakhir</option>
-                          <option value="12">12 pesan terakhir</option>
-                          <option value="20">20 pesan terakhir</option>
+                          <option value="0">{t("editor.contextNone")}</option>
+                          <option value="4">{t("editor.contextMessages", { count: 4 })}</option>
+                          <option value="8">{t("editor.contextMessages", { count: 8 })}</option>
+                          <option value="12">{t("editor.contextMessages", { count: 12 })}</option>
+                          <option value="20">{t("editor.contextMessages", { count: 20 })}</option>
                         </select>
                         <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                          Jumlah pesan sebelumnya yang dikirim ke AI.
+                          {t("editor.contextHint")}
                         </span>
                       </label>
                     </div>
 
                     <label className="block">
                       <span className={labelClass}>
-                        Temperature:{" "}
-                        {Number(inspectorData?.temperature ?? 0.7).toFixed(1)}
+                        {t("editor.temperature", {
+                          value: Number(
+                            inspectorData?.temperature ?? 0.7,
+                          ).toFixed(1),
+                        })}
                       </span>
                       <input
                         type="range"
@@ -2215,8 +2262,8 @@ export default function WorkflowEditor({
                         }
                       />
                       <span className="mt-1 flex justify-between text-xs text-muted-foreground">
-                        <span>More focused</span>
-                        <span>More creative</span>
+                        <span>{t("editor.moreFocused")}</span>
+                        <span>{t("editor.moreCreative")}</span>
                       </span>
                     </label>
                   </div>}
@@ -2226,21 +2273,21 @@ export default function WorkflowEditor({
                 <div className="space-y-5">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Message configuration
+                      {t("editor.messageConfig")}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Compose a static reply or use dynamic values.
+                      {t("editor.messageConfigHint")}
                     </p>
                   </div>
 
                   <label className="block">
-                    <span className={labelClass}>Message</span>
+                    <span className={labelClass}>{t("editor.message")}</span>
                     <SmartValueTextarea
                       rows={6}
                       value={String(inspectorData?.messageTemplate ?? "")}
                       onChange={(value) => updateNode({ messageTemplate: value, messageMode: "smart_value" })}
                       variables={upstreamVariables}
-                      placeholder="Hi {{customer_name}}, how can I help?"
+                      placeholder={t("editor.messagePlaceholder")}
                     />
                   </label>
 
@@ -2260,20 +2307,19 @@ export default function WorkflowEditor({
                             ),
                           )
                       ) : (
-                        "Your message preview will appear here."
+                        t("editor.previewEmpty")
                       )}
                     </p>
                   </div>
 
                   {arrayBubbleVariable && (
                     <p className="text-xs leading-5 text-primary">
-                      List terdeteksi: setiap item akan dikirim sebagai bubble
-                      chat terpisah.
+                      {t("editor.listDetected")}
                     </p>
                   )}
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Blue tokens are dynamic values provided by connected AI Agent nodes.
+                    {t("editor.blueTokens")}
                   </p>
                 </div>
               )}
@@ -2281,23 +2327,20 @@ export default function WorkflowEditor({
                 <div className="space-y-5">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Condition
+                      {t("editor.condition")}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Pilih smart value boolean dari AI Agent terdekat. Jika
-                      kondisi terpenuhi, alur masuk ke If match; jika tidak,
-                      masuk ke Else.
+                      {t("editor.conditionHint")}
                     </p>
                   </div>
 
                   {booleanVariables.length === 0 ? (
                     <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3.5 text-xs leading-5 text-amber-200">
-                      Belum ada variabel boolean. Tambahkan variabel bertipe
-                      Yes-No di AI Agent yang terhubung sebelum node ini.
+                      {t("editor.noBoolean")}
                     </div>
                   ) : (
                     <div className="block">
-                      <span className={labelClass}>Boolean smart value</span>
+                      <span className={labelClass}>{t("editor.booleanSmartValue")}</span>
 
                       {String(inspectorData?.conditionVariable ?? "").trim() && (
                         <div className="mt-2.5 rounded-lg border border-primary/25 bg-primary/[0.06] px-3 py-2">
@@ -2343,8 +2386,7 @@ export default function WorkflowEditor({
                       </div>
 
                       <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                        Smart value memakai nama AI Agent terdekat agar variabel
-                        dari node sebelumnya tidak tercampur.
+                        {t("editor.conditionVariableHint")}
                       </span>
                     </div>
                   )}
@@ -2354,10 +2396,10 @@ export default function WorkflowEditor({
                       <Check size={15} className="text-emerald-300" />
                       <div>
                         <p className="text-sm font-medium text-emerald-300">
-                          If match
+                          {t("editor.ifMatch")}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Cabang jika kondisi terpenuhi.
+                          {t("editor.ifMatchHint")}
                         </p>
                       </div>
                     </div>
@@ -2365,18 +2407,17 @@ export default function WorkflowEditor({
                       <X size={15} className="text-destructive" />
                       <div>
                         <p className="text-sm font-medium text-destructive">
-                          Else
+                          {t("editor.else")}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Cabang jika kondisi tidak terpenuhi.
+                          {t("editor.elseHint")}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Hubungkan port hijau (If match) dan port merah (Else) ke
-                    langkah berikutnya.
+                    {t("editor.conditionPorts")}
                   </p>
                 </div>
               )}
@@ -2384,15 +2425,15 @@ export default function WorkflowEditor({
                 <div className="space-y-5">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Go To
+                      {t("editor.goTo")}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Lompat ke node lain tanpa menggambar koneksi tambahan.
+                      {t("editor.goToHint")}
                     </p>
                   </div>
 
                   <label className="block">
-                    <span className={labelClass}>Workflow tujuan</span>
+                    <span className={labelClass}>{t("editor.targetWorkflow")}</span>
                     <select
                       className={inputClass}
                       value={String(
@@ -2411,7 +2452,7 @@ export default function WorkflowEditor({
                       {goToWorkflowOptions.map((option) => (
                         <option key={option.id} value={String(option.id)}>
                           {option.id === currentWorkflowId
-                            ? `${option.name} (workflow ini)`
+                            ? t("editor.currentWorkflowSuffix", { name: option.name })
                             : option.name}
                         </option>
                       ))}
@@ -2419,7 +2460,7 @@ export default function WorkflowEditor({
                   </label>
 
                   <label className="block">
-                    <span className={labelClass}>Node tujuan</span>
+                    <span className={labelClass}>{t("editor.targetNode")}</span>
                     <select
                       className={inputClass}
                       value={String(inspectorData?.targetNodeId ?? "")}
@@ -2427,7 +2468,7 @@ export default function WorkflowEditor({
                         updateNode({ targetNodeId: event.target.value })
                       }
                     >
-                      <option value="">Pilih node tujuan…</option>
+                      <option value="">{t("editor.chooseTargetNode")}</option>
                       {goToTargetNodes
                         .filter((node) =>
                           selectedGoToWorkflowId === currentWorkflowId
@@ -2454,20 +2495,16 @@ export default function WorkflowEditor({
                     />
                     <span>
                       <span className="block text-sm font-medium text-foreground">
-                        End flow
+                        {t("editor.endFlow")}
                       </span>
                       <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                        Berhenti dulu di node tujuan. Alur lanjut saat pelanggan
-                        mengirim pesan lagi. Jika nonaktif, node tujuan langsung
-                        dijalankan pada turn yang sama.
+                        {t("editor.endFlowHint")}
                       </span>
                     </span>
                   </label>
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Go To dapat berpindah ke workflow lain. Workflow tujuan
-                    tidak perlu Trigger. Variabel dari workflow sebelumnya tetap
-                    tersedia pada context percakapan.
+                    {t("editor.goToWorkflowNote")}
                   </p>
                 </div>
               )}
@@ -2475,27 +2512,24 @@ export default function WorkflowEditor({
                 <div className="space-y-4">
                   <div className="rounded-xl border border-teal-400/20 bg-teal-400/[0.06] p-4">
                     <div className="flex items-center gap-2 text-sm font-medium text-teal-200">
-                      <Handshake size={17} /> Handoff to admin
+                      <Handshake size={17} /> {t("editor.handoff")}
                     </div>
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      Saat alur masuk ke node ini, AI berhenti membalas.
-                      Percakapan ditandai sudah ditangani admin manusia, dan
-                      pesan pelanggan berikutnya tidak dijawab AI.
+                      {t("editor.handoffHint")}
                     </p>
                   </div>
                   <p className="text-xs leading-5 text-muted-foreground">
-                    Tempatkan Relocate di akhir alur, misalnya setelah Condition
-                    mendeteksi pelanggan minta bantuan manusia.
+                    {t("editor.relocateNote")}
                   </p>
                 </div>
               )}
               {inspectorData?.label === "Stopper" && (
                 <div className="rounded-xl border border-rose-400/15 bg-rose-400/[0.05] p-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-rose-200">
-                    <PauseCircle size={17} /> Pause point
+                    <PauseCircle size={17} /> {t("editor.pausePoint")}
                   </div>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    This step pauses the workflow. When the customer sends another message, execution continues from the next connected step.
+                    {t("editor.pauseHint")}
                   </p>
                 </div>
               )}
@@ -2505,14 +2539,14 @@ export default function WorkflowEditor({
                   onClick={cancelNodeChanges}
                   className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}
                 >
-                  <X size={14} /> Cancel
+                  <X size={14} /> {t("editor.cancel")}
                 </button>
                 <button
                   type="button"
                   onClick={saveNodeChanges}
                   className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}
                 >
-                  <Check size={14} /> Save changes
+                  <Check size={14} /> {t("editor.saveChanges")}
                 </button>
               </div>
             </div>
@@ -2524,11 +2558,12 @@ export default function WorkflowEditor({
       <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-5 py-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-amber-400" />
-          Draft workflow
+          {t("editor.draft")}
         </span>
         <span>
-          {nodes.length} steps <span className="mx-2 text-muted-foreground/50">·</span>{" "}
-          {edges.length} connections
+          {t("editor.steps", { count: nodes.length })}{" "}
+          <span className="mx-2 text-muted-foreground/50">·</span>{" "}
+          {t("editor.connections", { count: edges.length })}
         </span>
       </footer>
 
@@ -2557,7 +2592,7 @@ export default function WorkflowEditor({
           <p className="flex-1 leading-5">{notice}</p>
           <button
             type="button"
-            aria-label="Dismiss notification"
+            aria-label={t("editor.dismiss")}
             onClick={() => setNotice("")}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -2577,15 +2612,14 @@ export default function WorkflowEditor({
             <AlertDialogMedia className="bg-amber-400/10 text-amber-300">
               <Save />
             </AlertDialogMedia>
-            <AlertDialogTitle>Unsaved workflow changes</AlertDialogTitle>
+            <AlertDialogTitle>{t("editor.unsavedTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              You have changes that are not saved yet. Save them before
-              leaving?
+              {t("editor.unsavedHint")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:flex-nowrap">
             <AlertDialogCancel disabled={isSaving} className="h-9 whitespace-nowrap px-3">
-              Continue editing
+              {t("editor.continueEditing")}
             </AlertDialogCancel>
             <button
               type="button"
@@ -2596,7 +2630,7 @@ export default function WorkflowEditor({
               }}
               className={`${buttonClass} h-9 whitespace-nowrap border border-border bg-transparent px-3 text-muted-foreground hover:bg-muted/60`}
             >
-              Discard & leave
+              {t("editor.discardLeave")}
             </button>
             <button
               type="button"
@@ -2607,7 +2641,7 @@ export default function WorkflowEditor({
               {isSaving && (
                 <span className="size-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
               )}
-              Save & leave
+              {t("editor.saveLeave")}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

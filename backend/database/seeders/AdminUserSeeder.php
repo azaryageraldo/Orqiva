@@ -13,7 +13,7 @@ class AdminUserSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'admin@gmail.com'],
             [
-                'name' => 'FlowPilot Admin',
+                'name' => 'Orqiva Admin',
                 'password' => Hash::make('dsadsadsa'),
             ]
         );

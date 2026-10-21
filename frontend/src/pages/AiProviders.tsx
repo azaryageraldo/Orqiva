@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/lib/i18n";
 import { getErrorMessage } from "../services/api";
 import {
   deleteAiProvider,
@@ -42,8 +43,7 @@ const PROVIDERS = [
   {
     provider: "gemini",
     name: "Google Gemini",
-    description:
-      "Model cepat dan multimodal dari Google untuk percakapan pelanggan.",
+    descriptionKey: "ai.provider.gemini",
     icon: GoogleLogo,
     tile: "border-primary/25 bg-primary/10 text-primary",
     docs: "https://aistudio.google.com/app/apikey",
@@ -51,8 +51,7 @@ const PROVIDERS = [
   {
     provider: "openai",
     name: "OpenAI",
-    description:
-      "Akses model GPT untuk reasoning, penulisan, dan pengambilan keputusan.",
+    descriptionKey: "ai.provider.openai",
     icon: OpenAiLogo,
     tile: "border-emerald-400/25 bg-emerald-400/10 text-emerald-300",
     docs: "https://platform.openai.com/api-keys",
@@ -60,8 +59,7 @@ const PROVIDERS = [
   {
     provider: "openrouter",
     name: "OpenRouter",
-    description:
-      "Satu API key untuk menjangkau banyak model dari provider berbeda.",
+    descriptionKey: "ai.provider.openrouter",
     icon: ArrowsSplit,
     tile: "border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-300",
     docs: "https://openrouter.ai/keys",
@@ -72,6 +70,7 @@ const fieldClass =
   "mt-2 h-11 w-full rounded-lg border border-border bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
 
 export default function AiProviders() {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -100,9 +99,7 @@ export default function AiProviders() {
       })
       .catch((caught: unknown) => {
         if (active) {
-          setError(
-            getErrorMessage(caught, "Koneksi AI gagal dimuat. Coba lagi."),
-          );
+          setError(getErrorMessage(caught, t("ai.errorLoad")));
         }
       })
       .finally(() => {
@@ -112,6 +109,8 @@ export default function AiProviders() {
     return () => {
       active = false;
     };
+    // AI settings should only load once per page visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const configuredCount =
@@ -146,7 +145,7 @@ export default function AiProviders() {
 
   async function handleDetect() {
     if (!apiKey.trim() && !activeSetting?.configured) {
-      setDialogError("Isi API key terlebih dahulu.");
+      setDialogError(t("ai.keyRequired"));
       return;
     }
 
@@ -166,7 +165,7 @@ export default function AiProviders() {
           : (result.models[0] ?? ""),
       );
     } catch (caught) {
-      setDialogError(getErrorMessage(caught, "Model gagal dideteksi."));
+      setDialogError(getErrorMessage(caught, t("ai.errorDetect")));
     } finally {
       setDetecting(false);
     }
@@ -176,7 +175,7 @@ export default function AiProviders() {
     if (!dialogProvider) return;
 
     if (!apiKey.trim() && !activeSetting?.configured) {
-      setDialogError("API key wajib diisi untuk provider ini.");
+      setDialogError(t("ai.keyRequiredProvider"));
       return;
     }
 
@@ -191,10 +190,12 @@ export default function AiProviders() {
       });
 
       setSettings(result);
-      setNotice(`API key ${activeCatalog?.name ?? "provider"} berhasil disimpan.`);
+      setNotice(
+        t("ai.keySaved", { name: activeCatalog?.name ?? t("ai.providerFallback") }),
+      );
       closeDialog();
     } catch (caught) {
-      setDialogError(getErrorMessage(caught, "API key gagal disimpan."));
+      setDialogError(getErrorMessage(caught, t("ai.errorSave")));
     } finally {
       setSaving(false);
     }
@@ -205,7 +206,9 @@ export default function AiProviders() {
 
     if (
       !window.confirm(
-        `Hapus API key ${activeCatalog?.name}? Node AI Agent yang memakai provider ini tidak bisa dijalankan sampai key dipasang lagi.`,
+        t("ai.deleteConfirm", {
+          name: activeCatalog?.name ?? t("ai.providerFallback"),
+        }),
       )
     ) {
       return;
@@ -217,10 +220,12 @@ export default function AiProviders() {
     try {
       const result = await deleteAiProvider(dialogProvider);
       setSettings(result);
-      setNotice(`API key ${activeCatalog?.name} dihapus.`);
+      setNotice(
+        t("ai.keyDeleted", { name: activeCatalog?.name ?? t("ai.providerFallback") }),
+      );
       closeDialog();
     } catch (caught) {
-      setDialogError(getErrorMessage(caught, "API key gagal dihapus."));
+      setDialogError(getErrorMessage(caught, t("ai.errorDelete")));
     } finally {
       setDeleting(false);
     }
@@ -237,11 +242,9 @@ export default function AiProviders() {
 
       setSettings(result);
       setDebounceMs(String(result.debounce_ms));
-      setNotice("Preferensi balasan AI disimpan.");
+      setNotice(t("ai.prefSaved"));
     } catch (caught) {
-      setPrefError(
-        getErrorMessage(caught, "Preferensi balasan gagal disimpan."),
-      );
+      setPrefError(getErrorMessage(caught, t("ai.errorPrefs")));
     } finally {
       setPrefSaving(false);
     }
@@ -262,14 +265,13 @@ export default function AiProviders() {
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
               <KeyRound className="size-4" />
-              Preferences
+              {t("ai.eyebrow")}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              API Keys
+              {t("nav.apiKeys")}
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Hubungkan model AI milik Anda sendiri. Key yang disimpan langsung
-              dipakai oleh workflow tanpa perlu mengubah file environment.
+              {t("ai.subtitle")}
             </p>
           </div>
 
@@ -286,8 +288,8 @@ export default function AiProviders() {
               }`}
             />
             {configuredCount > 0
-              ? `${configuredCount} provider terhubung`
-              : "Belum ada provider"}
+              ? t("ai.connectedCount", { count: configuredCount })
+              : t("ai.noneConnected")}
           </span>
         </div>
 
@@ -303,7 +305,7 @@ export default function AiProviders() {
               size="sm"
               onClick={() => setError("")}
             >
-              Tutup
+              {t("common.close")}
             </Button>
           </div>
         )}
@@ -324,7 +326,7 @@ export default function AiProviders() {
               onClick={() => setNotice("")}
               className="text-emerald-200 hover:text-emerald-100"
             >
-              Tutup
+              {t("common.close")}
             </Button>
           </div>
         )}
@@ -333,15 +335,17 @@ export default function AiProviders() {
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                Provider yang tersedia
+                {t("ai.catalogTitle")}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Pilih kartu provider untuk menambahkan atau mengganti API key.
+                {t("ai.catalogDescription")}
               </p>
             </div>
             <span className="text-xs text-muted-foreground">
-              {configuredCount} aktif · {PROVIDERS.length - configuredCount}{" "}
-              belum diatur
+              {t("ai.catalogCount", {
+                active: configuredCount,
+                unset: PROVIDERS.length - configuredCount,
+              })}
             </span>
           </div>
 
@@ -358,7 +362,7 @@ export default function AiProviders() {
                   key={item.provider}
                   type="button"
                   onClick={() => openProvider(item.provider)}
-                  aria-label={`Atur API key ${item.name}`}
+                  aria-label={t("ai.configureAria", { name: item.name })}
                   className={`group relative flex min-h-60 flex-col rounded-xl border p-5 text-left transition hover:-translate-y-0.5 ${
                     configured
                       ? "border-primary/30 bg-[linear-gradient(145deg,rgba(59,130,246,0.10),rgba(15,23,42,0.18))] shadow-lg shadow-black/10"
@@ -378,7 +382,7 @@ export default function AiProviders() {
                           : "border-border bg-muted/40 text-muted-foreground"
                       }`}
                     >
-                      {configured ? "Terhubung" : "Belum diatur"}
+                      {configured ? t("ai.cardConnected") : t("ai.cardNotConfigured")}
                     </span>
                   </div>
 
@@ -387,13 +391,13 @@ export default function AiProviders() {
                       {item.name}
                     </h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {item.description}
+                      {t(item.descriptionKey)}
                     </p>
                     {configured && (
                       <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground/80">
                         {setting?.default_model ??
                           setting?.models[0] ??
-                          "Model belum dipilih"}
+                          t("ai.modelNotChosen")}
                       </p>
                     )}
                   </div>
@@ -403,12 +407,14 @@ export default function AiProviders() {
                       <KeyRound className="size-3.5 shrink-0" />
                       <span className="truncate">
                         {configured
-                          ? `${setting?.models.length ?? 0} model tersedia`
-                          : "API key belum disimpan"}
+                          ? t("ai.modelsAvailable", {
+                              count: setting?.models.length ?? 0,
+                            })
+                          : t("ai.keyNotSaved")}
                       </span>
                     </span>
                     <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
-                      Atur
+                      {t("ai.configure")}
                       <ArrowUpRight className="size-3.5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                     </span>
                   </div>
@@ -423,16 +429,16 @@ export default function AiProviders() {
             <div className="border-b border-border px-5 py-4">
               <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
                 <Timer className="size-4 text-muted-foreground" />
-                Preferensi balasan AI
+                {t("ai.prefTitle")}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Atur jeda sebelum AI memproses pesan yang baru masuk.
+                {t("ai.prefDescription")}
               </p>
             </div>
             <div className="space-y-4 p-5">
               <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_160px] sm:items-end">
                 <div>
-                  <Label htmlFor="ai-debounce">Debounce balasan</Label>
+                  <Label htmlFor="ai-debounce">{t("ai.debounceLabel")}</Label>
                   <div className="mt-2 flex items-center gap-3">
                     <input
                       id="ai-debounce-range"
@@ -449,7 +455,7 @@ export default function AiProviders() {
                     </span>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    0 ms berarti AI langsung membalas. Maksimal 5 detik.
+                    {t("ai.debounceHint")}
                   </p>
                 </div>
                 <Input
@@ -477,7 +483,7 @@ export default function AiProviders() {
                 disabled={prefSaving}
               >
                 {prefSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
-                Simpan preferensi
+                {t("ai.savePrefs")}
               </Button>
             </div>
           </Card>
@@ -485,13 +491,13 @@ export default function AiProviders() {
           <Card className="border-primary/20 bg-primary/[0.04] p-5">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <ShieldCheck className="size-4 text-primary" />
-              Aman dan langsung aktif
+              {t("ai.secureTitle")}
             </div>
             <ul className="mt-3 space-y-2 text-xs leading-5 text-muted-foreground">
-              <li>API key disimpan terenkripsi di database backend.</li>
-              <li>Key tidak pernah dikirim kembali ke browser.</li>
-              <li>Perubahan langsung dipakai saat workflow berjalan.</li>
-              <li>Tidak perlu mengatur API key di file `.env`.</li>
+              <li>{t("ai.secure1")}</li>
+              <li>{t("ai.secure2")}</li>
+              <li>{t("ai.secure3")}</li>
+              <li>{t("ai.secure4")}</li>
             </ul>
           </Card>
         </div>
@@ -514,9 +520,9 @@ export default function AiProviders() {
                 </span>
               )}
               <div>
-                <DialogTitle>{activeCatalog?.name ?? "Provider AI"}</DialogTitle>
+                <DialogTitle>{activeCatalog?.name ?? t("ai.providerFallback")}</DialogTitle>
                 <DialogDescription>
-                  Simpan API key untuk mengaktifkan provider ini di workflow.
+                  {t("ai.dialogDescription")}
                 </DialogDescription>
               </div>
             </div>
@@ -536,12 +542,14 @@ export default function AiProviders() {
                 <TriangleAlert className="size-4" />
               )}
               {activeSetting?.configured
-                ? `API key sudah tersimpan. ${activeSetting.models.length} model terdeteksi.`
-                : "Provider ini belum memiliki API key."}
+                ? t("ai.keyConfigured", {
+                    count: activeSetting.models.length,
+                  })
+                : t("ai.providerNoKey")}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ai-provider-key">API key</Label>
+              <Label htmlFor="ai-provider-key">{t("ai.apiKeyLabel")}</Label>
               <Input
                 id="ai-provider-key"
                 type="password"
@@ -556,18 +564,20 @@ export default function AiProviders() {
                 spellCheck={false}
                 placeholder={
                   activeSetting?.configured
-                    ? "Sudah tersimpan. Isi untuk mengganti API key."
-                    : `Masukkan API key ${activeCatalog?.name ?? "provider"}`
+                    ? t("ai.keyPlaceholderExisting")
+                    : t("ai.keyPlaceholderNew", {
+                        name: activeCatalog?.name ?? t("ai.providerFallback"),
+                      })
                 }
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                Key disimpan terenkripsi dan tidak pernah ditampilkan kembali.
+                {t("ai.keyHint")}
               </p>
             </div>
 
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label htmlFor="ai-provider-model">Default model</Label>
+                <Label htmlFor="ai-provider-model">{t("ai.defaultModel")}</Label>
                 <Button
                   type="button"
                   variant="ghost"
@@ -580,7 +590,7 @@ export default function AiProviders() {
                   ) : (
                     <ArrowUpRight />
                   )}
-                  {detecting ? "Mendeteksi..." : "Deteksi model"}
+                  {detecting ? t("ai.detecting") : t("ai.detectModels")}
                 </Button>
               </div>
               <select
@@ -591,7 +601,7 @@ export default function AiProviders() {
                 disabled={availableModels.length === 0}
               >
                 {availableModels.length === 0 && (
-                  <option value="">Deteksi model terlebih dahulu</option>
+                  <option value="">{t("ai.detectFirst")}</option>
                 )}
                 {availableModels.map((model) => (
                   <option key={model} value={model}>
@@ -605,8 +615,10 @@ export default function AiProviders() {
               </select>
               <p className="text-xs leading-5 text-muted-foreground">
                 {availableModels.length > 0
-                  ? `${availableModels.length} model tersedia untuk provider ini.`
-                  : "Simpan key untuk mendeteksi model secara otomatis."}
+                  ? t("ai.modelsAvailableCount", {
+                      count: availableModels.length,
+                    })
+                  : t("ai.detectHint")}
               </p>
             </div>
 
@@ -622,7 +634,9 @@ export default function AiProviders() {
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
             >
-              Cara mendapatkan API key {activeCatalog?.name}
+              {t("ai.getKey", {
+                name: activeCatalog?.name ?? t("ai.providerFallback"),
+              })}
               <ArrowUpRight className="size-3.5" />
             </a>
           </div>
@@ -641,7 +655,7 @@ export default function AiProviders() {
                   ) : (
                     <Trash2 />
                   )}
-                  Hapus key
+                  {t("ai.deleteKey")}
                 </Button>
               )}
             </div>
@@ -652,7 +666,7 @@ export default function AiProviders() {
                 onClick={closeDialog}
                 disabled={saving || deleting}
               >
-                Batal
+                {t("common.cancel")}
               </Button>
               <Button
                 type="button"
@@ -660,7 +674,7 @@ export default function AiProviders() {
                 disabled={saving || deleting || detecting}
               >
                 {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
-                Simpan API key
+                {t("ai.saveKey")}
               </Button>
             </div>
           </DialogFooter>

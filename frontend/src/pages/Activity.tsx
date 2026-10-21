@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
+import { formatLocale, useI18n } from "@/lib/i18n";
 import {
   getActivity,
   type ActivityExecution,
@@ -34,28 +35,28 @@ interface ActivityProps {
 }
 
 const STATUS_LABELS: Record<ExecutionStatus, string> = {
-  success: "Sukses",
-  failed: "Gagal",
-  waiting: "Menunggu",
-  running: "Berjalan",
-  escalated: "Ke admin",
+  success: "activity.success",
+  failed: "activity.failed",
+  waiting: "activity.waiting",
+  running: "activity.running",
+  escalated: "activity.escalated",
 };
 
 const DATE_PRESETS = [
-  { label: "Hari ini", days: 0 },
-  { label: "7 hari", days: 6 },
-  { label: "30 hari", days: 29 },
+  { labelKey: "activity.presetToday", days: 0 },
+  { labelKey: "activity.preset7", days: 6 },
+  { labelKey: "activity.preset30", days: 29 },
 ] as const;
 
-const dateFormat = new Intl.DateTimeFormat("id-ID", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, locale: string): string {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function toDateInput(date: Date): string {
@@ -70,6 +71,7 @@ export default function Activity({
   onOpenWorkflow,
   onOpenExecution,
 }: ActivityProps) {
+  const { t } = useI18n();
   const [stats, setStats] = useState<ActivityStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -105,7 +107,7 @@ export default function Activity({
       setError(
         getErrorMessage(
           caught,
-          "Audit log gagal dimuat. Periksa koneksi backend.",
+          t("activity.loadError"),
         ),
       );
     } finally {
@@ -176,7 +178,7 @@ export default function Activity({
           setError(
             getErrorMessage(
               caught,
-              "Audit log gagal dimuat. Periksa koneksi backend.",
+              t("activity.loadError"),
             ),
           );
         }
@@ -188,7 +190,7 @@ export default function Activity({
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   return (
     <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
@@ -197,14 +199,13 @@ export default function Activity({
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
               <ActivityIcon className="size-4" />
-              Workspace
+              {t("nav.workspace")}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Audit Log
+              {t("activity.title")}
             </h1>
             <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              Satu log per session pelanggan, mencakup seluruh workflow yang
-              dijalankan lewat Go To.
+              {t("activity.subtitle")}
             </p>
           </div>
 
@@ -216,7 +217,7 @@ export default function Activity({
             className="h-10 px-4"
           >
             <RefreshCw className={loading ? "animate-spin" : undefined} />
-            Segarkan
+            {t("activity.refresh")}
           </Button>
         </div>
 
@@ -227,7 +228,7 @@ export default function Activity({
           >
             <span>{error}</span>
             <Button type="button" variant="ghost" size="sm" onClick={refresh}>
-              Coba lagi
+              {t("common.retry")}
             </Button>
           </div>
         )}
@@ -235,11 +236,11 @@ export default function Activity({
         <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-5">
           {(
             [
-              ["Total", stats?.summary.total],
-              ["Sukses", stats?.summary.success],
-              ["Gagal", stats?.summary.failed],
-              ["Menunggu", stats?.summary.waiting],
-              ["Ke admin", stats?.summary.escalated],
+              [t("activity.total"), stats?.summary.total],
+              [t("activity.success"), stats?.summary.success],
+              [t("activity.failed"), stats?.summary.failed],
+              [t("activity.waiting"), stats?.summary.waiting],
+              [t("activity.escalated"), stats?.summary.escalated],
             ] as const
           ).map(([label, value]) => (
             <div key={label} className="bg-card p-5">
@@ -260,16 +261,15 @@ export default function Activity({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-foreground">
-                  Session terbaru
+                  {t("activity.latestTitle")}
                 </h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Filter berdasarkan status dan tanggal, lalu buka detail untuk
-                  audit per langkah dan workflow.
+                  {t("activity.latestDescription")}
                 </p>
               </div>
 
               <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
-                {stats?.executions.length ?? 0} session dimuat
+                {t("activity.loadedCount", { count: stats?.executions.length ?? 0 })}
               </span>
             </div>
 
@@ -280,7 +280,7 @@ export default function Activity({
                     htmlFor="activity-status"
                     className="text-xs font-normal text-muted-foreground"
                   >
-                    Status
+                    {t("activity.statusLabel")}
                   </Label>
                   <Select
                     value={draft.status || "all"}
@@ -301,18 +301,18 @@ export default function Activity({
                       <SelectValue>
                         {(value) =>
                           value && value !== "all"
-                            ? STATUS_LABELS[value as ExecutionStatus]
-                            : "Semua status"
+                            ? t(STATUS_LABELS[value as ExecutionStatus])
+                            : t("activity.allStatus")
                         }
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Semua status</SelectItem>
-                      <SelectItem value="success">Sukses</SelectItem>
-                      <SelectItem value="failed">Gagal</SelectItem>
-                      <SelectItem value="waiting">Menunggu</SelectItem>
-                      <SelectItem value="running">Berjalan</SelectItem>
-                      <SelectItem value="escalated">Ke admin</SelectItem>
+                      <SelectItem value="all">{t("activity.allStatus")}</SelectItem>
+                      <SelectItem value="success">{t("activity.success")}</SelectItem>
+                      <SelectItem value="failed">{t("activity.failed")}</SelectItem>
+                      <SelectItem value="waiting">{t("activity.waiting")}</SelectItem>
+                      <SelectItem value="running">{t("activity.running")}</SelectItem>
+                      <SelectItem value="escalated">{t("activity.escalated")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -322,7 +322,7 @@ export default function Activity({
                     htmlFor="activity-from"
                     className="text-xs font-normal text-muted-foreground"
                   >
-                    Dari tanggal
+                    {t("activity.fromDate")}
                   </Label>
                   <Input
                     id="activity-from"
@@ -343,7 +343,7 @@ export default function Activity({
                     htmlFor="activity-to"
                     className="text-xs font-normal text-muted-foreground"
                   >
-                    Sampai tanggal
+                    {t("activity.toDate")}
                   </Label>
                   <Input
                     id="activity-to"
@@ -366,7 +366,7 @@ export default function Activity({
                     disabled={loading}
                     className="h-9 flex-1 xl:flex-none"
                   >
-                    Terapkan
+                    {t("activity.apply")}
                   </Button>
                   <Button
                     type="button"
@@ -375,18 +375,18 @@ export default function Activity({
                     disabled={loading || !hasDraft}
                     className="h-9"
                   >
-                    Reset
+                    {t("activity.reset")}
                   </Button>
                 </div>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground">
-                  Rentang cepat
+                  {t("activity.quickRange")}
                 </span>
                 {DATE_PRESETS.map((preset) => (
                   <Button
-                    key={preset.label}
+                    key={preset.labelKey}
                     type="button"
                     size="sm"
                     variant="outline"
@@ -394,20 +394,20 @@ export default function Activity({
                     disabled={loading}
                     className="h-7 rounded-full px-3 text-xs"
                   >
-                    {preset.label}
+                    {t(preset.labelKey)}
                   </Button>
                 ))}
               </div>
 
               {hasFilters && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/70 pt-3 text-xs">
-                  <span className="text-muted-foreground">Filter aktif</span>
+                  <span className="text-muted-foreground">{t("activity.activeFilter")}</span>
                   {filters.status && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-primary">
-                      {STATUS_LABELS[filters.status]}
+                      {t(STATUS_LABELS[filters.status])}
                       <button
                         type="button"
-                        aria-label="Hapus filter status"
+                        aria-label={t("activity.removeStatus")}
                         onClick={() => {
                           const next = { ...draft, status: "" as const };
                           setDraft(next);
@@ -422,10 +422,10 @@ export default function Activity({
                   )}
                   {(filters.from || filters.to) && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-muted-foreground">
-                      {filters.from || "Awal"} – {filters.to || "Sekarang"}
+                      {filters.from || t("activity.dateStart")} – {filters.to || t("activity.dateEnd")}
                       <button
                         type="button"
-                        aria-label="Hapus filter tanggal"
+                        aria-label={t("activity.removeDate")}
                         onClick={() => {
                           const next = { ...draft, from: "", to: "" };
                           setDraft(next);
@@ -454,13 +454,13 @@ export default function Activity({
               </span>
               <p className="text-sm font-medium text-foreground">
                 {hasFilters
-                  ? "Tidak ada session yang cocok"
-                  : "Belum ada session"}
+                  ? t("activity.noMatch")
+                  : t("activity.empty")}
               </p>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {hasFilters
-                  ? "Ubah status atau rentang tanggal, lalu terapkan kembali."
-                  : "Buka Channel lalu mulai percakapan lewat widget untuk melihat audit log di sini."}
+                  ? t("activity.noMatchHint")
+                  : t("activity.emptyHint")}
               </p>
             </div>
           ) : (
@@ -488,7 +488,7 @@ export default function Activity({
                     {loadingMore && (
                       <LoaderCircle className="animate-spin" />
                     )}
-                    Muat lebih banyak
+                    {t("activity.loadMore")}
                   </Button>
                 </div>
               )}
@@ -509,6 +509,9 @@ function ActivityRow({
   onOpenWorkflow: (workflowId: string) => void;
   onOpenExecution: (execution: ActivityExecution) => void;
 }) {
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
+
   return (
     <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
       <ExecutionStatusBadge status={execution.status} />
@@ -519,19 +522,23 @@ function ActivityRow({
           onClick={() => onOpenWorkflow(String(execution.workflow_id))}
           className="truncate text-sm font-medium text-foreground hover:underline focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
         >
-          {execution.workflow_name || `Workflow #${execution.workflow_id}`}
+          {execution.workflow_name || t("activity.workflowFallback", { id: execution.workflow_id })}
         </button>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          Session {execution.session_id ?? `#${execution.id}`} ·{" "}
-          {formatDate(execution.started_at)}
+          {t("activity.session", {
+            id: execution.session_id ?? `#${execution.id}`,
+          })}{" "}
+          · {formatDate(execution.started_at, locale)}
           {execution.steps_count > 0
-            ? ` · ${execution.steps_count} langkah`
+            ? ` · ${t("activity.steps", { count: execution.steps_count })}`
             : ""}
         </p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {execution.contact_id
-            ? `Contact ${execution.contact_name || execution.contact_id}`
-            : "Contact tidak tercatat"}
+            ? t("activity.contact", {
+                name: execution.contact_name || execution.contact_id,
+              })
+            : t("activity.contactMissing")}
         </p>
         {execution.error && (
           <p className="mt-1 line-clamp-2 text-xs text-destructive">
@@ -542,8 +549,10 @@ function ActivityRow({
 
       <span className="shrink-0 text-xs text-muted-foreground">
         {execution.total_tokens > 0
-          ? `${execution.total_tokens.toLocaleString("id-ID")} token`
-          : "Tanpa token"}
+          ? t("activity.tokens", {
+              count: execution.total_tokens.toLocaleString(locale),
+            })
+          : t("activity.noTokens")}
       </span>
 
       <Button
@@ -553,7 +562,7 @@ function ActivityRow({
         onClick={() => onOpenExecution(execution)}
         className="shrink-0 text-muted-foreground hover:text-foreground"
       >
-        Lihat detail
+        {t("activity.detail")}
         <ChevronRight className="size-4" />
       </Button>
     </li>

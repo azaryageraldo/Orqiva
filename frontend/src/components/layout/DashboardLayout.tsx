@@ -2,12 +2,13 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import Sidebar, { type Health, type NavKey } from "./Sidebar";
-import Header, { type HeaderIcon } from "./Header";
+import Header, { type HeaderIcon, type HeaderUser } from "./Header";
 
 interface DashboardLayoutProps {
   title: string;
   icon: HeaderIcon;
   health: Health;
+  user: HeaderUser | null;
   loggingOut: boolean;
   onLogout: () => void;
   activeNav: NavKey;
@@ -26,6 +27,7 @@ export default function DashboardLayout({
   title,
   icon,
   health,
+  user,
   loggingOut,
   onLogout,
   activeNav,
@@ -60,6 +62,7 @@ export default function DashboardLayout({
         <Header
           title={title}
           icon={icon}
+          user={user}
           loggingOut={loggingOut}
           onLogout={onLogout}
         />

@@ -46,6 +46,7 @@ import {
 } from "../services/workflow";
 import type { Workflow as WorkflowItem } from "../types/workflow";
 import { getErrorMessage } from "../services/api";
+import { useI18n } from "@/lib/i18n";
 
 interface WorkflowsProps {
   onOpenWorkflow: (workflowId: string) => void;
@@ -55,6 +56,7 @@ const SELECT_CLASS =
   "h-10 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
 
 export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
+  const { language, t } = useI18n();
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,14 +101,12 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
       } catch (caught) {
         if (requestId !== requestRef.current) return;
 
-        setError(
-          getErrorMessage(caught, "Workflow gagal dimuat. Periksa koneksi API."),
-        );
+        setError(getErrorMessage(caught, t("wf.errorLoad")));
       } finally {
         if (requestId === requestRef.current) setLoading(false);
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => {
@@ -132,9 +132,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
       .catch((caught: unknown) => {
         if (!active || requestId !== requestRef.current) return;
 
-        setError(
-          getErrorMessage(caught, "Workflow gagal dimuat. Periksa koneksi API."),
-        );
+        setError(getErrorMessage(caught, t("wf.errorLoad")));
       })
       .finally(() => {
         if (active && requestId === requestRef.current) setLoading(false);
@@ -143,7 +141,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
     return () => {
       active = false;
     };
-  }, [searchQuery]);
+  }, [searchQuery, t]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -163,9 +161,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
       setSearchQuery("");
       await loadWorkflows(1, "");
     } catch (caught) {
-      setError(
-        getErrorMessage(caught, "Workflow gagal dibuat. Periksa koneksi API."),
-      );
+      setError(getErrorMessage(caught, t("wf.errorCreate")));
     } finally {
       setCreating(false);
     }
@@ -186,9 +182,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
       setWorkflowToDelete(null);
       await loadWorkflows(targetPage, searchQuery);
     } catch (caught) {
-      setError(
-        getErrorMessage(caught, "Workflow gagal dihapus. Coba lagi."),
-      );
+      setError(getErrorMessage(caught, t("wf.errorDelete")));
     } finally {
       setDeleting(false);
     }
@@ -219,9 +213,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
       setWorkflowToEdit(updated);
       if (openCanvas) onOpenWorkflow(String(updated.id));
     } catch (caught) {
-      setError(
-        getErrorMessage(caught, "Perubahan workflow gagal disimpan. Coba lagi."),
-      );
+      setError(getErrorMessage(caught, t("wf.errorSave")));
     } finally {
       setSavingEdit(false);
     }
@@ -244,7 +236,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
               className="mb-6 text-muted-foreground"
             >
               <ArrowRight className="rotate-180" />
-              Kembali ke daftar workflow
+              {t("wf.back")}
             </Button>
             <form
               onSubmit={handleEditSubmit}
@@ -253,13 +245,13 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
               <div className="space-y-5">
                 <div>
                   <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-                    Edit workflow
+                    {t("wf.editEyebrow")}
                   </p>
                   <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-                    Perbarui detail workflow
+                    {t("wf.editHeading")}
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Simpan perubahan sebelum membuka kanvas workflow.
+                    {t("wf.editDescription")}
                   </p>
                 </div>
 
@@ -274,7 +266,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-name">Nama workflow</Label>
+                    <Label htmlFor="edit-name">{t("wf.nameLabel")}</Label>
                     <Input
                       id="edit-name"
                       required
@@ -287,9 +279,9 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
 
                   <div className="space-y-2">
                     <Label htmlFor="edit-description">
-                      Deskripsi{" "}
+                      {t("wf.descriptionLabel")}{" "}
                       <span className="font-normal text-muted-foreground">
-                        (opsional)
+                        {t("wf.optional")}
                       </span>
                     </Label>
                     <Textarea
@@ -297,13 +289,13 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                       rows={4}
                       value={editDescription}
                       onChange={(event) => setEditDescription(event.target.value)}
-                      placeholder="Jelaskan fungsi workflow ini"
+                      placeholder={t("wf.descriptionPlaceholder")}
                       className="dark:bg-input/30"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="edit-status">Status</Label>
+                    <Label htmlFor="edit-status">{t("wf.statusLabel")}</Label>
                     <select
                       id="edit-status"
                       value={editStatus}
@@ -314,12 +306,11 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                       }
                       className={SELECT_CLASS}
                     >
-                      <option value="draft">Draft</option>
-                      <option value="active">Active</option>
+                      <option value="draft">{t("wf.status.draft")}</option>
+                      <option value="active">{t("wf.status.active")}</option>
                     </select>
                     <p className="text-xs text-muted-foreground">
-                      Draft belum aktif untuk otomasi. Active menandai workflow
-                      siap digunakan.
+                      {t("wf.statusHint")}
                     </p>
                   </div>
                 </div>
@@ -332,7 +323,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                     onClick={() => setWorkflowToEdit(null)}
                     className="h-10 px-4"
                   >
-                    Batal
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
@@ -345,7 +336,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                     ) : (
                       <CheckCircle2 />
                     )}
-                    {savingEdit ? "Menyimpan..." : "Simpan perubahan"}
+                    {savingEdit ? t("wf.saving") : t("wf.saveChanges")}
                   </Button>
                   <Button
                     type="button"
@@ -358,7 +349,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                     ) : (
                       <Pencil />
                     )}
-                    Buka kanvas
+                    {t("wf.openCanvas")}
                   </Button>
                 </div>
               </div>
@@ -371,7 +362,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
               <div>
                 <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                   <WorkflowIcon className="size-4" />
-                  Workspace
+                  {t("wf.eyebrow")}
                 </div>
 
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
@@ -379,8 +370,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                 </h1>
 
                 <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-                  Buat, susun, dan kelola otomatisasi alur kerja dalam satu
-                  tempat.
+                  {t("wf.subtitle")}
                 </p>
               </div>
 
@@ -390,7 +380,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                 className="h-10 px-4"
               >
                 <Plus />
-                Buat workflow baru
+                {t("wf.create")}
               </Button>
             </div>
 
@@ -401,8 +391,8 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                   <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder="Cari workflow..."
-                    aria-label="Cari workflow"
+                    placeholder={t("wf.searchPlaceholder")}
+                    aria-label={t("wf.searchAria")}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     className="h-10 pr-9 pl-9 dark:bg-input/30 [&::-webkit-search-cancel-button]:hidden"
@@ -410,7 +400,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                   {search && (
                     <button
                       type="button"
-                      aria-label="Hapus pencarian"
+                      aria-label={t("wf.clearSearch")}
                       onClick={() => setSearch("")}
                       className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                     >
@@ -420,11 +410,10 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  Menampilkan{" "}
-                  <span className="font-medium text-foreground">
-                    {workflows.length}
-                  </span>{" "}
-                  dari {total} workflow
+                  {t("wf.showing", {
+                    shown: workflows.length,
+                    total,
+                  })}
                 </p>
               </div>
 
@@ -440,7 +429,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                 ) : (
                   <Activity />
                 )}
-                {loading ? "Memuat..." : "Segarkan"}
+                {loading ? t("wf.loading") : t("wf.refresh")}
               </Button>
             </div>
 
@@ -453,7 +442,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                 <button
                   type="button"
                   onClick={() => setError("")}
-                  aria-label="Abatalkan pesan error"
+                  aria-label={t("wf.dismissError")}
                   className="text-destructive/70 transition hover:text-destructive"
                 >
                   <X className="size-4" />
@@ -465,10 +454,10 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
               <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-border bg-background text-center">
                 <LoaderCircle className="size-7 animate-spin text-primary" />
                 <p className="mt-4 text-sm font-medium text-foreground">
-                  Memuat workflows
+                  {t("wf.loadingTitle")}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Mengambil data dari workspace Anda.
+                  {t("wf.loadingDescription")}
                 </p>
               </div>
             ) : workflows.length === 0 ? (
@@ -479,14 +468,14 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
 
                 <h3 className="mt-2 text-base font-semibold text-foreground">
                   {search
-                    ? "Tidak ada workflow yang cocok"
-                    : "Workspace Anda siap digunakan"}
+                    ? t("wf.noMatch")
+                    : t("wf.workspaceReady")}
                 </h3>
 
                 <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
                   {search
-                    ? "Coba kata kunci nama atau deskripsi yang berbeda."
-                    : "Buat workflow pertama Anda untuk mulai membangun otomasi."}
+                    ? t("wf.noMatchDescription")
+                    : t("wf.workspaceReadyDescription")}
                 </p>
 
                 {!search && (
@@ -497,7 +486,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                     className="mt-4 text-primary hover:text-primary"
                   >
                     <Plus />
-                    Buat workflow
+                    {t("wf.createShort")}
                   </Button>
                 )}
               </div>
@@ -528,14 +517,19 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                         </h3>
 
                         <p className="mt-1 truncate text-sm text-muted-foreground">
-                          {item.description || "Belum ada deskripsi."}
+                          {item.description || t("wf.noDescription")}
                         </p>
 
                         <p className="mt-2 text-xs text-muted-foreground">
-                          {item.definition?.nodes?.length ?? 0} node
+                          {t("wf.nodeCount", {
+                            count: item.definition?.nodes?.length ?? 0,
+                          })}
                           <span className="mx-1 text-border">·</span>
-                          Diperbarui{" "}
-                          {new Date(item.updated_at).toLocaleDateString("id-ID")}
+                          {t("wf.updated", {
+                            date: new Date(item.updated_at).toLocaleDateString(
+                              language === "en" ? "en-US" : "id-ID",
+                            ),
+                          })}
                         </p>
                       </div>
 
@@ -552,15 +546,15 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                         ) : (
                           <CircleDashed className="size-3" />
                         )}
-                        {item.status}
+                        {t(`wf.status.${item.status}`)}
                       </Badge>
 
                       <Button
                         type="button"
                         variant="outline"
                         size="icon-lg"
-                        aria-label={`Edit ${item.name}`}
-                        title="Edit workflow"
+                        aria-label={t("wf.editAria", { name: item.name })}
+                        title={t("wf.editTitle")}
                         onClick={(event) => {
                           event.stopPropagation();
                           beginEdit(item);
@@ -574,8 +568,8 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                         type="button"
                         variant="destructive"
                         size="icon-lg"
-                        aria-label={`Hapus ${item.name}`}
-                        title="Hapus workflow"
+                        aria-label={t("wf.deleteAria", { name: item.name })}
+                        title={t("wf.deleteTitle")}
                         onClick={(event) => {
                           event.stopPropagation();
                           setWorkflowToDelete(item);
@@ -593,9 +587,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
             {lastPage > 1 && (
               <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row">
                 <p className="text-xs text-muted-foreground">
-                  Halaman{" "}
-                  <span className="font-medium text-foreground">{page}</span>{" "}
-                  dari {lastPage}
+                  {t("wf.pageOf", { page, last: lastPage })}
                 </p>
 
                 <div className="flex items-center gap-2">
@@ -606,7 +598,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                     onClick={() => void loadWorkflows(page - 1, searchQuery)}
                     disabled={loading || page <= 1}
                   >
-                    Sebelumnya
+                    {t("wf.previous")}
                   </Button>
                   <Button
                     type="button"
@@ -615,7 +607,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                     onClick={() => void loadWorkflows(page + 1, searchQuery)}
                     disabled={loading || page >= lastPage}
                   >
-                    Berikutnya
+                    {t("wf.next")}
                   </Button>
                 </div>
               </div>
@@ -633,17 +625,17 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-                Otomasi baru
+                {t("wf.newAutomation")}
               </p>
-              <DialogTitle>Buat workflow</DialogTitle>
+              <DialogTitle>{t("wf.createTitle")}</DialogTitle>
               <DialogDescription>
-                Beri nama workflow dan tambahkan deskripsi singkat.
+                {t("wf.createDescription")}
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleCreate} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="create-name">Nama workflow</Label>
+                <Label htmlFor="create-name">{t("wf.nameLabel")}</Label>
                 <Input
                   id="create-name"
                   autoFocus
@@ -651,16 +643,16 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                   maxLength={255}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Contoh: Alur Dukungan Pelanggan"
+                  placeholder={t("wf.createPlaceholder")}
                   className="h-10 dark:bg-input/30"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="create-description">
-                  Deskripsi{" "}
+                  {t("wf.descriptionLabel")}{" "}
                   <span className="font-normal text-muted-foreground">
-                    (opsional)
+                    {t("wf.optional")}
                   </span>
                 </Label>
                 <Textarea
@@ -668,7 +660,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                   rows={4}
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Apa yang akan diotomatisasi workflow ini?"
+                  placeholder={t("wf.createDescriptionPlaceholder")}
                   className="dark:bg-input/30"
                 />
               </div>
@@ -681,7 +673,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                   onClick={() => setShowCreate(false)}
                   className="h-10 px-4"
                 >
-                  Batal
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -693,7 +685,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                   ) : (
                     <ArrowRight />
                   )}
-                  {creating ? "Membuat..." : "Buat workflow"}
+                  {creating ? t("wf.creating") : t("wf.createTitle")}
                 </Button>
               </DialogFooter>
             </form>
@@ -712,17 +704,16 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
               <AlertDialogMedia className="bg-destructive/10 text-destructive">
                 <Trash2 />
               </AlertDialogMedia>
-              <AlertDialogTitle>Hapus workflow?</AlertDialogTitle>
+              <AlertDialogTitle>{t("wf.deleteQuestion")}</AlertDialogTitle>
               <AlertDialogDescription>
-                <span className="font-medium text-foreground">
-                  {workflowToDelete?.name}
-                </span>{" "}
-                dan konfigurasi node yang disimpan akan dihapus secara permanen.
+                {t("wf.deleteDescription", {
+                  name: workflowToDelete?.name ?? "",
+                })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={deleting} className="h-10 px-4">
-                Batal
+                {t("common.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
                 variant="destructive"
@@ -731,7 +722,7 @@ export default function Workflows({ onOpenWorkflow }: WorkflowsProps) {
                 className="h-10 px-4"
               >
                 {deleting && <LoaderCircle className="animate-spin" />}
-                {deleting ? "Menghapus..." : "Hapus workflow"}
+                {deleting ? t("wf.deleting") : t("wf.deleteAction")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

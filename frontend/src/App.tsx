@@ -16,6 +16,8 @@ import AiProviders from "./pages/AiProviders";
 import PublicChatWidget from "./pages/PublicChatWidget";
 import ExecutionDetail from "./pages/ExecutionDetail";
 import Settings from "./pages/Settings";
+import Help from "./pages/Help";
+import { useI18n } from "./lib/i18n";
 import "./App.css";
 
 type Health = "checking" | "online" | "offline";
@@ -26,7 +28,10 @@ type View =
   | "channel"
   | "activity"
   | "ai-providers"
-  | "settings";
+  | "settings"
+  | "help";
+
+type CurrentUser = { name: string; email: string };
 
 function ErrorBanner({
   message,
@@ -35,6 +40,8 @@ function ErrorBanner({
   message: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div
       role="alert"
@@ -48,16 +55,18 @@ function ErrorBanner({
         onClick={onClose}
         className="text-destructive hover:text-destructive"
       >
-        Tutup
+        {t("common.close")}
       </Button>
     </div>
   );
 }
 
 export default function App() {
+  const { t } = useI18n();
   const [health, setHealth] = useState<Health>("checking");
   const [authChecking, setAuthChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("dashboard");
@@ -75,11 +84,15 @@ export default function App() {
     let active = true;
 
     getCurrentUser()
-      .then(() => {
-        if (active) setAuthenticated(true);
+      .then((currentUser) => {
+        if (!active) return;
+        setUser(currentUser);
+        setAuthenticated(true);
       })
       .catch(() => {
-        if (active) setAuthenticated(false);
+        if (!active) return;
+        setUser(null);
+        setAuthenticated(false);
       })
       .finally(() => {
         if (active) setAuthChecking(false);
@@ -93,6 +106,7 @@ export default function App() {
   useEffect(() => {
     const handleUnauthorized = () => {
       setAuthenticated(false);
+      setUser(null);
       setEditingWorkflowId(null);
       setViewingExecution(null);
       setView("dashboard");
@@ -132,11 +146,12 @@ export default function App() {
     try {
       await logout();
       setAuthenticated(false);
+      setUser(null);
       setEditingWorkflowId(null);
       setViewingExecution(null);
       setView("dashboard");
     } catch {
-      setError("Logout gagal. Silakan coba lagi.");
+      setError(t("auth.logoutError"));
     } finally {
       setLoggingOut(false);
     }
@@ -176,7 +191,7 @@ export default function App() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-sm text-muted-foreground">
         <LoaderCircle className="size-7 animate-spin text-primary" />
-        <p>Memeriksa sesi login...</p>
+        <p>{t("auth.checking")}</p>
       </div>
     );
   }
@@ -193,6 +208,7 @@ export default function App() {
 
   const layoutProps = {
     health,
+    user,
     loggingOut,
     onLogout: () => void handleLogout(),
     onDashboardClick: () => goTo("dashboard"),
@@ -201,7 +217,7 @@ export default function App() {
     onChannelClick: () => goTo("channel"),
     onActivityClick: () => goTo("activity"),
     onAiProvidersClick: () => goTo("ai-providers"),
-    onHelpClick: () => goTo("settings", "settings-support"),
+    onHelpClick: () => goTo("help"),
     onSettingsClick: () => goTo("settings"),
   };
 
@@ -209,7 +225,7 @@ export default function App() {
   if (editingWorkflowId !== null) {
     return (
       <DashboardLayout
-        title="Workflow editor"
+        title={t("nav.workflows")}
         icon="editor"
         activeNav="workflows"
         {...layoutProps}
@@ -228,7 +244,7 @@ export default function App() {
   if (viewingExecution !== null) {
     return (
       <DashboardLayout
-        title="Audit log"
+        title={t("nav.activity")}
         icon="activity"
         activeNav="activity"
         {...layoutProps}
@@ -247,7 +263,7 @@ export default function App() {
   if (view === "dashboard") {
     return (
       <DashboardLayout
-        title="Dashboard"
+        title={t("nav.dashboard")}
         icon="dashboard"
         activeNav="dashboard"
         {...layoutProps}
@@ -262,7 +278,7 @@ export default function App() {
   if (view === "inbox") {
     return (
       <DashboardLayout
-        title="Inbox"
+        title={t("nav.inbox")}
         icon="inbox"
         activeNav="inbox"
         {...layoutProps}
@@ -277,7 +293,7 @@ export default function App() {
   if (view === "channel") {
     return (
       <DashboardLayout
-        title="Channel"
+        title={t("nav.channel")}
         icon="channel"
         activeNav="channel"
         {...layoutProps}
@@ -292,7 +308,7 @@ export default function App() {
   if (view === "activity") {
     return (
       <DashboardLayout
-        title="Audit Log"
+        title={t("nav.activity")}
         icon="activity"
         activeNav="activity"
         {...layoutProps}
@@ -317,7 +333,7 @@ export default function App() {
   if (view === "ai-providers") {
     return (
       <DashboardLayout
-        title="API Keys"
+        title={t("nav.apiKeys")}
         icon="keys"
         activeNav="ai-providers"
         {...layoutProps}
@@ -329,10 +345,29 @@ export default function App() {
     );
   }
 
+  if (view === "help") {
+    return (
+      <DashboardLayout
+        title={t("nav.help")}
+        icon="help"
+        activeNav="help"
+        {...layoutProps}
+      >
+        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
+
+        <Help
+          onOpenAiProviders={() => goTo("ai-providers")}
+          onOpenWorkflows={() => goTo("workflows")}
+          onOpenChannel={() => goTo("channel")}
+        />
+      </DashboardLayout>
+    );
+  }
+
   if (view === "settings") {
     return (
       <DashboardLayout
-        title="Settings"
+        title={t("nav.settings")}
         icon="settings"
         activeNav="settings"
         {...layoutProps}
@@ -342,6 +377,7 @@ export default function App() {
         <Settings
           health={health}
           onOpenAiProviders={() => goTo("ai-providers")}
+          onProfileUpdated={setUser}
         />
       </DashboardLayout>
     );
@@ -350,7 +386,7 @@ export default function App() {
   // Halaman daftar workflow
   return (
     <DashboardLayout
-      title="Workflows"
+      title={t("nav.workflows")}
       icon="workflows"
       activeNav="workflows"
       {...layoutProps}

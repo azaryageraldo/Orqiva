@@ -10,7 +10,7 @@ const api = axios.create({
   },
 });
 
-export const UNAUTHORIZED_EVENT = "flowpilot:unauthorized";
+export const UNAUTHORIZED_EVENT = "orqiva:unauthorized";
 
 type ApiErrorPayload = {
   message?: string;

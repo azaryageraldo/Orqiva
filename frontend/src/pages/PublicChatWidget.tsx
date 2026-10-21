@@ -3,7 +3,6 @@ import type { FormEvent } from "react";
 import {
   Bot,
   LoaderCircle,
-  MessageCircle,
   Send,
   ShieldCheck,
   TriangleAlert,
@@ -11,7 +10,10 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import OrqivaLogo from "@/components/brand/OrqivaLogo";
 import { Textarea } from "@/components/ui/textarea";
+import { APP_NAME } from "@/lib/constants";
+import { useI18n, type Language } from "@/lib/i18n";
 import { getErrorMessage } from "../services/api";
 import {
   getPublicSession,
@@ -21,16 +23,21 @@ import {
   type PublicMessage,
 } from "../services/publicChat";
 
-const CONTACT_KEY = "flowpilot_contact_id";
+const CONTACT_KEY = "orqiva_contact_id";
+const LEGACY_CONTACT_KEY = "flowpilot_contact_id";
 
-const timeFormat = new Intl.DateTimeFormat("id-ID", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
+const TIME_FORMATS: Record<Language, Intl.DateTimeFormat> = {
+  id: new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }),
+  en: new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit" }),
+};
 
 function readContactId(): string | undefined {
   try {
-    return window.localStorage.getItem(CONTACT_KEY) ?? undefined;
+    return (
+      window.localStorage.getItem(CONTACT_KEY) ??
+      window.localStorage.getItem(LEGACY_CONTACT_KEY) ??
+      undefined
+    );
   } catch {
     return undefined;
   }
@@ -44,13 +51,16 @@ function saveContactId(contactId: string) {
   }
 }
 
-function formatTime(value: string | null): string {
+function formatTime(value: string | null, language: Language): string {
   if (!value) return "";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : timeFormat.format(date);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : TIME_FORMATS[language].format(date);
 }
 
 export default function PublicChatWidget({ token }: { token: string }) {
+  const { t } = useI18n();
   const [channel, setChannel] = useState<PublicChannel | null>(null);
   const [sessionToken, setSessionToken] = useState("");
   const [contactId, setContactId] = useState("");
@@ -82,10 +92,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
       })
       .catch((caught: unknown) => {
         setError(
-          getErrorMessage(
-            caught,
-            "Widget tidak dapat dibuka. Periksa tautan atau hubungi admin.",
-          ),
+          getErrorMessage(caught, t("public.startError")),
         );
       })
       .finally(() => setLoading(false));
@@ -96,6 +103,8 @@ export default function PublicChatWidget({ token }: { token: string }) {
      * dipakai oleh instance komponen yang sama.
      */
     return () => undefined;
+    // The session should only restart when the channel token changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
@@ -155,10 +164,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
     } catch (caught) {
       setDraft(text);
       setError(
-        getErrorMessage(
-          caught,
-          "Pesan gagal dikirim. Periksa koneksi lalu coba lagi.",
-        ),
+        getErrorMessage(caught, t("public.sendError")),
       );
     } finally {
       setSending(false);
@@ -176,19 +182,21 @@ export default function PublicChatWidget({ token }: { token: string }) {
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-3 py-4 sm:px-6 sm:py-8">
         <header className="flex items-center gap-3 rounded-t-2xl border border-b-0 border-border bg-card/90 px-4 py-3.5 backdrop-blur sm:px-5">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-            <MessageCircle className="size-5" />
-          </span>
+          <OrqivaLogo
+            showWordmark={false}
+            markClassName="size-10"
+            className="shrink-0"
+          />
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-sm font-semibold text-foreground">
               {channel?.name || "Customer Support"}
             </h1>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
               {sessionStatus === "human"
-                ? "Admin sedang menangani percakapan"
+                ? t("public.humanHandling")
                 : channel?.workflow_name
                   ? `AI · ${channel.workflow_name}`
-                  : "AI customer service"}
+                  : t("public.aiCustomerService")}
             </p>
           </div>
           <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[10px] text-muted-foreground">
@@ -197,7 +205,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                 sessionStatus === "human" ? "bg-teal-400" : "bg-emerald-400"
               }`}
             />
-            {sessionStatus === "human" ? "Admin" : "AI"}
+            {sessionStatus === "human" ? t("public.admin") : "AI"}
           </span>
         </header>
 
@@ -213,7 +221,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                   <TriangleAlert className="size-5" />
                 </span>
                 <p className="mt-4 text-sm font-medium text-foreground">
-                  Widget tidak tersedia
+                  {t("public.unavailableTitle")}
                 </p>
                 <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
                   {error}
@@ -222,11 +230,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
             ) : (
               <>
                 {welcome && messages.length === 0 && (
-                  <Bubble
-                    role="assistant"
-                    content={welcome}
-                    time={null}
-                  />
+                  <Bubble role="assistant" content={welcome} time={null} />
                 )}
 
                 {messages.map((message) =>
@@ -255,7 +259,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                 {sending && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Bot className="size-4" />
-                    AI sedang mengetik...
+                    {t("public.typing")}
                   </div>
                 )}
                 <div ref={bottomRef} />
@@ -291,8 +295,10 @@ export default function PublicChatWidget({ token }: { token: string }) {
                 }}
                 rows={1}
                 maxLength={4000}
-                placeholder={channel?.settings.placeholder || "Tulis pesan..."}
-                aria-label="Pesan"
+                placeholder={
+                  channel?.settings.placeholder || t("public.inputPlaceholder")
+                }
+                aria-label={t("public.messageLabel")}
                 disabled={loading || !sessionToken || sending}
                 className="max-h-36 min-h-11 resize-none"
               />
@@ -300,7 +306,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
                 type="submit"
                 size="icon-lg"
                 disabled={!draft.trim() || loading || sending || !sessionToken}
-                aria-label="Kirim pesan"
+                aria-label={t("public.send")}
                 className="shrink-0"
               >
                 {sending ? (
@@ -314,14 +320,18 @@ export default function PublicChatWidget({ token }: { token: string }) {
               <span className="inline-flex items-center gap-1">
                 <ShieldCheck className="size-3" />
                 {sessionStatus === "human"
-                  ? "Admin sedang menangani percakapan ini."
+                  ? t("public.humanNote")
                   : sessionStatus === "ended"
-                    ? "Sesi telah berakhir. Muat ulang widget untuk memulai lagi."
-                    : "Percakapan ini dilayani AI dan dapat diambil alih admin."}
+                    ? t("public.endedNote")
+                    : t("public.aiNote")}
               </span>
-              {contactId && (
-                <span className="font-mono">ID {contactId}</span>
-              )}
+              <span className="inline-flex items-center gap-2">
+                {contactId && <span className="font-mono">ID {contactId}</span>}
+                <span aria-hidden="true">·</span>
+                <span>
+                  {t("public.poweredBy", { name: APP_NAME })}
+                </span>
+              </span>
             </div>
           </form>
         </main>
@@ -339,6 +349,8 @@ function Bubble({
   content: string;
   time: string | null;
 }) {
+  const { language } = useI18n();
+
   if (role === "admin") {
     return (
       <div className="flex items-end justify-end gap-2">
@@ -348,7 +360,7 @@ function Bubble({
           </p>
           <p className="whitespace-pre-wrap break-words">{content}</p>
           <p className="mt-1 text-right text-[10px] text-muted-foreground">
-            {formatTime(time)}
+            {formatTime(time, language)}
           </p>
         </div>
         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-teal-400/25 bg-teal-400/10 text-teal-300">
@@ -391,7 +403,7 @@ function Bubble({
             isAssistant ? "" : "text-right"
           }`}
         >
-          {formatTime(time)}
+          {formatTime(time, language)}
         </p>
       </div>
     </div>

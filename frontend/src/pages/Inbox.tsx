@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { formatLocale, useI18n } from "@/lib/i18n";
 import { getErrorMessage } from "../services/api";
 import {
   getContact,
@@ -29,39 +30,22 @@ import {
   type InboxSession,
 } from "../services/inbox";
 
-const timeFormat = new Intl.DateTimeFormat("id-ID", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-const dayFormat = new Intl.DateTimeFormat("id-ID", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
-
-const shortDateFormat = new Intl.DateTimeFormat("id-ID", {
-  day: "numeric",
-  month: "short",
-});
-
 const CONTACT_STATUS: Record<
   InboxContact["session_status"],
-  { label: string; dot: string; tone: string }
+  { labelKey: string; dot: string; tone: string }
 > = {
   active: {
-    label: "AI aktif",
+    labelKey: "inbox.status.active",
     dot: "bg-emerald-400",
     tone: "border-emerald-400/25 bg-emerald-400/10 text-emerald-300",
   },
   human: {
-    label: "Admin",
+    labelKey: "inbox.status.human",
     dot: "bg-teal-400",
     tone: "border-teal-400/25 bg-teal-400/10 text-teal-300",
   },
   ended: {
-    label: "Selesai",
+    labelKey: "inbox.status.ended",
     dot: "bg-muted-foreground",
     tone: "border-border bg-muted/40 text-muted-foreground",
   },
@@ -81,18 +65,27 @@ function isSameDay(left: Date, right: Date): boolean {
   );
 }
 
-function listTime(value: string | null): string {
+function listTime(value: string | null, locale: string): string {
   const date = parseDate(value);
   if (!date) return "";
 
   const now = new Date();
 
-  if (isSameDay(date, now)) return timeFormat.format(date);
-  if (date.getFullYear() === now.getFullYear()) {
-    return shortDateFormat.format(date);
+  if (isSameDay(date, now)) {
+    return new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
   }
 
-  return new Intl.DateTimeFormat("id-ID", {
+  if (date.getFullYear() === now.getFullYear()) {
+    return new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -104,9 +97,20 @@ function dayKey(value: string | null): string {
   return date ? date.toDateString() : "unknown";
 }
 
-function dayLabel(value: string | null): string {
+function dayLabel(
+  value: string | null,
+  locale: string,
+  fallback: string,
+): string {
   const date = parseDate(value);
-  return date ? dayFormat.format(date) : "Tanggal tidak diketahui";
+  if (!date) return fallback;
+
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
 }
 
 function initials(name: string): string {
@@ -124,6 +128,8 @@ function sessionTone(status: InboxSession["status"]): string {
 }
 
 export default function Inbox() {
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
   const [contacts, setContacts] = useState<InboxContact[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState("");
@@ -158,13 +164,13 @@ export default function Inbox() {
       setListError(
         getErrorMessage(
           caught,
-          "Daftar contact gagal dimuat. Periksa koneksi backend.",
+          t("inbox.listError"),
         ),
       );
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadList(), 0);
@@ -190,7 +196,7 @@ export default function Inbox() {
             setDetailError(
               getErrorMessage(
                 caught,
-                "Riwayat contact gagal dimuat. Coba lagi.",
+                t("inbox.detailError"),
               ),
             );
           }
@@ -204,7 +210,7 @@ export default function Inbox() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedId, detailReload]);
+  }, [selectedId, detailReload, t]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -253,10 +259,10 @@ export default function Inbox() {
     try {
       if (mode === "takeover") {
         await takeOverSession(latestSession.id);
-        setNotice("Percakapan diambil alih. Anda dapat membalas sebagai admin.");
+        setNotice(t("inbox.takeoverNotice"));
       } else {
         await releaseSession(latestSession.id);
-        setNotice("Percakapan dikembalikan ke AI.");
+        setNotice(t("inbox.releaseNotice"));
         setReply("");
       }
 
@@ -264,7 +270,7 @@ export default function Inbox() {
       await loadList();
     } catch (caught) {
       setDetailError(
-        getErrorMessage(caught, "Status percakapan gagal diubah. Coba lagi."),
+        getErrorMessage(caught, t("inbox.actionError")),
       );
     } finally {
       setAction(null);
@@ -284,12 +290,12 @@ export default function Inbox() {
     try {
       await sendAdminReply(latestSession.id, text);
       setReply("");
-      setNotice("Balasan admin terkirim.");
+      setNotice(t("inbox.replySent"));
       setDetailReload((current) => current + 1);
       await loadList();
     } catch (caught) {
       setDetailError(
-        getErrorMessage(caught, "Balasan admin gagal dikirim. Coba lagi."),
+        getErrorMessage(caught, t("inbox.replyError")),
       );
     } finally {
       setSending(false);
@@ -303,19 +309,19 @@ export default function Inbox() {
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
               <InboxIcon className="size-4" />
-              Workspace
+              {t("nav.workspace")}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Inbox
+              {t("inbox.title")}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Riwayat lengkap per contact, dengan takeover per session.
+              {t("inbox.subtitle")}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
-              {contacts.length} contact
+              {t("inbox.contactCount", { count: contacts.length })}
             </span>
             <Button
               type="button"
@@ -330,7 +336,7 @@ export default function Inbox() {
               className="h-9 px-3"
             >
               <RefreshCw className={listLoading ? "animate-spin" : undefined} />
-              Segarkan
+              {t("inbox.refresh")}
             </Button>
           </div>
         </div>
@@ -347,8 +353,8 @@ export default function Inbox() {
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Cari nama, ID, atau pesan..."
-                  aria-label="Cari contact"
+                  placeholder={t("inbox.searchPlaceholder")}
+                  aria-label={t("inbox.searchAria")}
                   className="h-9 pl-8 dark:bg-input/30"
                 />
               </div>
@@ -369,7 +375,7 @@ export default function Inbox() {
                     onClick={() => void loadList()}
                     className="mt-3"
                   >
-                    Coba lagi
+                    {t("common.retry")}
                   </Button>
                 </div>
               ) : filtered.length === 0 ? (
@@ -378,12 +384,12 @@ export default function Inbox() {
                     <InboxIcon className="size-5" />
                   </span>
                   <p className="mt-3 text-sm font-medium text-foreground">
-                    {query ? "Contact tidak ditemukan" : "Inbox masih kosong"}
+                    {query ? t("inbox.emptyQuery") : t("inbox.emptyTitle")}
                   </p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     {query
-                      ? "Coba kata kunci lain."
-                      : "Contact muncul setelah pelanggan mengirim pesan lewat widget Channel."}
+                      ? t("inbox.emptyQueryHint")
+                      : t("inbox.emptyHint")}
                   </p>
                 </div>
               ) : (
@@ -417,22 +423,22 @@ export default function Inbox() {
                                 {contact.name}
                               </span>
                               <span className="shrink-0 text-[10px] text-muted-foreground">
-                                {listTime(contact.last_activity_at)}
+                                {listTime(contact.last_activity_at, locale)}
                               </span>
                             </span>
 
                             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {contact.last_message || "Belum ada pesan"}
+                              {contact.last_message || t("inbox.noMessages")}
                             </span>
 
                             <span className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
                               <span className="inline-flex items-center gap-1">
                                 <span className={`size-1.5 rounded-full ${meta.dot}`} />
-                                {meta.label}
+                                {t(meta.labelKey)}
                               </span>
                               <span className="text-muted-foreground/50">·</span>
                               <span className="truncate">
-                                {contact.session_count} session
+                                {t("inbox.sessionCount", { count: contact.session_count })}
                               </span>
                               <span className="font-mono text-muted-foreground/70">
                                 {contact.contact_id}
@@ -459,11 +465,10 @@ export default function Inbox() {
                   <InboxIcon className="size-6" />
                 </span>
                 <p className="mt-4 text-sm font-medium text-foreground">
-                  Pilih contact
+                  {t("inbox.selectTitle")}
                 </p>
                 <p className="mt-1 max-w-xs text-sm leading-6 text-muted-foreground">
-                  Pilih contact di kiri untuk melihat seluruh riwayat session
-                  dan mengambil alih percakapan.
+                  {t("inbox.selectHint")}
                 </p>
               </div>
             ) : detailLoading && !detail ? (
@@ -480,12 +485,12 @@ export default function Inbox() {
                   onClick={() => setDetailReload((current) => current + 1)}
                   className="mt-3"
                 >
-                  Coba lagi
+                  {t("common.retry")}
                 </Button>
               </div>
             ) : !detail ? (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                Detail contact tidak tersedia.
+                {t("inbox.detailUnavailable")}
               </div>
             ) : (
               <>
@@ -494,7 +499,7 @@ export default function Inbox() {
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Kembali ke daftar contact"
+                    aria-label={t("inbox.back")}
                     onClick={() => setSelectedId(null)}
                     className="lg:hidden"
                   >
@@ -514,12 +519,15 @@ export default function Inbox() {
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusMeta.tone}`}
                       >
                         <span className={`size-1.5 rounded-full ${statusMeta.dot}`} />
-                        {statusMeta.label}
+                        {t(statusMeta.labelKey)}
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       <span className="font-mono">{detail.contact_id}</span> ·{" "}
-                      {detail.sessions.length} session · {messageCount} pesan
+                      {t("inbox.sessionCount", {
+                        count: detail.sessions.length,
+                      })}{" "}
+                      · {t("inbox.messageCount", { count: messageCount })}
                       {latestSession?.workflow_name
                         ? ` · ${latestSession.workflow_name}`
                         : ""}
@@ -545,8 +553,8 @@ export default function Inbox() {
                         <ShieldCheck />
                       )}
                       {latestStatus === "human"
-                        ? "Kembalikan ke AI"
-                        : "Ambil alih"}
+                        ? t("inbox.release")
+                        : t("inbox.takeover")}
                     </Button>
                   )}
                 </header>
@@ -568,7 +576,7 @@ export default function Inbox() {
                     <div className="flex h-full min-h-52 flex-col items-center justify-center text-center">
                       <Bot className="size-7 text-muted-foreground" />
                       <p className="mt-3 text-sm text-muted-foreground">
-                        Belum ada session untuk contact ini.
+                        {t("inbox.noSessions")}
                       </p>
                     </div>
                   ) : (
@@ -599,7 +607,7 @@ export default function Inbox() {
                           }}
                           rows={1}
                           maxLength={4000}
-                          placeholder="Balas sebagai admin..."
+                          placeholder={t("inbox.replyPlaceholder")}
                           className="max-h-32 min-h-10 resize-none"
                           disabled={sending}
                         />
@@ -607,7 +615,7 @@ export default function Inbox() {
                           type="submit"
                           size="icon-lg"
                           disabled={!reply.trim() || sending}
-                          aria-label="Kirim balasan admin"
+                          aria-label={t("inbox.sendReply")}
                         >
                           {sending ? (
                             <LoaderCircle className="animate-spin" />
@@ -618,8 +626,7 @@ export default function Inbox() {
                       </div>
                       <p className="mt-2 flex items-center gap-1.5 text-[11px] text-teal-300">
                         <ShieldCheck className="size-3.5" />
-                        Anda membalas sebagai admin. AI berhenti hingga
-                        percakapan dikembalikan.
+                        {t("inbox.replyHint")}
                       </p>
                     </form>
                   ) : latestSession ? (
@@ -628,13 +635,12 @@ export default function Inbox() {
                         {latestStatus === "active" ? (
                           <>
                             <Bot className="size-4 text-primary" />
-                            AI menangani session ini. Ambil alih untuk membalas.
+                            {t("inbox.aiHandling")}
                           </>
                         ) : (
                           <>
                             <ShieldCheck className="size-4" />
-                            Session sudah berakhir. Pelanggan perlu membuka
-                            widget baru.
+                            {t("inbox.endedHint")}
                           </>
                         )}
                       </span>
@@ -647,7 +653,7 @@ export default function Inbox() {
                           disabled={action !== null}
                         >
                           <ShieldCheck />
-                          Ambil alih
+                          {t("inbox.takeover")}
                         </Button>
                       )}
                     </div>
@@ -669,30 +675,33 @@ function SessionHistory({
   session: InboxSession;
   latest: boolean;
 }) {
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/25 px-3 py-2 text-[11px] text-muted-foreground">
         <span className="font-medium text-foreground">
-          Session #{session.id}
-          {latest ? " · terbaru" : ""}
+          {t("inbox.sessionLabel", { id: session.id })}
+          {latest ? ` · ${t("inbox.latest")}` : ""}
         </span>
         <span className="text-muted-foreground/50">·</span>
         <span>{session.workflow_name || "Workflow"}</span>
         <span className="text-muted-foreground/50">·</span>
-        <span>{session.started_at ? dayLabel(session.started_at) : "—"}</span>
+        <span>{session.started_at ? dayLabel(session.started_at, locale, t("inbox.dayUnknown")) : "—"}</span>
         <span
           className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${sessionTone(session.status)}`}
         >
           <span
             className={`size-1.5 rounded-full ${CONTACT_STATUS[session.status].dot}`}
           />
-          {CONTACT_STATUS[session.status].label}
+          {t(CONTACT_STATUS[session.status].labelKey)}
         </span>
       </div>
 
       {session.messages.length === 0 ? (
         <p className="px-3 text-xs text-muted-foreground">
-          Belum ada pesan pada session ini.
+          {t("inbox.noSessionMessages")}
         </p>
       ) : (
         <div className="space-y-4">
@@ -735,14 +744,19 @@ function SessionHistory({
 }
 
 function DayLabel({ value }: { value: string | null }) {
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
+
   return (
     <p className="mb-3 text-center text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-      {dayLabel(value)}
+      {dayLabel(value, locale, t("inbox.dayUnknown"))}
     </p>
   );
 }
 
 function MessageBubble({ message }: { message: InboxMessage }) {
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
   const isCustomer = message.role === "customer";
   const isAdmin = message.role === "admin";
   const Icon = isAdmin ? ShieldCheck : isCustomer ? UserRound : Bot;
@@ -776,7 +790,7 @@ function MessageBubble({ message }: { message: InboxMessage }) {
       >
         {isAdmin && (
           <p className="mb-1 text-[10px] font-semibold tracking-wide text-teal-300 uppercase">
-            Admin
+            {t("inbox.admin")}
           </p>
         )}
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -785,7 +799,12 @@ function MessageBubble({ message }: { message: InboxMessage }) {
             isCustomer || isAdmin ? "text-right" : ""
           }`}
         >
-          {message.created_at ? timeFormat.format(new Date(message.created_at)) : ""}
+          {message.created_at
+            ? new Intl.DateTimeFormat(locale, {
+                hour: "2-digit",
+                minute: "2-digit",
+              }).format(new Date(message.created_at))
+            : ""}
         </p>
       </div>
     </div>

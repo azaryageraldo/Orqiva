@@ -5,6 +5,7 @@ import {
   Inbox,
   KeyRound,
   LayoutDashboard,
+  LifeBuoy,
   LoaderCircle,
   LogOut,
   MessageSquare,
@@ -33,6 +34,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import PreferenceControls from "@/components/preferences/PreferenceControls";
+import { useI18n } from "@/lib/i18n";
 
 export type HeaderIcon =
   | "dashboard"
@@ -43,13 +46,20 @@ export type HeaderIcon =
   | "channel"
   | "activity"
   | "keys"
-  | "settings";
+  | "settings"
+  | "help";
 
 interface HeaderProps {
   title: string;
   icon: HeaderIcon;
   loggingOut: boolean;
   onLogout: () => void;
+  user: HeaderUser | null;
+}
+
+export interface HeaderUser {
+  name: string;
+  email: string;
 }
 
 const ICONS: Record<HeaderIcon, LucideIcon> = {
@@ -62,22 +72,33 @@ const ICONS: Record<HeaderIcon, LucideIcon> = {
   activity: Activity,
   keys: KeyRound,
   settings: Settings,
+  help: LifeBuoy,
 };
 
-const ACCOUNT = {
-  name: "Azarya Geraldo",
-  email: "admin@gmail.com",
-  role: "Workspace admin",
-  initials: "AG",
-};
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "OR";
+}
 
 export default function Header({
   title,
   icon,
   loggingOut,
   onLogout,
+  user,
 }: HeaderProps) {
+  const { t } = useI18n();
   const Icon = ICONS[icon];
+  const account = {
+    name: user?.name || "Orqiva Admin",
+    email: user?.email || "admin@gmail.com",
+    role: t("header.workspaceAdmin"),
+    initials: initialsOf(user?.name || "Orqiva Admin"),
+  };
 
   return (
     <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-md sm:px-6">
@@ -97,7 +118,7 @@ export default function Header({
           </BreadcrumbItem>
           <BreadcrumbSeparator className="hidden md:flex" />
           <BreadcrumbItem className="hidden sm:flex">
-            <span>Workspace</span>
+            <span>{t("header.workspace")}</span>
           </BreadcrumbItem>
           <BreadcrumbSeparator className="hidden sm:flex" />
           <BreadcrumbItem>
@@ -107,6 +128,8 @@ export default function Header({
       </Breadcrumb>
 
       <div className="ml-auto flex items-center gap-2">
+        <PreferenceControls className="hidden sm:flex" />
+
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -115,15 +138,15 @@ export default function Header({
           >
             <Avatar size="sm">
               <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
-                {ACCOUNT.initials}
+                {account.initials}
               </AvatarFallback>
             </Avatar>
             <span className="hidden text-left leading-tight sm:block">
               <span className="block text-sm font-medium text-foreground">
-                {ACCOUNT.name}
+                {account.name}
               </span>
               <span className="block text-xs font-normal text-muted-foreground">
-                {ACCOUNT.role}
+                {account.role}
               </span>
             </span>
             <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
@@ -133,10 +156,10 @@ export default function Header({
             <DropdownMenuGroup>
               <DropdownMenuLabel>
                 <span className="block text-sm font-medium text-foreground">
-                  {ACCOUNT.name}
+                  {account.name}
                 </span>
                 <span className="block truncate text-xs font-normal text-muted-foreground">
-                  {ACCOUNT.email}
+                  {account.email}
                 </span>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
@@ -153,7 +176,7 @@ export default function Header({
               ) : (
                 <LogOut />
               )}
-              {loggingOut ? "Logging out..." : "Logout"}
+              {loggingOut ? t("header.loggingOut") : t("header.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
