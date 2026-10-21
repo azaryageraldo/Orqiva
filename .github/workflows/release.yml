@@ -102,6 +102,10 @@ jobs:
           printf '%s\n' "$output"
           if [ "$code" -ne 0 ]; then
             message=$(printf '%s\n' "$output" | tail -n 30 | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-2000)
+            if printf '%s' "$output" | grep -q "cannot publish over the previously published versions"; then
+              echo "::notice::Versi sudah terbit, publish dilewati."
+              exit 0
+            fi
             echo "::error::npm publish failed: $message"
             exit "$code"
           fi
@@ -166,6 +170,10 @@ jobs:
           printf '%s\n' "$output"
           if [ "$code" -ne 0 ]; then
             message=$(printf '%s\n' "$output" | tail -n 30 | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-2000)
+            if printf '%s' "$output" | grep -q "cannot publish over the previously published versions"; then
+              echo "::notice::Versi sudah terbit, publish dilewati."
+              exit 0
+            fi
             echo "::error::npm publish failed: $message"
             exit "$code"
           fi
@@ -194,6 +202,13 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           version="${VERSION#v}"
+          for attempt in $(seq 1 30); do
+            if npm view "orqiva@$version" version >/dev/null 2>&1; then
+              break
+            fi
+            echo "Menunggu orqiva@$version tersedia di registry (percobaan $attempt)..."
+            sleep 10
+          done
           npm install -g "orqiva@$version"
           orqiva help
           set +e

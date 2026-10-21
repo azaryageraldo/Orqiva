@@ -19,7 +19,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Tentukan versi terbaru
+        id: version
+        run: echo "version=$(npm view orqiva dist-tags.latest)" >> "$GITHUB_OUTPUT"
       - name: Unduh paket runtime dan periksa format binary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p runtime-check
@@ -28,7 +33,7 @@ jobs:
             package="$1"
             pattern="$2"
             label="$3"
-            npm pack "$package@0.1.0" --silent > tarball.txt
+            npm pack "$package@$VERSION" --silent > tarball.txt
             tarball=$(cat tarball.txt | tail -n 1)
             tar -xzf "$tarball"
             file package/frankenphp* | tee "$label.txt"
@@ -61,13 +66,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Tentukan versi terbaru
+        id: version
+        run: echo "version=$(npm view orqiva dist-tags.latest)" >> "$GITHUB_OUTPUT"
       - name: Install and inspect published package
         env:
           ORQIVA_DATA_DIR: ${{ runner.temp }}/orqiva-data
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          npx --yes orqiva@0.1.0 help
+          for attempt in $(seq 1 30); do
+            if npm view "orqiva@$VERSION" version >/dev/null 2>&1; then
+              break
+            fi
+            echo "Menunggu orqiva@$VERSION tersedia di registry (percobaan $attempt)..."
+            sleep 10
+          done
+          npx --yes "orqiva@$VERSION" help
           set +e
-          npx --yes orqiva@0.1.0 doctor > doctor.txt 2>&1
+          npx --yes "orqiva@$VERSION" doctor > doctor.txt 2>&1
           code=$?
           cat doctor.txt
           if ! grep -q "Runtime PHP: FrankenPHP" doctor.txt; then
