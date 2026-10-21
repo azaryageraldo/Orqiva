@@ -87,7 +87,7 @@ jobs:
           code=$?
           printf '%s\n' "$output"
           if [ "$code" -ne 0 ]; then
-            message=$(printf '%s' "$output" | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-900)
+            message=$(printf '%s\n' "$output" | tail -n 30 | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-2000)
             echo "::error::npm publish failed: $message"
             exit "$code"
           fi
@@ -138,7 +138,7 @@ jobs:
           code=$?
           printf '%s\n' "$output"
           if [ "$code" -ne 0 ]; then
-            message=$(printf '%s' "$output" | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-900)
+            message=$(printf '%s\n' "$output" | tail -n 30 | tr '\n' ' ' | sed -E 's/npm_[A-Za-z0-9]{6,}/npm_***/g' | cut -c1-2000)
             echo "::error::npm publish failed: $message"
             exit "$code"
           fi
