@@ -101,6 +101,7 @@ export function getRuntimePaths(dataDir) {
     stateFile: join(dataDir, "runtime.json"),
     serverLog: join(dataDir, "logs", "server.log"),
     workerLog: join(dataDir, "logs", "worker.log"),
+    pollerLog: join(dataDir, "logs", "telegram.log"),
     database: join(dataDir, "data", "orqiva.sqlite"),
   };
 }

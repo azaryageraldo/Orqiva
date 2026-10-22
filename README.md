@@ -10,6 +10,7 @@ Orqiva is an open-source, self-hostable AI customer service automation workspace
 - BYOK AI providers: Google Gemini, OpenAI, and OpenRouter with encrypted per-user API keys
 - Resumable workflow execution with per-step audit logs and checkpoint recovery
 - Public website chat widget with embeddable snippet
+- Telegram bot channel that receives messages through long polling
 - Human handoff and shared inbox for taking over AI conversations
 - Usage statistics, token tracking, and execution history
 - Dark and light themes with English and Indonesian interfaces
@@ -29,7 +30,7 @@ npm install -g orqiva
 orqiva
 ```
 
-The `orqiva` command starts the bundled FrankenPHP runtime with SQLite, runs migrations, starts a queue worker, and opens the browser setup wizard.
+The `orqiva` command starts the bundled FrankenPHP runtime with SQLite, runs migrations, starts a queue worker and the Telegram poller, and opens the browser setup wizard.
 
 From source, requirements are PHP 8.3+, Composer, and Node.js/npm. SQLite is the default database; MySQL 8 is optional.
 

@@ -85,6 +85,12 @@ Route::prefix('v1')->group(function () {
         Route::delete('/channel/icon/{kind}', [ChannelController::class, 'deleteIcon']);
         Route::post('/channel/regenerate', [ChannelController::class, 'regenerate']);
 
+        Route::get('/channels', [ChannelController::class, 'index']);
+        Route::post('/channels', [ChannelController::class, 'store']);
+        Route::put('/channels/{channel}', [ChannelController::class, 'update']);
+        Route::delete('/channels/{channel}', [ChannelController::class, 'destroy']);
+        Route::post('/channels/{channel}/regenerate', [ChannelController::class, 'regenerate']);
+
         Route::get(
             '/stats/token-usage',
             [UsageStatsController::class, 'tokenUsage']

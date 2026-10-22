@@ -107,10 +107,20 @@ export async function startRuntime(options = {}) {
     logFile: paths.workerLog,
   });
 
+  const poller = startChild({
+    name: "telegram",
+    command: phpBinary,
+    args: [...artisanPrefix(phpBinary), "channels:telegram-poll"],
+    cwd: appRoot,
+    env,
+    logFile: paths.pollerLog,
+  });
+
   const state = {
     pid: process.pid,
     serverPid: server.child.pid,
     workerPid: worker.child.pid,
+    pollerPid: poller.child.pid,
     port,
     url,
     appRoot,
@@ -125,15 +135,18 @@ export async function startRuntime(options = {}) {
 
   let shuttingDown = false;
   let workerRestartTimer = null;
+  let pollerRestartTimer = null;
 
   const shutdown = (exitCode = 0) => {
     if (shuttingDown) return;
     shuttingDown = true;
 
     if (workerRestartTimer) clearTimeout(workerRestartTimer);
+    if (pollerRestartTimer) clearTimeout(pollerRestartTimer);
 
     terminateChild(server.child);
     terminateChild(worker.child);
+    terminateChild(poller.child);
 
     try {
       rmSync(paths.stateFile, { force: true });
@@ -173,6 +186,44 @@ export async function startRuntime(options = {}) {
     workerRestartTimer.unref();
   });
 
+  poller.child.once("exit", (code) => {
+    if (shuttingDown) return;
+
+    appendFileSync(
+      paths.pollerLog,
+      `[${new Date().toISOString()}] telegram poller exited with code ${code ?? "unknown"}; restarting\n`,
+    );
+
+    pollerRestartTimer = setTimeout(() => {
+      if (!shuttingDown) {
+        restartPoller();
+      }
+    }, 5000);
+    pollerRestartTimer.unref();
+  });
+
+  function restartPoller() {
+    const next = startChild({
+      name: "telegram",
+      command: phpBinary,
+      args: [...artisanPrefix(phpBinary), "channels:telegram-poll"],
+      cwd: appRoot,
+      env,
+      logFile: paths.pollerLog,
+    });
+
+    state.pollerPid = next.child.pid;
+    next.child.once("exit", (code) => {
+      if (shuttingDown) return;
+      appendFileSync(
+        paths.pollerLog,
+        `[${new Date().toISOString()}] telegram poller exited with code ${code ?? "unknown"}; restarting\n`,
+      );
+      pollerRestartTimer = setTimeout(restartPoller, 5000);
+      pollerRestartTimer.unref();
+    });
+  }
+
   function restartWorker() {
     const next = startChild({
       name: "worker",
@@ -208,6 +259,7 @@ export async function startRuntime(options = {}) {
     console.error("Orqiva gagal mulai. Log terakhir:");
     printLogTail(paths.serverLog);
     printLogTail(paths.workerLog);
+    printLogTail(paths.pollerLog);
     shutdown(1);
     throw new Error("Server tidak merespons health check.");
   }

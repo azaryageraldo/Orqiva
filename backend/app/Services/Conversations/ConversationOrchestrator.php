@@ -7,9 +7,12 @@ use App\Models\Channel;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use App\Models\Contact;
+use App\Models\ContactChannel;
 use App\Models\WorkflowExecution;
+use App\Services\Channels\MessageDelivery;
 use App\Services\Workflows\WorkflowRunner;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -22,7 +25,8 @@ class ConversationOrchestrator
     private const PROCESSING_TTL_MINUTES = 5;
 
     public function __construct(
-        private readonly WorkflowRunner $runner
+        private readonly WorkflowRunner $runner,
+        private readonly MessageDelivery $delivery
     ) {}
 
     /**
@@ -42,6 +46,28 @@ class ConversationOrchestrator
             ]);
         }
 
+        $contact = $this->resolveContact($channel, $contactId);
+
+        $this->closePreviousSessions($contact, $channel);
+
+        $session = ChatSession::create([
+            'user_id' => $channel->user_id,
+            'channel_id' => $channel->id,
+            'contact_id' => $contact->id,
+            'workflow_id' => $channel->workflow->id,
+            'public_token' => Str::random(48),
+            'status' => ChatSession::STATUS_ACTIVE,
+            'last_activity_at' => now(),
+        ]);
+
+        return [
+            'contact' => $contact,
+            'session' => $session,
+        ];
+    }
+
+    public function resolveContact(Channel $channel, ?string $contactId = null): Contact
+    {
         $contact = null;
 
         if (is_string($contactId) && trim($contactId) !== '') {
@@ -62,9 +88,95 @@ class ConversationOrchestrator
             $contact->update(['last_seen_at' => now()]);
         }
 
-        $this->closePreviousSessions($contact, $channel);
+        $this->linkContactChannel($channel, $contact, $contact->public_id);
 
-        $session = ChatSession::create([
+        return $contact;
+    }
+
+    public function contactForExternalId(
+        Channel $channel,
+        string $externalId,
+        ?string $name = null
+    ): Contact {
+        $externalId = trim($externalId);
+
+        if ($externalId === '') {
+            throw ValidationException::withMessages([
+                'contact' => 'ID kontak channel tidak valid.',
+            ]);
+        }
+
+        $contact = $this->contactByExternalId($channel, $externalId);
+
+        if ($contact !== null) {
+            $updates = ['last_seen_at' => now()];
+
+            if ($this->shouldAdoptName($contact, $name)) {
+                $updates['name'] = $this->normalizeContactName($name);
+            }
+
+            $contact->update($updates);
+
+            return $contact;
+        }
+
+        try {
+            return DB::transaction(function () use ($channel, $externalId, $name): Contact {
+                $contact = Contact::create([
+                    'user_id' => $channel->user_id,
+                    'public_id' => $this->contactId(),
+                    'name' => $this->normalizeContactName($name),
+                    'last_seen_at' => now(),
+                ]);
+
+                $this->linkContactChannel($channel, $contact, $externalId);
+
+                return $contact;
+            });
+        } catch (UniqueConstraintViolationException) {
+            $contact = $this->contactByExternalId($channel, $externalId);
+
+            if ($contact === null) {
+                throw ValidationException::withMessages([
+                    'contact' => 'Kontak channel gagal disimpan. Coba lagi.',
+                ]);
+            }
+
+            return $contact;
+        }
+    }
+
+    /**
+     * Reuse one conversation per contact and channel so transports such as
+     * Telegram can keep a long-lived thread instead of opening a session per
+     * message.
+     */
+    public function ensureSession(Channel $channel, Contact $contact): ChatSession
+    {
+        if ($channel->workflow === null) {
+            throw ValidationException::withMessages([
+                'channel' => 'Workflow entry belum dipilih pada channel ini.',
+            ]);
+        }
+
+        $session = ChatSession::query()
+            ->where('user_id', $channel->user_id)
+            ->where('channel_id', $channel->id)
+            ->where('contact_id', $contact->id)
+            ->whereIn('status', [
+                ChatSession::STATUS_ACTIVE,
+                ChatSession::STATUS_HUMAN,
+            ])
+            ->latest('id')
+            ->first();
+
+        if ($session !== null) {
+            $session->update(['last_activity_at' => now()]);
+
+            return $session;
+        }
+
+        return ChatSession::create([
             'user_id' => $channel->user_id,
             'channel_id' => $channel->id,
             'contact_id' => $contact->id,
@@ -73,11 +185,6 @@ class ConversationOrchestrator
             'status' => ChatSession::STATUS_ACTIVE,
             'last_activity_at' => now(),
         ]);
-
-        return [
-            'contact' => $contact,
-            'session' => $session,
-        ];
     }
 
     /**
@@ -86,7 +193,8 @@ class ConversationOrchestrator
     public function enqueueMessage(
         ChatSession $session,
         string $text,
-        ?string $clientMessageId = null
+        ?string $clientMessageId = null,
+        ?string $externalMessageId = null
     ): array {
         $lock = Cache::lock('public-chat-send:'.$session->id, 30);
 
@@ -96,7 +204,8 @@ class ConversationOrchestrator
                 fn (): array => $this->createMessage(
                     $session,
                     $text,
-                    $clientMessageId
+                    $clientMessageId,
+                    $externalMessageId
                 )
             );
         } catch (LockTimeoutException) {
@@ -218,7 +327,7 @@ class ConversationOrchestrator
                     continue;
                 }
 
-                ChatMessage::create([
+                $replyMessage = ChatMessage::create([
                     'chat_session_id' => $session->id,
                     'contact_id' => $session->contact_id,
                     'workflow_execution_id' => $execution?->id,
@@ -226,6 +335,8 @@ class ConversationOrchestrator
                     'content' => trim($reply),
                     'metadata' => ['node' => 'workflow'],
                 ]);
+
+                $this->delivery->send($replyMessage);
             }
 
             $session->refresh();
@@ -312,7 +423,8 @@ class ConversationOrchestrator
     private function createMessage(
         ChatSession $session,
         string $text,
-        ?string $clientMessageId
+        ?string $clientMessageId,
+        ?string $externalMessageId = null
     ): array {
         $session->refresh()->loadMissing([
             'channel.workflow',
@@ -327,18 +439,27 @@ class ConversationOrchestrator
             ]);
         }
 
+        $existing = null;
+
         if ($clientMessageId !== null) {
             $existing = ChatMessage::query()
                 ->where('chat_session_id', $session->id)
                 ->where('client_message_id', $clientMessageId)
                 ->first();
+        }
 
-            if ($existing !== null) {
-                return [
-                    'state' => $this->state($session),
-                    'queued' => data_get($existing->metadata, 'job_status') === 'pending',
-                ];
-            }
+        if ($existing === null && $externalMessageId !== null) {
+            $existing = ChatMessage::query()
+                ->where('chat_session_id', $session->id)
+                ->where('external_message_id', $externalMessageId)
+                ->first();
+        }
+
+        if ($existing !== null) {
+            return [
+                'state' => $this->state($session),
+                'queued' => data_get($existing->metadata, 'job_status') === 'pending',
+            ];
         }
 
         $channel = $session->channel;
@@ -364,6 +485,7 @@ class ConversationOrchestrator
             'contact_id' => $session->contact_id,
             'role' => 'customer',
             'content' => $text,
+            'external_message_id' => $externalMessageId,
             'client_message_id' => $clientMessageId,
             'metadata' => [
                 'job_status' => $humanHandling ? 'processed' : 'pending',
@@ -434,6 +556,7 @@ class ConversationOrchestrator
                 'role' => $message->role,
                 'content' => $message->content,
                 'variant' => data_get($message->metadata, 'variant'),
+                'delivery_status' => $message->delivery_status,
                 'created_at' => $message->created_at?->toISOString(),
             ])
             ->values()
@@ -493,6 +616,46 @@ class ConversationOrchestrator
         }
 
         $message->update($updates);
+    }
+
+    private function shouldAdoptName(Contact $contact, ?string $name): bool
+    {
+        if ($name === null || trim($name) === '') {
+            return false;
+        }
+
+        return in_array(trim((string) $contact->name), ['', 'Pengunjung'], true);
+    }
+
+    private function normalizeContactName(?string $name): string
+    {
+        $name = trim((string) $name);
+
+        return $name !== '' ? Str::limit($name, 100, '') : 'Pengunjung';
+    }
+
+    private function contactByExternalId(Channel $channel, string $externalId): ?Contact
+    {
+        return ContactChannel::query()
+            ->with('contact')
+            ->where('channel_id', $channel->id)
+            ->where('external_id', $externalId)
+            ->first()
+            ?->contact;
+    }
+
+    private function linkContactChannel(
+        Channel $channel,
+        Contact $contact,
+        string $externalId
+    ): void {
+        ContactChannel::query()->firstOrCreate(
+            [
+                'channel_id' => $channel->id,
+                'external_id' => $externalId,
+            ],
+            ['contact_id' => $contact->id]
+        );
     }
 
     private function contactId(): string

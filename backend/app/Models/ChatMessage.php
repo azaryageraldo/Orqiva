@@ -7,12 +7,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ChatMessage extends Model
 {
+    public const DELIVERY_PENDING = 'pending';
+
+    public const DELIVERY_SENT = 'sent';
+
+    public const DELIVERY_FAILED = 'failed';
+
     protected $fillable = [
         'chat_session_id',
         'contact_id',
         'workflow_execution_id',
         'role',
         'content',
+        'delivery_status',
+        'external_message_id',
+        'delivery_error',
+        'attachments',
         'client_message_id',
         'metadata',
     ];
@@ -21,6 +31,7 @@ class ChatMessage extends Model
     {
         return [
             'metadata' => 'array',
+            'attachments' => 'array',
         ];
     }
 

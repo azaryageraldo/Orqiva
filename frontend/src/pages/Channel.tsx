@@ -46,11 +46,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
 import { getErrorMessage } from "../services/api";
 import {
+  createChannel,
   deleteChannelIcon,
   getChannel,
   getWorkflowOptions,
+  listChannels,
   regenerateChannelToken,
   updateChannel,
+  updateChannelById,
   uploadChannelIcon,
   type ChannelAppearance,
   type ChannelIconKind,
@@ -74,7 +77,7 @@ const CHANNEL_CATALOG = [
     descriptionKey: "channel.telegramDescription",
     icon: TelegramLogo,
     tile: "border-sky-400/25 bg-sky-400/10 text-sky-400",
-    active: false,
+    active: true,
   },
   {
     id: "whatsapp",
@@ -138,6 +141,13 @@ export default function Channel() {
   const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState(false);
   const [snippetCopied, setSnippetCopied] = useState(false);
+  const [telegram, setTelegram] = useState<WidgetChannel | null>(null);
+  const [telegramOpen, setTelegramOpen] = useState(false);
+  const [telegramName, setTelegramName] = useState("Telegram");
+  const [telegramWorkflowId, setTelegramWorkflowId] = useState("");
+  const [telegramActive, setTelegramActive] = useState(false);
+  const [botToken, setBotToken] = useState("");
+  const [telegramSaving, setTelegramSaving] = useState(false);
 
   function applyChannel(value: WidgetChannel) {
     setChannel(value);
@@ -160,11 +170,24 @@ export default function Channel() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([getChannel(), getWorkflowOptions()])
-      .then(([channelData, workflowData]) => {
+    Promise.all([getChannel(), getWorkflowOptions(), listChannels()])
+      .then(([channelData, workflowData, channels]) => {
         if (!active) return;
         applyChannel(channelData);
         setWorkflows(workflowData);
+
+        const bot =
+          channels.find((item) => item.type === "telegram") ?? null;
+
+        setTelegram(bot);
+
+        if (bot) {
+          setTelegramName(bot.name);
+          setTelegramWorkflowId(
+            bot.workflow_id ? String(bot.workflow_id) : "",
+          );
+          setTelegramActive(bot.is_active);
+        }
       })
       .catch((caught: unknown) => {
         if (active) {
@@ -280,6 +303,63 @@ export default function Channel() {
   function openEditor() {
     setError("");
     setEditing(true);
+  }
+
+  function openTelegram() {
+    setError("");
+    setBotToken("");
+
+    if (telegram) {
+      setTelegramName(telegram.name);
+      setTelegramWorkflowId(
+        telegram.workflow_id ? String(telegram.workflow_id) : "",
+      );
+      setTelegramActive(telegram.is_active);
+    }
+
+    setTelegramOpen(true);
+  }
+
+  async function saveTelegram() {
+    if (telegramSaving) return;
+
+    const token = botToken.trim();
+
+    if (!telegram && !token) {
+      setError(t("channel.telegramTokenRequired"));
+      return;
+    }
+
+    setTelegramSaving(true);
+    setError("");
+    setNotice("");
+
+    const payload = {
+      name: telegramName.trim() || "Telegram",
+      workflow_id: telegramWorkflowId ? Number(telegramWorkflowId) : null,
+      is_active: telegramActive,
+      ...(token ? { bot_token: token } : {}),
+    };
+
+    try {
+      const saved = telegram
+        ? await updateChannelById(telegram.id, payload)
+        : await createChannel({ type: "telegram", ...payload, bot_token: token });
+
+      setTelegram(saved);
+      setTelegramName(saved.name);
+      setTelegramWorkflowId(
+        saved.workflow_id ? String(saved.workflow_id) : "",
+      );
+      setTelegramActive(saved.is_active);
+      setBotToken("");
+      setTelegramOpen(false);
+      setNotice(t("channel.telegramSaved"));
+    } catch (caught) {
+      setError(getErrorMessage(caught, t("channel.telegramError")));
+    } finally {
+      setTelegramSaving(false);
+    }
   }
 
   async function changeIcon(kind: ChannelIconKind, file?: File) {
@@ -415,8 +495,8 @@ export default function Channel() {
             </div>
             <span className="text-xs text-muted-foreground">
               {t("channel.catalogCount", {
-                active: CHANNEL_CATALOG.filter((item) => item.active).length,
-                soon: CHANNEL_CATALOG.filter((item) => !item.active).length,
+                active: 1 + (telegram ? 1 : 0),
+                soon: 3,
               })}
             </span>
           </div>
@@ -424,12 +504,23 @@ export default function Channel() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {CHANNEL_CATALOG.map((item) => {
               const Icon = item.icon;
+              const isTelegram = item.id === "telegram";
+              const available = item.active || isTelegram;
+              const connected = isTelegram ? telegram !== null : true;
+              const cardActive = isTelegram ? Boolean(telegram?.is_active) : isActive;
+              const badgeLabel = !available
+                ? t("channel.cardComingSoon")
+                : !connected
+                  ? t("channel.cardNotConnected")
+                  : cardActive
+                    ? t("channel.cardActive")
+                    : t("channel.cardInactive");
 
               return (
                 <div
                   key={item.id}
                   className={`relative flex min-h-52 flex-col rounded-xl border p-4 transition ${
-                    item.active
+                    available
                       ? "border-primary/30 bg-[linear-gradient(145deg,rgba(59,130,246,0.10),rgba(15,23,42,0.18))] shadow-lg shadow-black/10"
                       : "border-border bg-card/60"
                   }`}
@@ -442,16 +533,14 @@ export default function Channel() {
                     </span>
                     <span
                       className={`rounded-full border px-2 py-1 text-[10px] font-medium ${
-                        item.active
-                          ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
-                          : "border-border bg-muted/40 text-muted-foreground"
+                        !available
+                          ? "border-border bg-muted/40 text-muted-foreground"
+                          : cardActive
+                            ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
+                            : "border-amber-400/25 bg-amber-400/10 text-amber-300"
                       }`}
                     >
-                      {item.active
-                        ? isActive
-                          ? t("channel.cardActive")
-                          : t("channel.cardInactive")
-                        : t("channel.cardComingSoon")}
+                      {badgeLabel}
                     </span>
                   </div>
 
@@ -464,7 +553,20 @@ export default function Channel() {
                     </p>
                   </div>
 
-                  {item.active ? (
+                  {isTelegram ? (
+                    <Button
+                      type="button"
+                      variant={telegram ? "outline" : "default"}
+                      size="sm"
+                      className="mt-4 w-full"
+                      onClick={openTelegram}
+                    >
+                      <TelegramLogo size={15} weight="bold" />
+                      {telegram
+                        ? t("channel.telegramManage")
+                        : t("channel.telegramConnect")}
+                    </Button>
+                  ) : item.active ? (
                     <div className="mt-4 flex items-center gap-2">
                       <Button
                         type="button"
@@ -989,6 +1091,151 @@ export default function Channel() {
             <Button type="button" onClick={() => void save()} disabled={saving}>
               {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
               {t("channel.updateWidget")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={telegramOpen} onOpenChange={setTelegramOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("channel.telegramDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("channel.telegramDialogDescription")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            {telegram && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                <TelegramLogo
+                  size={16}
+                  weight="fill"
+                  className="text-sky-400"
+                />
+                <span className="font-medium text-foreground">
+                  {telegram.external_id
+                    ? t("channel.telegramConnectedAs", {
+                        username: telegram.external_id,
+                      })
+                    : t("channel.cardNotConnected")}
+                </span>
+                {telegram.last_error && (
+                  <span className="w-full leading-5 text-destructive">
+                    {t("channel.telegramLastError", {
+                      error: telegram.last_error,
+                    })}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="telegram-token">
+                {t("channel.botTokenLabel")}
+              </Label>
+              <Input
+                id="telegram-token"
+                type="password"
+                autoComplete="off"
+                value={botToken}
+                onChange={(event) => setBotToken(event.target.value)}
+                maxLength={200}
+                placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+              />
+              <p className="text-xs leading-5 text-muted-foreground">
+                {telegram?.has_credentials
+                  ? t("channel.botTokenKeepHint")
+                  : t("channel.botTokenHint")}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="telegram-name">{t("channel.nameLabel")}</Label>
+              <Input
+                id="telegram-name"
+                value={telegramName}
+                onChange={(event) => setTelegramName(event.target.value)}
+                maxLength={120}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="telegram-workflow">
+                {t("channel.workflowLabel")}
+              </Label>
+              <Select
+                value={telegramWorkflowId || "none"}
+                onValueChange={(value) =>
+                  setTelegramWorkflowId(
+                    !value || value === "none" ? "" : value,
+                  )
+                }
+              >
+                <SelectTrigger id="telegram-workflow" className="w-full">
+                  <SelectValue>
+                    {(value) =>
+                      !value || value === "none"
+                        ? t("channel.selectWorkflow")
+                        : (entryWorkflows.find(
+                            (workflow) => String(workflow.id) === value,
+                          )?.name ?? t("channel.workflowFallback"))
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    {t("channel.noneSelected")}
+                  </SelectItem>
+                  {entryWorkflows.map((workflow) => (
+                    <SelectItem key={workflow.id} value={String(workflow.id)}>
+                      {workflow.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {entryWorkflows.length === 0 && (
+                <p className="flex items-start gap-2 text-xs leading-5 text-amber-300">
+                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                  {t("channel.noTriggerWarning")}
+                </p>
+              )}
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-4">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 accent-primary"
+                checked={telegramActive}
+                onChange={(event) => setTelegramActive(event.target.checked)}
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">
+                  {t("channel.activateLabel")}
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                  {t("channel.telegramActivateHint")}
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTelegramOpen(false)}
+              disabled={telegramSaving}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void saveTelegram()}
+              disabled={telegramSaving}
+            >
+              {telegramSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
+              {t("channel.telegramSave")}
             </Button>
           </DialogFooter>
         </DialogContent>

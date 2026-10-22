@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use App\Models\Contact;
+use App\Services\Channels\MessageDelivery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class InboxController extends Controller
 {
+    public function __construct(
+        private readonly MessageDelivery $delivery
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $contacts = Contact::query()
@@ -211,6 +216,8 @@ class InboxController extends Controller
 
         $session->update(['last_activity_at' => now()]);
 
+        $this->delivery->send($message);
+
         return response()->json([
             'data' => $this->messagePayload($message),
         ], 201);
@@ -231,6 +238,7 @@ class InboxController extends Controller
             'role' => $message->role,
             'content' => $message->content,
             'variant' => data_get($message->metadata, 'variant'),
+            'delivery_status' => $message->delivery_status,
             'created_at' => $message->created_at?->toISOString(),
         ];
     }

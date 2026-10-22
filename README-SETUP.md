@@ -64,6 +64,16 @@ cd backend
 php artisan queue:work --sleep=1 --tries=2 --timeout=240
 ```
 
+### Telegram bot
+
+Connect a Telegram bot from **Channel → Telegram**:
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) using `/newbot`, then copy its token.
+2. Paste the token, choose an entry workflow, and enable the channel.
+3. Keep the poller running. `orqiva start` launches it automatically (log: `telegram.log` in the Orqiva data directory, or run `orqiva logs`). When running from source, start it with `php artisan channels:telegram-poll` (add `--once` to poll a single batch).
+
+The bot receives updates with long polling, so no public URL or HTTPS certificate is required. Orqiva removes any existing webhook when the token is saved; do not enable a webhook for the same bot elsewhere or polling stops. Incoming messages appear in **Inbox** and replies are sent back through the bot. Only one Telegram bot can be connected per account.
+
 The frontend runs at `http://127.0.0.1:5173` and proxies `/api` to `http://127.0.0.1:8000`. Health endpoints: `GET /up` and `GET /api/v1/health`. Messages are queued in the `jobs` table (`QUEUE_CONNECTION=database`); the widget shows a typing indicator while a job is pending or processing.
 
 For a production build:
@@ -78,7 +88,7 @@ npm run build
 - **Dashboard** — workflow and execution summary
 - **Workflows** — create, validate, and edit visual workflows
 - **Inbox** — take over conversations and hand them back to AI
-- **Channel** — configure the website widget and copy its embed snippet
+- **Channel** — configure the website widget and connect a Telegram bot
 - **Audit Log** — inspect execution steps, tokens, variables, and errors
 - **API Keys** — connect Gemini, OpenAI, or OpenRouter with encrypted BYOK keys
 - **Settings** — account, language, theme, service status, and help

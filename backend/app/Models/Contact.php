@@ -38,4 +38,9 @@ class Contact extends Model
     {
         return $this->hasMany(ChatMessage::class);
     }
+
+    public function channelIdentities(): HasMany
+    {
+        return $this->hasMany(ContactChannel::class);
+    }
 }

@@ -15,8 +15,8 @@ The first run opens the browser setup wizard. Create an admin account, add an AI
 orqiva                  # start and open the browser
 orqiva start --no-open  # start without opening the browser
 orqiva status           # show URL and process state
-orqiva stop             # stop server and queue worker
-orqiva logs --lines 100 # read server and worker logs
+orqiva stop             # stop server, queue worker, and Telegram poller
+orqiva logs --lines 100 # read server, worker, and Telegram logs
 orqiva doctor           # check PHP runtime, extensions, data, and port
 orqiva backup           # back up SQLite, storage, and runtime config
 orqiva restore <folder> --yes
@@ -40,7 +40,7 @@ The SQLite database lives at `<data-dir>/data/orqiva.sqlite`. Keep backups and n
 
 ## Runtime
 
-The npm package ships with a FrankenPHP runtime per platform. The server and queue worker run as child processes; press `Ctrl+C` or run `orqiva stop` to stop them.
+The npm package ships with a FrankenPHP runtime per platform. The server, queue worker, and Telegram poller run as child processes; press `Ctrl+C` or run `orqiva stop` to stop them. The poller exits harmlessly when no Telegram bot is connected.
 
 If `public/app.html` is missing, build the frontend first:
 

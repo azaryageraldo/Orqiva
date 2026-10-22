@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\Workflow;
+use App\Services\Channels\Telegram\TelegramClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ChannelController extends Controller
 {
@@ -24,6 +26,100 @@ class ChannelController extends Controller
 
     private const ICON_KINDS = ['chat', 'launcher'];
 
+    public function __construct(
+        private readonly TelegramClient $telegram
+    ) {}
+
+    public function index(Request $request): JsonResponse
+    {
+        $channels = Channel::query()
+            ->where('user_id', $request->user()->id)
+            ->with('workflow:id,name,status')
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'data' => $channels
+                ->map(fn (Channel $channel) => $this->serialize($channel))
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'type' => ['sometimes', 'string', Rule::in(Channel::TYPES)],
+            'name' => ['required', 'string', 'max:120'],
+            'workflow_id' => ['sometimes', 'nullable', 'integer'],
+            'is_active' => ['sometimes', 'boolean'],
+            'bot_token' => ['sometimes', 'nullable', 'string', 'max:200'],
+        ]);
+
+        $type = $validated['type'] ?? Channel::TYPE_WIDGET;
+        $botToken = trim((string) ($validated['bot_token'] ?? ''));
+        $bot = null;
+
+        if ($type === Channel::TYPE_WIDGET && $botToken !== '') {
+            throw ValidationException::withMessages([
+                'bot_token' => 'Token bot hanya dipakai channel Telegram.',
+            ]);
+        }
+
+        if ($type === Channel::TYPE_TELEGRAM) {
+            if ($botToken === '') {
+                throw ValidationException::withMessages([
+                    'bot_token' => 'Token bot Telegram wajib diisi.',
+                ]);
+            }
+
+            $bot = $this->validatedTelegramBot($botToken);
+        }
+
+        $exists = Channel::query()
+            ->where('user_id', $request->user()->id)
+            ->where('type', $type)
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'type' => 'Channel tipe ini sudah ada. Ubah channel tersebut atau hapus dulu.',
+            ]);
+        }
+
+        $workflow = null;
+
+        if (($validated['workflow_id'] ?? null) !== null) {
+            $workflow = $this->ownedEntryWorkflow(
+                $request,
+                (int) $validated['workflow_id']
+            );
+        }
+
+        if (($validated['is_active'] ?? false) === true && $workflow === null) {
+            throw ValidationException::withMessages([
+                'workflow_id' => 'Pilih workflow entry sebelum mengaktifkan channel.',
+            ]);
+        }
+
+        $channel = Channel::create([
+            'user_id' => $request->user()->id,
+            'workflow_id' => $workflow?->id,
+            'type' => $type,
+            'name' => $validated['name'],
+            'public_token' => Str::random(48),
+            'external_id' => $bot === null ? null : $this->botHandle($bot),
+            'credentials' => $bot === null ? null : ['bot_token' => $botToken],
+            'is_active' => (bool) ($validated['is_active'] ?? false),
+            'last_connected_at' => $bot === null ? null : now(),
+            'settings' => $this->defaultSettings($type),
+        ]);
+
+        return response()->json([
+            'data' => $this->serialize($channel->fresh(['workflow'])),
+        ], 201);
+    }
+
     public function show(Request $request): JsonResponse
     {
         return response()->json([
@@ -31,9 +127,11 @@ class ChannelController extends Controller
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request, ?Channel $channel = null): JsonResponse
     {
-        $channel = $this->channelFor($request);
+        $channel ??= $this->channelFor($request);
+
+        $this->authorizeChannel($request, $channel);
 
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:120'],
@@ -48,51 +146,74 @@ class ChannelController extends Controller
             'settings.appearance.background_color' => ['sometimes', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'settings.appearance.outgoing_color' => ['sometimes', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'settings.appearance.accent_color' => ['sometimes', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'bot_token' => ['sometimes', 'nullable', 'string', 'max:200'],
         ]);
+
+        $botToken = trim((string) ($validated['bot_token'] ?? ''));
+
+        if (array_key_exists('bot_token', $validated)) {
+            unset($validated['bot_token']);
+
+            if ($channel->type !== Channel::TYPE_TELEGRAM) {
+                throw ValidationException::withMessages([
+                    'bot_token' => 'Token bot hanya dipakai channel Telegram.',
+                ]);
+            }
+
+            if ($botToken === '') {
+                throw ValidationException::withMessages([
+                    'bot_token' => 'Token bot Telegram wajib diisi.',
+                ]);
+            }
+
+            $bot = $this->validatedTelegramBot($botToken);
+
+            $validated['credentials'] = ['bot_token' => $botToken];
+            $validated['external_id'] = $this->botHandle($bot);
+            $validated['last_connected_at'] = now();
+            $validated['last_error'] = null;
+        }
 
         if (
             array_key_exists('workflow_id', $validated)
             && $validated['workflow_id'] !== null
         ) {
-            $workflow = Workflow::query()
-                ->whereKey($validated['workflow_id'])
-                ->where('user_id', $request->user()->id)
-                ->first();
-
-            if ($workflow === null) {
-                throw ValidationException::withMessages([
-                    'workflow_id' => 'Workflow tidak ditemukan atau bukan milik akun ini.',
-                ]);
-            }
-
-            $hasTrigger = collect(data_get($workflow->definition, 'nodes', []))
-                ->contains(fn ($node) => is_array($node)
-                    && in_array($node['type'] ?? null, ['Trigger', 'trigger'], true));
-
-            if (! $hasTrigger) {
-                throw ValidationException::withMessages([
-                    'workflow_id' => 'Workflow entry harus memiliki satu node Trigger. Workflow lanjutan cukup diakses lewat Go To.',
-                ]);
-            }
+            $this->ownedEntryWorkflow($request, (int) $validated['workflow_id']);
         }
 
-        if (($validated['is_active'] ?? false) === true && $channel->workflow_id === null && ! isset($validated['workflow_id'])) {
+        if (
+            ($validated['is_active'] ?? false) === true
+            && $channel->workflow_id === null
+            && ! isset($validated['workflow_id'])
+        ) {
             throw ValidationException::withMessages([
                 'workflow_id' => 'Pilih workflow entry sebelum mengaktifkan widget.',
             ]);
         }
 
         if (array_key_exists('settings', $validated)) {
-            $validated['settings'] = $this->mergeSettings(
-                $channel->settings ?? [],
-                is_array($validated['settings']) ? $validated['settings'] : []
-            );
+            $incoming = is_array($validated['settings']) ? $validated['settings'] : [];
+
+            $validated['settings'] = $channel->type === Channel::TYPE_WIDGET
+                ? $this->mergeSettings($channel->settings ?? [], $incoming)
+                : array_replace($channel->settings ?? [], $incoming);
         }
 
         $channel->update($validated);
 
         return response()->json([
             'data' => $this->serialize($channel->fresh(['workflow'])),
+        ]);
+    }
+
+    public function destroy(Request $request, Channel $channel): JsonResponse
+    {
+        $this->authorizeChannel($request, $channel);
+
+        $channel->delete();
+
+        return response()->json([
+            'data' => ['deleted' => true],
         ]);
     }
 
@@ -141,9 +262,17 @@ class ChannelController extends Controller
         ]);
     }
 
-    public function regenerate(Request $request): JsonResponse
+    public function regenerate(Request $request, ?Channel $channel = null): JsonResponse
     {
-        $channel = $this->channelFor($request);
+        $channel ??= $this->channelFor($request);
+
+        $this->authorizeChannel($request, $channel);
+
+        if ($channel->type !== Channel::TYPE_WIDGET) {
+            throw ValidationException::withMessages([
+                'channel' => 'Ganti token hanya berlaku untuk widget.',
+            ]);
+        }
 
         $channel->update([
             'public_token' => Str::random(48),
@@ -159,7 +288,7 @@ class ChannelController extends Controller
         return Channel::query()->firstOrCreate(
             [
                 'user_id' => $request->user()->id,
-                'type' => 'widget',
+                'type' => Channel::TYPE_WIDGET,
             ],
             [
                 'name' => 'Website Chat Widget',
@@ -168,6 +297,78 @@ class ChannelController extends Controller
                 'settings' => $this->normalizeSettings([]),
             ]
         );
+    }
+
+    private function authorizeChannel(Request $request, Channel $channel): void
+    {
+        abort_unless($channel->user_id === $request->user()->id, 404);
+    }
+
+    private function ownedEntryWorkflow(Request $request, int $workflowId): Workflow
+    {
+        $workflow = Workflow::query()
+            ->whereKey($workflowId)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if ($workflow === null) {
+            throw ValidationException::withMessages([
+                'workflow_id' => 'Workflow tidak ditemukan atau bukan milik akun ini.',
+            ]);
+        }
+
+        $hasTrigger = collect(data_get($workflow->definition, 'nodes', []))
+            ->contains(fn ($node) => is_array($node)
+                && in_array($node['type'] ?? null, ['Trigger', 'trigger'], true));
+
+        if (! $hasTrigger) {
+            throw ValidationException::withMessages([
+                'workflow_id' => 'Workflow entry harus memiliki satu node Trigger. Workflow lanjutan cukup diakses lewat Go To.',
+            ]);
+        }
+
+        return $workflow;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validatedTelegramBot(string $token): array
+    {
+        try {
+            $bot = $this->telegram->getMe($token);
+            $this->telegram->deleteWebhook($token);
+        } catch (Throwable $exception) {
+            throw ValidationException::withMessages([
+                'bot_token' => 'Token bot tidak valid: '.$exception->getMessage(),
+            ]);
+        }
+
+        if (! is_array($bot) || ! isset($bot['id'])) {
+            throw ValidationException::withMessages([
+                'bot_token' => 'Token bot tidak valid.',
+            ]);
+        }
+
+        return $bot;
+    }
+
+    /**
+     * @param  array<string, mixed>  $bot
+     */
+    private function botHandle(array $bot): ?string
+    {
+        $username = trim((string) ($bot['username'] ?? ''));
+
+        return $username !== '' ? '@'.$username : (string) $bot['id'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function defaultSettings(string $type): array
+    {
+        return $type === Channel::TYPE_WIDGET ? $this->normalizeSettings([]) : [];
     }
 
     /**
@@ -182,14 +383,20 @@ class ChannelController extends Controller
             'name' => $channel->name,
             'type' => $channel->type,
             'public_token' => $channel->public_token,
+            'external_id' => $channel->external_id,
+            'has_credentials' => $channel->getRawOriginal('credentials') !== null,
             'workflow_id' => $channel->workflow_id,
             'workflow_name' => $channel->workflow?->name,
             'is_active' => (bool) $channel->is_active,
-            'settings' => $this->normalizeSettings($channel->settings ?? []),
+            'settings' => $channel->type === Channel::TYPE_WIDGET
+                ? $this->normalizeSettings($channel->settings ?? [])
+                : ($channel->settings ?? []),
             'icon_urls' => [
                 'chat' => $this->iconUrl($channel, 'chat'),
                 'launcher' => $this->iconUrl($channel, 'launcher'),
             ],
+            'last_connected_at' => $channel->last_connected_at?->toISOString(),
+            'last_error' => $channel->last_error,
             'updated_at' => $channel->updated_at?->toISOString(),
         ];
     }

@@ -127,7 +127,11 @@ export async function main(argv = process.argv.slice(2)) {
         throw new Error("--lines harus berupa angka positif.");
       }
 
-      if (!existsSync(paths.serverLog) && !existsSync(paths.workerLog)) {
+      if (
+        !existsSync(paths.serverLog) &&
+        !existsSync(paths.workerLog) &&
+        !existsSync(paths.pollerLog)
+      ) {
         console.log("Belum ada log. Jalankan Orqiva terlebih dahulu.");
         break;
       }
@@ -137,6 +141,9 @@ export async function main(argv = process.argv.slice(2)) {
       console.log("");
       console.log(`== Worker (${paths.workerLog}) ==`);
       printLogTail(paths.workerLog, lines);
+      console.log("");
+      console.log(`== Telegram (${paths.pollerLog}) ==`);
+      printLogTail(paths.pollerLog, lines);
       break;
     }
 

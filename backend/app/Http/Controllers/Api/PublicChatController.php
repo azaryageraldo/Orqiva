@@ -65,6 +65,7 @@ class PublicChatController extends Controller
         abort_unless(in_array($kind, ['chat', 'launcher'], true), 404);
 
         $channel = Channel::query()
+            ->where('type', Channel::TYPE_WIDGET)
             ->where('public_token', $token)
             ->first();
 
@@ -159,6 +160,7 @@ class PublicChatController extends Controller
     private function resolveChannel(string $token): Channel
     {
         $channel = Channel::query()
+            ->where('type', Channel::TYPE_WIDGET)
             ->where('public_token', $token)
             ->with('workflow:id,name,status,definition')
             ->first();
@@ -172,6 +174,7 @@ class PublicChatController extends Controller
     {
         $session = ChatSession::query()
             ->where('public_token', $token)
+            ->whereHas('channel', fn ($query) => $query->where('type', Channel::TYPE_WIDGET))
             ->with(['channel.workflow:id,name,status', 'contact', 'workflow'])
             ->first();
 

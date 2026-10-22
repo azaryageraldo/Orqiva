@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Channel;
 use App\Models\Workflow;
+use App\Services\Channels\ChannelTransportManager;
+use App\Services\Channels\Telegram\TelegramTransport;
+use App\Services\Channels\WidgetTransport;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -13,7 +17,13 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Register application services here.
+        $this->app->singleton(
+            ChannelTransportManager::class,
+            fn ($app): ChannelTransportManager => new ChannelTransportManager($app, [
+                Channel::TYPE_WIDGET => WidgetTransport::class,
+                Channel::TYPE_TELEGRAM => TelegramTransport::class,
+            ])
+        );
     }
 
     public function boot(): void

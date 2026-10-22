@@ -23,6 +23,10 @@ export type WidgetChannel = {
   name: string;
   type: string;
   public_token: string;
+  external_id: string | null;
+  has_credentials: boolean;
+  last_connected_at: string | null;
+  last_error: string | null;
   workflow_id: number | null;
   workflow_name: string | null;
   is_active: boolean;
@@ -90,6 +94,37 @@ export async function deleteChannelIcon(
 export async function regenerateChannelToken(): Promise<WidgetChannel> {
   const response = await api.post<{ data: WidgetChannel }>(
     "/channel/regenerate",
+  );
+  return response.data.data;
+}
+
+export type ChannelPayload = {
+  type?: string;
+  name?: string;
+  workflow_id?: number | null;
+  is_active?: boolean;
+  bot_token?: string;
+};
+
+export async function listChannels(): Promise<WidgetChannel[]> {
+  const response = await api.get<{ data: WidgetChannel[] }>("/channels");
+  return response.data.data;
+}
+
+export async function createChannel(
+  payload: ChannelPayload,
+): Promise<WidgetChannel> {
+  const response = await api.post<{ data: WidgetChannel }>("/channels", payload);
+  return response.data.data;
+}
+
+export async function updateChannelById(
+  id: number,
+  payload: ChannelPayload,
+): Promise<WidgetChannel> {
+  const response = await api.put<{ data: WidgetChannel }>(
+    `/channels/${id}`,
+    payload,
   );
   return response.data.data;
 }

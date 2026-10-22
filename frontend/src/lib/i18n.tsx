@@ -577,7 +577,7 @@ const ID: Dictionary = {
     "Workflow adalah graph node dan edge. Setiap workflow entry wajib memiliki satu Trigger dan minimal satu Send Message atau Relocate.",
   "help.section.channel.title": "Channel dan widget",
   "help.section.channel.intro":
-    "Channel menghubungkan workflow ke pelanggan. Saat ini tersedia widget website; channel lain ditandai sebagai segera hadir.",
+    "Channel menghubungkan workflow ke pelanggan. Widget website dan bot Telegram sudah tersedia; hubungkan bot lewat token @BotFather. Pesan Telegram diambil dengan long polling sehingga tidak perlu URL publik.",
   "help.section.inbox.title": "Inbox dan human handoff",
   "help.section.inbox.intro":
     "AI menangani percakapan secara otomatis. Admin dapat mengambil alih sesi, membalas manual, lalu mengembalikan percakapan ke AI.",
@@ -604,7 +604,7 @@ const ID: Dictionary = {
     "Hubungkan Facebook Messenger untuk percakapan pelanggan.",
   "channel.eyebrow": "Workspace",
   "channel.subtitle":
-    "Satu widget per akun. Widget memakai workflow entry sebagai titik awal, lalu alur lanjutan dijalankan lewat Go To.",
+    "Satu widget dan satu bot Telegram per akun. Keduanya memakai workflow entry sebagai titik awal, lalu alur lanjutan dijalankan lewat Go To.",
   "channel.widgetActive": "Widget aktif",
   "channel.widgetInactive": "Widget nonaktif",
   "channel.errorLoad": "Channel gagal dimuat. Periksa koneksi backend.",
@@ -619,11 +619,31 @@ const ID: Dictionary = {
   "channel.noticeRegenerated": "Token widget berhasil diperbarui.",
   "channel.catalogTitle": "Saluran yang tersedia",
   "channel.catalogDescription":
-    "Widget website siap dipakai. Kanal lain segera hadir.",
+    "Widget website dan bot Telegram siap dipakai. Kanal lain segera hadir.",
   "channel.catalogCount": "{active} aktif · {soon} segera hadir",
   "channel.cardActive": "Aktif",
   "channel.cardInactive": "Nonaktif",
   "channel.cardComingSoon": "Segera hadir",
+  "channel.cardNotConnected": "Belum terhubung",
+  "channel.telegramConnect": "Hubungkan",
+  "channel.telegramManage": "Kelola bot",
+  "channel.telegramDialogTitle": "Bot Telegram",
+  "channel.telegramDialogDescription":
+    "Tempel token bot dari @BotFather. Pesan masuk diambil lewat long polling, jadi tidak perlu URL publik.",
+  "channel.botTokenLabel": "Token bot",
+  "channel.botTokenHint":
+    "Buat bot lewat @BotFather, lalu salin tokennya. Token disimpan terenkripsi.",
+  "channel.botTokenKeepHint":
+    "Kosongkan untuk mempertahankan token yang tersimpan.",
+  "channel.telegramConnectedAs": "Terhubung sebagai {username}",
+  "channel.telegramLastError": "Error terakhir: {error}",
+  "channel.telegramActivateHint":
+    "Aktifkan agar bot membalas pesan pelanggan. Pilih workflow entry terlebih dahulu.",
+  "channel.telegramSave": "Simpan bot",
+  "channel.telegramSaved": "Bot Telegram berhasil disimpan.",
+  "channel.telegramTokenRequired": "Isi token bot Telegram.",
+  "channel.telegramError":
+    "Bot Telegram gagal disimpan. Periksa token dan koneksi internet.",
   "channel.editWidgetTitle": "Edit widget",
   "channel.openWidgetTitle": "Buka widget",
   "channel.regenerateTitle": "Ganti token widget",
@@ -1509,7 +1529,7 @@ const EN: Dictionary = {
     "A workflow is a graph of nodes and edges. Every entry workflow must have one Trigger and at least one Send Message or Relocate.",
   "help.section.channel.title": "Channels and widget",
   "help.section.channel.intro":
-    "Channels connect workflows to customers. The website widget is available today; other channels are marked coming soon.",
+    "Channels connect workflows to customers. The website widget and Telegram bot are available; connect the bot with a token from @BotFather. Telegram messages use long polling, so no public URL is required.",
   "help.section.inbox.title": "Inbox and human handoff",
   "help.section.inbox.intro":
     "AI handles conversations automatically. Admins can take over a session, reply manually, then release it back to AI.",
@@ -1536,7 +1556,7 @@ const EN: Dictionary = {
     "Connect Facebook Messenger for customer conversations.",
   "channel.eyebrow": "Workspace",
   "channel.subtitle":
-    "One widget per account. The widget starts from an entry workflow, then continues through Go To steps.",
+    "One widget and one Telegram bot per account. Both start from an entry workflow, then continue through Go To steps.",
   "channel.widgetActive": "Widget active",
   "channel.widgetInactive": "Widget inactive",
   "channel.errorLoad": "Channel failed to load. Check the backend connection.",
@@ -1551,11 +1571,30 @@ const EN: Dictionary = {
   "channel.noticeRegenerated": "Widget token updated.",
   "channel.catalogTitle": "Available channels",
   "channel.catalogDescription":
-    "The website widget is ready. Other channels are coming soon.",
+    "The website widget and Telegram bot are ready. Other channels are coming soon.",
   "channel.catalogCount": "{active} active · {soon} coming soon",
   "channel.cardActive": "Active",
   "channel.cardInactive": "Inactive",
   "channel.cardComingSoon": "Coming soon",
+  "channel.cardNotConnected": "Not connected",
+  "channel.telegramConnect": "Connect",
+  "channel.telegramManage": "Manage bot",
+  "channel.telegramDialogTitle": "Telegram bot",
+  "channel.telegramDialogDescription":
+    "Paste the bot token from @BotFather. Incoming messages use long polling, so no public URL is needed.",
+  "channel.botTokenLabel": "Bot token",
+  "channel.botTokenHint":
+    "Create a bot with @BotFather, then copy its token. The token is stored encrypted.",
+  "channel.botTokenKeepHint": "Leave empty to keep the saved token.",
+  "channel.telegramConnectedAs": "Connected as {username}",
+  "channel.telegramLastError": "Last error: {error}",
+  "channel.telegramActivateHint":
+    "Enable this to let the bot reply to customer messages. Choose an entry workflow first.",
+  "channel.telegramSave": "Save bot",
+  "channel.telegramSaved": "Telegram bot saved.",
+  "channel.telegramTokenRequired": "Enter the Telegram bot token.",
+  "channel.telegramError":
+    "The Telegram bot could not be saved. Check the token and internet connection.",
   "channel.editWidgetTitle": "Edit widget",
   "channel.openWidgetTitle": "Open widget",
   "channel.regenerateTitle": "Regenerate widget token",
