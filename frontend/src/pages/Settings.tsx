@@ -273,7 +273,7 @@ export default function Settings({
             <CardContent className="space-y-3 pt-2">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">
-                  {t("settings.backend")}
+                  {t("settings.serviceLabel")}
                 </span>
                 <Badge
                   variant="outline"
@@ -293,15 +293,6 @@ export default function Settings({
                 >
                   {t("common.active")}
                 </Badge>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-muted-foreground">
-                  {t("settings.keyStorage")}
-                </span>
-                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-300">
-                  {t("settings.encrypted")}
-                </span>
               </div>
             </CardContent>
           </Card>

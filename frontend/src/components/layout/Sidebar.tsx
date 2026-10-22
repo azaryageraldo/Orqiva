@@ -202,7 +202,7 @@ export default function Sidebar({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60">
-                Backend API
+                {t("settings.serviceLabel")}
               </p>
               <p className={`truncate text-xs font-medium ${status.text}`}>
                 {statusLabel}

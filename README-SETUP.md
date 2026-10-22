@@ -92,7 +92,7 @@ npm run build
 - **Audit Log** — inspect execution steps, tokens, variables, and errors
 - **API Keys** — connect Gemini, OpenAI, or OpenRouter with encrypted BYOK keys
 - **Settings** — account, language, theme, service status, and help
-- **Help & Support** — setup, node reference, channel guide, FAQ, and license
+- **Help & Support** — quick start, all seven nodes with schema examples, variables, channels, inbox, audit, security, and license
 
 ## Tests
 
@@ -146,7 +146,7 @@ The bundled FrankenPHP runtime ships without a code signature:
 
 1. Create a granular access token on npm with **Read and write (publish and stage)** and **Bypass two-factor authentication**, then store it as the `NPM_TOKEN` repository secret.
 2. Bump the version in `packages/cli/package.json` and keep the `optionalDependencies` versions in sync.
-3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
+3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. The `Release` workflow publishes the runtime packages and the CLI, runs a smoke test on Linux, macOS, and Windows, then creates the GitHub release.
 
 The workflow is idempotent: re-running a tag skips packages that are already published.

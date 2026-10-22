@@ -541,11 +541,9 @@ const ID: Dictionary = {
   "settings.name": "Nama",
   "settings.email": "Email",
   "settings.status": "Status layanan",
-  "settings.statusDescription": "Koneksi frontend dengan backend Orqiva.",
-  "settings.backend": "Backend API",
+  "settings.statusDescription": "Koneksi frontend dengan layanan Orqiva.",
+  "settings.serviceLabel": "Status layanan",
   "settings.tokenTracking": "Pencatatan token",
-  "settings.keyStorage": "Penyimpanan API key",
-  "settings.encrypted": "Terenkripsi",
   "settings.license": "Lisensi",
   "settings.version": "Versi",
   "settings.madeBy": "Dibuat oleh Azarya Geraldo.",
@@ -565,6 +563,14 @@ const ID: Dictionary = {
   "help.socialTiktok": "TikTok",
   "help.socialLinkedin": "LinkedIn",
   "help.socialInstagram": "Instagram",
+  "help.copy": "Salin",
+  "help.copied": "Tersalin",
+  "help.config": "Konfigurasi",
+  "help.output": "Output",
+  "help.notes": "Catatan",
+  "help.schema": "Contoh schema",
+  "help.description": "Keterangan",
+  "help.repository": "Repositori",
 
   "help.section.account.title": "Akun dan login",
   "help.section.account.intro":
@@ -594,6 +600,10 @@ const ID: Dictionary = {
   "channel.widgetName": "Website Chat Widget",
   "channel.widgetDescription":
     "Pasang widget langsung di website dan hubungkan ke workflow entry.",
+  "channel.telegram": "Bot Telegram",
+  "channel.whatsapp": "WhatsApp Business",
+  "channel.instagram": "Instagram DM",
+  "channel.messenger": "Facebook Messenger",
   "channel.telegramDescription":
     "Hubungkan bot Telegram untuk menerima pesan pelanggan.",
   "channel.whatsappDescription":
@@ -607,7 +617,7 @@ const ID: Dictionary = {
     "Satu widget dan satu bot Telegram per akun. Keduanya memakai workflow entry sebagai titik awal, lalu alur lanjutan dijalankan lewat Go To.",
   "channel.widgetActive": "Widget aktif",
   "channel.widgetInactive": "Widget nonaktif",
-  "channel.errorLoad": "Channel gagal dimuat. Periksa koneksi backend.",
+  "channel.errorLoad": "Channel gagal dimuat. Coba muat ulang halaman.",
   "channel.errorSave": "Channel gagal disimpan. Periksa pengaturan.",
   "channel.errorToken": "Token widget gagal diperbarui.",
   "channel.errorCopyUrl": "Tautan gagal disalin. Salin URL secara manual.",
@@ -785,6 +795,8 @@ const ID: Dictionary = {
   "dashboard.refresh": "Segarkan",
   "dashboard.viewAudit": "Lihat audit log",
   "dashboard.retry": "Coba lagi",
+  "dashboard.tokenUsageError":
+    "Statistik token gagal dimuat. Periksa koneksi ke layanan Orqiva.",
   "dashboard.errorLoad":
     "Sebagian data dashboard gagal dimuat. Periksa koneksi API.",
   "dashboard.totalWorkflows": "Total workflow",
@@ -850,6 +862,7 @@ const ID: Dictionary = {
   "dashboard.pipelineTrigger": "Trigger",
   "dashboard.pipelineIncoming": "Pesan masuk",
   "dashboard.pipelineAI": "AI Agent",
+  "dashboard.pipelineAIHint": "Model fleksibel",
   "dashboard.pipelineReply": "Balasan",
   "dashboard.pipelineSend": "Send Message",
   "dashboard.tokenTooltip":
@@ -891,10 +904,9 @@ const ID: Dictionary = {
   "ai.savePrefs": "Simpan preferensi",
   "ai.prefSaved": "Preferensi balasan AI disimpan.",
   "ai.secureTitle": "Aman dan langsung aktif",
-  "ai.secure1": "API key disimpan terenkripsi di database backend.",
+  "ai.secure1": "API key disimpan terenkripsi di database.",
   "ai.secure2": "Key tidak pernah dikirim kembali ke browser.",
   "ai.secure3": "Perubahan langsung dipakai saat workflow berjalan.",
-  "ai.secure4": "Tidak perlu mengatur API key di file `.env`.",
   "ai.dialogDescription": "Simpan API key untuk mengaktifkan provider ini di workflow.",
   "ai.providerFallback": "Provider AI",
   "ai.keyConfigured": "API key sudah tersimpan. {count} model terdeteksi.",
@@ -925,28 +937,6 @@ const ID: Dictionary = {
   "channel.copySnippet": "Salin snippet",
   "channel.snippetCopied": "Snippet tersalin.",
   "help.onThisPage": "Di halaman ini",
-  "help.nodeReference": "Referensi node",
-  "help.nodeReferenceDescription":
-    "Gunakan ID node yang stabil di workflow dan label tampilan yang dapat diganti kapan saja.",
-  "help.node.trigger": "Titik masuk workflow. Setiap workflow membutuhkan tepat satu Trigger.",
-  "help.node.agent": "Memanggil provider AI dengan prompt, konteks, dan model yang dipilih.",
-  "help.node.condition": "Mengarahkan alur berdasarkan aturan atau hasil evaluasi AI.",
-  "help.node.delay": "Menunda langkah berikutnya untuk jeda atau menunggu respons.",
-  "help.node.send": "Mengirim balasan ke channel atau widget pelanggan.",
-  "help.node.relocate": "Memindahkan percakapan ke tim manusia atau antrean handoff.",
-  "help.faq": "Pertanyaan umum",
-  "help.faq.model.title": "Model AI gagal atau tidak tersedia",
-  "help.faq.model.answer":
-    "Periksa API key di halaman API Keys, pastikan provider terhubung, lalu pilih model chat yang didukung. Model gambar, embedding, dan TTS tidak dapat dipakai untuk node AI Agent.",
-  "help.faq.widget.title": "Widget tidak muncul di website",
-  "help.faq.widget.answer":
-    "Pastikan snippet ditempel sebelum tag penutup body, token channel masih aktif, dan domain diizinkan oleh konfigurasi CORS backend.",
-  "help.faq.queue.title": "Eksekusi berhenti di tengah jalan",
-  "help.faq.queue.answer":
-    "Buka Audit Log, periksa node yang gagal, lalu gunakan aksi lanjutkan setelah penyebabnya diperbaiki. Eksekusi yang gagal menyimpan checkpoint node terakhir.",
-  "help.faq.reset.title": "Lupa password admin",
-  "help.faq.reset.answer":
-    "Belum ada alur reset password publik. Jalankan seeder admin atau perbarui password melalui tinker/Artisan di server.",
   "help.noResults": "Tidak ada bagian yang cocok dengan pencarian.",
   "public.customerService": "Customer Service",
   "public.welcomeFallback": "Ada yang bisa kami bantu?",
@@ -1493,11 +1483,9 @@ const EN: Dictionary = {
   "settings.name": "Name",
   "settings.email": "Email",
   "settings.status": "Service status",
-  "settings.statusDescription": "Frontend connection to the Orqiva backend.",
-  "settings.backend": "Backend API",
+  "settings.statusDescription": "Frontend connection to the Orqiva service.",
+  "settings.serviceLabel": "Service status",
   "settings.tokenTracking": "Token tracking",
-  "settings.keyStorage": "API key storage",
-  "settings.encrypted": "Encrypted",
   "settings.license": "License",
   "settings.version": "Version",
   "settings.madeBy": "Built by Azarya Geraldo.",
@@ -1517,6 +1505,14 @@ const EN: Dictionary = {
   "help.socialTiktok": "TikTok",
   "help.socialLinkedin": "LinkedIn",
   "help.socialInstagram": "Instagram",
+  "help.copy": "Copy",
+  "help.copied": "Copied",
+  "help.config": "Configuration",
+  "help.output": "Output",
+  "help.notes": "Notes",
+  "help.schema": "Schema example",
+  "help.description": "Description",
+  "help.repository": "Repository",
 
   "help.section.account.title": "Account and login",
   "help.section.account.intro":
@@ -1546,6 +1542,10 @@ const EN: Dictionary = {
   "channel.widgetName": "Website Chat Widget",
   "channel.widgetDescription":
     "Embed a chat widget on your website and connect it to an entry workflow.",
+  "channel.telegram": "Telegram bot",
+  "channel.whatsapp": "WhatsApp Business",
+  "channel.instagram": "Instagram DM",
+  "channel.messenger": "Facebook Messenger",
   "channel.telegramDescription":
     "Connect a Telegram bot to receive customer messages.",
   "channel.whatsappDescription":
@@ -1559,7 +1559,7 @@ const EN: Dictionary = {
     "One widget and one Telegram bot per account. Both start from an entry workflow, then continue through Go To steps.",
   "channel.widgetActive": "Widget active",
   "channel.widgetInactive": "Widget inactive",
-  "channel.errorLoad": "Channel failed to load. Check the backend connection.",
+  "channel.errorLoad": "Channel failed to load. Reload the page.",
   "channel.errorSave": "Channel failed to save. Check the settings.",
   "channel.errorToken": "Widget token failed to update.",
   "channel.errorCopyUrl": "The link could not be copied. Copy the URL manually.",
@@ -1736,6 +1736,8 @@ const EN: Dictionary = {
   "dashboard.refresh": "Refresh",
   "dashboard.viewAudit": "View audit log",
   "dashboard.retry": "Try again",
+  "dashboard.tokenUsageError":
+    "Token statistics failed to load. Check the connection to the Orqiva service.",
   "dashboard.errorLoad":
     "Some dashboard data failed to load. Check the API connection.",
   "dashboard.totalWorkflows": "Total workflows",
@@ -1801,6 +1803,7 @@ const EN: Dictionary = {
   "dashboard.pipelineTrigger": "Trigger",
   "dashboard.pipelineIncoming": "Incoming message",
   "dashboard.pipelineAI": "AI Agent",
+  "dashboard.pipelineAIHint": "Flexible model",
   "dashboard.pipelineReply": "Reply",
   "dashboard.pipelineSend": "Send Message",
   "dashboard.tokenTooltip":
@@ -1842,10 +1845,9 @@ const EN: Dictionary = {
   "ai.savePrefs": "Save preferences",
   "ai.prefSaved": "AI reply preferences saved.",
   "ai.secureTitle": "Secure and immediately active",
-  "ai.secure1": "API keys are stored encrypted in the backend database.",
+  "ai.secure1": "API keys are stored encrypted in the database.",
   "ai.secure2": "Keys are never sent back to the browser.",
   "ai.secure3": "Changes take effect the next time a workflow runs.",
-  "ai.secure4": "No API key configuration is needed in `.env`.",
   "ai.dialogDescription": "Save an API key to enable this provider in workflows.",
   "ai.providerFallback": "AI provider",
   "ai.keyConfigured": "API key is saved. {count} models detected.",
@@ -1876,28 +1878,6 @@ const EN: Dictionary = {
   "channel.copySnippet": "Copy snippet",
   "channel.snippetCopied": "Snippet copied.",
   "help.onThisPage": "On this page",
-  "help.nodeReference": "Node reference",
-  "help.nodeReferenceDescription":
-    "Use stable node IDs in workflows and display labels that you can change at any time.",
-  "help.node.trigger": "The entry point of a workflow. Every workflow needs exactly one Trigger.",
-  "help.node.agent": "Calls an AI provider with the selected prompt, context, and model.",
-  "help.node.condition": "Routes the flow based on rules or an AI evaluation result.",
-  "help.node.delay": "Waits before the next step to add a pause or await a response.",
-  "help.node.send": "Sends a reply to a customer channel or widget.",
-  "help.node.relocate": "Hands the conversation over to a human team or handoff queue.",
-  "help.faq": "Frequently asked questions",
-  "help.faq.model.title": "The AI model fails or is unavailable",
-  "help.faq.model.answer":
-    "Check the API key on the API Keys page, make sure the provider is connected, then choose a supported chat model. Image, embedding, and TTS models cannot be used by an AI Agent node.",
-  "help.faq.widget.title": "The widget does not appear on my website",
-  "help.faq.widget.answer":
-    "Make sure the snippet is pasted before the closing body tag, the channel token is active, and the domain is allowed by the backend CORS configuration.",
-  "help.faq.queue.title": "An execution stops midway",
-  "help.faq.queue.answer":
-    "Open Audit Log, inspect the failed node, then use the resume action after fixing the cause. Failed executions keep a checkpoint of the last node.",
-  "help.faq.reset.title": "I forgot the admin password",
-  "help.faq.reset.answer":
-    "There is no public password reset flow yet. Run the admin seeder or update the password through tinker/Artisan on the server.",
   "help.noResults": "No sections match your search.",
   "public.customerService": "Customer Service",
   "public.welcomeFallback": "How can we help?",

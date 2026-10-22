@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
+  <title id="title">Orqiva workflow animation</title>
+  <desc id="desc">A trigger receives a customer message, an AI agent reasons about it, a condition branches the flow, and the result is either sent to the customer or handed off to a human.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1120"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="agent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity=".06"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <style>
+      .title { font: 600 13px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .18em; fill: #94a3b8; text-transform: uppercase; }
+      .node-title { font: 600 16px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: #e5e7eb; }
+      .node-meta { font: 400 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; fill: #94a3b8; }
+      .node-label { font: 500 11px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .08em; fill: #6ee7b7; text-transform: uppercase; }
+      .edge { fill: none; stroke: #334155; stroke-width: 2; }
+      .edge-live { fill: none; stroke: url(#accent); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 7 10; animation: dash 1.4s linear infinite; }
+      .pulse { animation: pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      .pulse.delay-1 { animation-delay: .35s; }
+      .pulse.delay-2 { animation-delay: .7s; }
+      .pulse.delay-3 { animation-delay: 1.05s; }
+      .flow-dot { fill: #5eead4; filter: url(#glow); }
+      .branch-true { animation: fade-left 2.4s ease-in-out infinite; }
+      .branch-false { animation: fade-right 2.4s ease-in-out infinite; }
+      .caption { font: 400 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: #94a3b8; }
+      .badge { font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; fill: #a7f3d0; }
+      @keyframes dash { to { stroke-dashoffset: -34; } }
+      @keyframes pulse { 0%, 100% { opacity: .55; transform: scale(.985); } 50% { opacity: 1; transform: scale(1.015); } }
+      @keyframes fade-left { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+      @keyframes fade-right { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+      @media (prefers-reduced-motion: reduce) {
+        .edge-live, .pulse, .branch-true, .branch-false { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <rect width="1200" height="440" rx="20" fill="url(#bg)"/>
+  <g opacity=".35" stroke="#1e293b">
+    <path d="M0 40h1200M0 100h1200M0 160h1200M0 220h1200M0 280h1200M0 340h1200M0 400h1200"/>
+    <path d="M60 0v440M180 0v440M300 0v440M420 0v440M540 0v440M660 0v440M780 0v440M900 0v440M1020 0v440M1140 0v440"/>
+  </g>
+
+  <text x="60" y="54" class="title">Conversation automation</text>
+  <text x="60" y="86" style="font: 400 13px ui-sans-serif, system-ui; fill:#64748b">Every message follows the same path: receive, reason, branch, respond or hand off.</text>
+
+  <!-- Trigger -->
+  <g class="pulse" filter="url(#soft)">
+    <rect x="60" y="150" width="210" height="132" rx="16" fill="#0f172a" stroke="#334155"/>
+    <rect x="60" y="150" width="210" height="132" rx="16" fill="#34d399" opacity=".04"/>
+    <circle cx="86" cy="178" r="5" fill="#34d399"/>
+    <text x="102" y="182" class="node-label">Trigger</text>
+    <text x="82" y="220" class="node-title">Customer message</text>
+    <text x="82" y="245" class="node-meta">{{customer_message}}</text>
+    <text x="82" y="264" class="node-meta">+ customer name</text>
+  </g>
+
+  <!-- AI Agent -->
+  <g class="pulse delay-1" filter="url(#soft)">
+    <rect x="345" y="132" width="250" height="168" rx="16" fill="url(#agent)" stroke="#2dd4bf" stroke-opacity=".65"/>
+    <circle cx="371" cy="162" r="5" fill="#22d3ee"/>
+    <text x="387" y="166" class="node-label">AI Agent</text>
+    <text x="367" y="204" class="node-title">Reason and extract</text>
+    <text x="367" y="229" class="node-meta">system prompt</text>
+    <text x="367" y="247" class="node-meta">Gemini / OpenAI / OpenRouter</text>
+    <rect x="367" y="263" width="140" height="20" rx="10" fill="#0f172a" stroke="#334155"/>
+    <text x="380" y="277" class="badge">temperature 0.4</text>
+  </g>
+
+  <!-- Condition -->
+  <g class="pulse delay-2" filter="url(#soft)">
+    <rect x="670" y="150" width="210" height="132" rx="16" fill="#0f172a" stroke="#334155"/>
+    <circle cx="696" cy="178" r="5" fill="#fbbf24"/>
+    <text x="712" y="182" class="node-label">Condition</text>
+    <text x="692" y="220" class="node-title">Wants to buy?</text>
+    <text x="692" y="246" class="node-meta">{{agent.wants_to_buy}}</text>
+    <rect x="692" y="259" width="86" height="18" rx="9" fill="#0f172a" stroke="#334155"/>
+    <text x="702" y="272" class="badge" style="fill:#fcd34d">true / false</text>
+  </g>
+
+  <!-- Send Message -->
+  <g class="pulse delay-3" filter="url(#soft)">
+    <rect x="955" y="66" width="190" height="112" rx="16" fill="#0f172a" stroke="#334155"/>
+    <circle cx="981" cy="94" r="5" fill="#34d399"/>
+    <text x="997" y="98" class="node-label">Send Message</text>
+    <text x="977" y="132" class="node-title">Reply to customer</text>
+    <text x="977" y="154" class="node-meta">widget or Telegram</text>
+  </g>
+
+  <!-- Relocate -->
+  <g class="pulse delay-2" filter="url(#soft)">
+    <rect x="955" y="264" width="190" height="112" rx="16" fill="#0f172a" stroke="#334155"/>
+    <circle cx="981" cy="292" r="5" fill="#f472b6"/>
+    <text x="997" y="296" class="node-label">Relocate</text>
+    <text x="977" y="330" class="node-title">Human handoff</text>
+    <text x="977" y="352" class="node-meta">shared inbox</text>
+  </g>
+
+  <!-- Edges -->
+  <path class="edge" d="M270 216h75"/>
+  <path class="edge-live" d="M270 216h75"/>
+  <path class="edge" d="M595 216h75"/>
+  <path class="edge-live" d="M595 216h75"/>
+
+  <path class="edge" d="M880 200c38 0 38-76 75-76"/>
+  <path class="edge-live branch-true" d="M880 200c38 0 38-76 75-76"/>
+  <path class="edge" d="M880 232c38 0 38 88 75 88"/>
+  <path class="edge-live branch-false" d="M880 232c38 0 38 88 75 88"/>
+
+  <text x="884" y="171" class="badge" style="fill:#6ee7b7">true</text>
+  <text x="884" y="283" class="badge" style="fill:#f9a8d4">false</text>
+
+  <!-- Moving dots -->
+  <circle class="flow-dot" r="4">
+    <animateMotion dur="1.8s" repeatCount="indefinite" path="M270 216h75"/>
+  </circle>
+  <circle class="flow-dot" r="4">
+    <animateMotion dur="1.8s" begin=".6s" repeatCount="indefinite" path="M595 216h75"/>
+  </circle>
+  <circle class="flow-dot" r="4">
+    <animateMotion dur="2.2s" begin=".9s" repeatCount="indefinite" path="M880 200c38 0 38-76 75-76"/>
+  </circle>
+  <circle class="flow-dot" r="4" fill="#f9a8d4">
+    <animateMotion dur="2.2s" begin="1.4s" repeatCount="indefinite" path="M880 232c38 0 38 88 75 88"/>
+  </circle>
+
+  <text x="60" y="410" class="caption">Seven node types, server-side validation, resumable execution, and a full audit trail.</text>
+  <text x="1140" y="410" text-anchor="end" class="badge" style="fill:#64748b">orqiva</text>
+</svg>

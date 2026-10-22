@@ -238,7 +238,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
       })
       .catch(() => {
         if (active) {
-          setError("Statistik token gagal dimuat. Periksa koneksi backend.");
+          setError(t("dashboard.tokenUsageError"));
         }
       })
       .finally(() => {
@@ -248,7 +248,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
     return () => {
       active = false;
     };
-  }, [period]);
+  }, [period, t]);
 
   function changePeriod(next: TokenUsagePeriod) {
     setUsageLoading(true);
@@ -691,7 +691,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
 
               <div className="mt-3 space-y-2">
                 <SystemRow
-                  label={t("settings.backend")}
+                  label={t("settings.serviceLabel")}
                   value={t(HEALTH_STYLES[health].labelKey)}
                   dot={HEALTH_STYLES[health].dot}
                   text={HEALTH_STYLES[health].text}
@@ -969,7 +969,7 @@ function AutomationPipeline() {
             <PipelineNode
               icon={Bot}
               label={t("dashboard.pipelineAI")}
-              hint="Gemini"
+              hint={t("dashboard.pipelineAIHint")}
               active
             />
             <PipelineConnector />

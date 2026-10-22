@@ -497,7 +497,6 @@ export default function AiProviders() {
               <li>{t("ai.secure1")}</li>
               <li>{t("ai.secure2")}</li>
               <li>{t("ai.secure3")}</li>
-              <li>{t("ai.secure4")}</li>
             </ul>
           </Card>
         </div>
