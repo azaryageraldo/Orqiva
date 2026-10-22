@@ -44,3 +44,6 @@
 
 # Laravel compiled views
 /backend/storage/framework/views/*.php
+
+# Separate website repository (orqiva-web)
+/website/
