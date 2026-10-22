@@ -1,6 +1,6 @@
 {
   "name": "orqiva",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local-first AI customer service automation for Orqiva.",
   "type": "module",
   "bin": {
@@ -17,11 +17,11 @@
     "node": ">=20"
   },
   "optionalDependencies": {
-    "orqiva-runtime-darwin-arm64": "0.1.1",
-    "orqiva-runtime-darwin-x64": "0.1.1",
-    "orqiva-runtime-linux-arm64": "0.1.1",
-    "orqiva-runtime-linux-x64": "0.1.1",
-    "orqiva-runtime-win32-x64": "0.1.1"
+    "orqiva-runtime-darwin-arm64": "0.1.2",
+    "orqiva-runtime-darwin-x64": "0.1.2",
+    "orqiva-runtime-linux-arm64": "0.1.2",
+    "orqiva-runtime-linux-x64": "0.1.2",
+    "orqiva-runtime-win32-x64": "0.1.2"
   },
   "scripts": {
     "test": "node --test",
