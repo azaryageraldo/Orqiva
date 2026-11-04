@@ -14,7 +14,7 @@ class AuthTest extends TestCase
     {
         return User::create([
             'name' => 'Admin',
-            'email' => 'admin@example.com',
+            'email' => null,
             'password' => 'password',
         ]);
     }
@@ -25,11 +25,10 @@ class AuthTest extends TestCase
 
         $this->withHeader('Origin', 'http://localhost:5173')
             ->postJson('/api/v1/login', [
-                'email' => 'admin@example.com',
                 'password' => 'password',
             ])
             ->assertOk()
-            ->assertJsonPath('user.email', 'admin@example.com');
+            ->assertJsonPath('user.name', 'Admin');
     }
 
     public function test_login_fails_with_wrong_password(): void
@@ -38,11 +37,10 @@ class AuthTest extends TestCase
 
         $this->withHeader('Origin', 'http://localhost:5173')
             ->postJson('/api/v1/login', [
-                'email' => 'admin@example.com',
                 'password' => 'wrong-password',
             ])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('email');
+            ->assertJsonValidationErrors('password');
     }
 
     public function test_login_is_rate_limited(): void
@@ -52,7 +50,6 @@ class AuthTest extends TestCase
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $this->withHeader('Origin', 'http://localhost:5173')
                 ->postJson('/api/v1/login', [
-                    'email' => 'admin@example.com',
                     'password' => 'wrong-password',
                 ])
                 ->assertStatus(422);
@@ -60,7 +57,6 @@ class AuthTest extends TestCase
 
         $this->withHeader('Origin', 'http://localhost:5173')
             ->postJson('/api/v1/login', [
-                'email' => 'admin@example.com',
                 'password' => 'wrong-password',
             ])
             ->assertStatus(429);
@@ -73,6 +69,6 @@ class AuthTest extends TestCase
         $this->actingAs($this->user())
             ->getJson('/api/v1/me')
             ->assertOk()
-            ->assertJsonPath('user.email', 'admin@example.com');
+            ->assertJsonPath('user.name', 'Admin');
     }
 }

@@ -31,7 +31,7 @@ type View =
   | "settings"
   | "help";
 
-type CurrentUser = { name: string; email: string };
+type CurrentUser = { name: string };
 
 function ErrorBanner({
   message,

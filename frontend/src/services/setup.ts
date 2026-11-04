@@ -13,14 +13,12 @@ export type SetupStatus = {
 
 export type FirstAccountInput = {
   name: string;
-  email: string;
   password: string;
   passwordConfirmation: string;
 };
 
 export type SetupUser = {
   name: string;
-  email: string;
 };
 
 type FirstAccountResponse = {
@@ -40,7 +38,6 @@ export async function createFirstAccount(
 
   const response = await api.post<FirstAccountResponse>("/setup", {
     name: input.name,
-    email: input.email,
     password: input.password,
     password_confirmation: input.passwordConfirmation,
   });

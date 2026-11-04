@@ -11,11 +11,11 @@ class ProfileTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function user(string $email = 'owner@example.com'): User
+    private function user(): User
     {
         return User::create([
             'name' => 'Owner',
-            'email' => $email,
+            'email' => null,
             'password' => 'password',
         ]);
     }
@@ -26,39 +26,22 @@ class ProfileTest extends TestCase
         $this->putJson('/api/v1/profile', [])->assertUnauthorized();
     }
 
-    public function test_user_can_update_name_and_email(): void
+    public function test_user_can_update_name(): void
     {
         $user = $this->user();
 
         $this->actingAs($user)
             ->putJson('/api/v1/profile', [
                 'name' => 'Orqiva Admin',
-                'email' => 'new@example.com',
             ])
             ->assertOk()
             ->assertJsonPath('user.name', 'Orqiva Admin')
-            ->assertJsonPath('user.email', 'new@example.com')
             ->assertJsonMissingPath('user.password');
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'name' => 'Orqiva Admin',
-            'email' => 'new@example.com',
         ]);
-    }
-
-    public function test_email_must_be_unique(): void
-    {
-        $user = $this->user();
-        $this->user('taken@example.com');
-
-        $this->actingAs($user)
-            ->putJson('/api/v1/profile', [
-                'name' => 'Owner',
-                'email' => 'taken@example.com',
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('email');
     }
 
     public function test_password_change_requires_current_password(): void
@@ -68,7 +51,6 @@ class ProfileTest extends TestCase
         $this->actingAs($user)
             ->putJson('/api/v1/profile', [
                 'name' => 'Owner',
-                'email' => 'owner@example.com',
                 'password' => 'new-password',
             ])
             ->assertStatus(422)
@@ -84,7 +66,6 @@ class ProfileTest extends TestCase
         $this->actingAs($user)
             ->putJson('/api/v1/profile', [
                 'name' => 'Owner',
-                'email' => 'owner@example.com',
                 'password' => 'new-password',
                 'current_password' => 'wrong-password',
             ])
@@ -101,7 +82,6 @@ class ProfileTest extends TestCase
         $this->actingAs($user)
             ->putJson('/api/v1/profile', [
                 'name' => 'Owner',
-                'email' => 'owner@example.com',
                 'password' => 'new-password',
                 'current_password' => 'password',
             ])
@@ -117,7 +97,6 @@ class ProfileTest extends TestCase
         $this->actingAs($user)
             ->putJson('/api/v1/profile', [
                 'name' => 'Owner',
-                'email' => 'owner@example.com',
                 'password' => 'short',
                 'current_password' => 'password',
             ])

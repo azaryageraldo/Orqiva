@@ -12,18 +12,13 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         $email = env('ORQIVA_ADMIN_EMAIL');
-        $password = env('ORQIVA_ADMIN_PASSWORD');
-
-        if (! is_string($email) || trim($email) === '' || ! is_string($password) || $password === '') {
-            throw new RuntimeException(
-                'Set ORQIVA_ADMIN_EMAIL dan ORQIVA_ADMIN_PASSWORD, atau gunakan wizard setup saat pertama kali membuka Orqiva.'
-            );
-        }
+        $name = env('ORQIVA_ADMIN_NAME', 'Orqiva Admin');
+        $password = env('ORQIVA_ADMIN_PASSWORD', '12345');
 
         User::updateOrCreate(
-            ['email' => strtolower(trim($email))],
+            ['email' => $email],
             [
-                'name' => env('ORQIVA_ADMIN_NAME', 'Orqiva Admin'),
+                'name' => $name,
                 'password' => Hash::make($password),
             ]
         );

@@ -59,7 +59,6 @@ interface HeaderProps {
 
 export interface HeaderUser {
   name: string;
-  email: string;
 }
 
 const ICONS: Record<HeaderIcon, LucideIcon> = {
@@ -96,7 +95,6 @@ export default function Header({
   const displayName = user?.name || t("header.workspaceAdmin");
   const account = {
     name: displayName,
-    email: user?.email || "",
     role: t("header.workspaceAdmin"),
     initials: initialsOf(displayName),
   };
@@ -179,11 +177,6 @@ export default function Header({
                 <span className="block truncate text-sm font-medium text-foreground">
                   {account.name}
                 </span>
-                {account.email && (
-                  <span className="block truncate text-xs font-normal text-muted-foreground">
-                    {account.email}
-                  </span>
-                )}
               </DropdownMenuLabel>
             </DropdownMenuGroup>
 

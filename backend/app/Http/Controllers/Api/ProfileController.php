@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
@@ -23,12 +22,6 @@ class ProfileController extends Controller
         $user = $request->user();
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => [
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('users')->ignore($user->id),
-            ],
             'password' => ['nullable', 'string', 'min:8'],
             'current_password' => [
                 'nullable',
@@ -43,7 +36,6 @@ class ProfileController extends Controller
         ]);
 
         $user->name = $data['name'];
-        $user->email = $data['email'];
         if (! empty($data['password'])) {
             $user->password = Hash::make($data['password']);
         }

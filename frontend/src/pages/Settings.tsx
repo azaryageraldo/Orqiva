@@ -78,7 +78,6 @@ export default function Settings({
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -106,7 +105,6 @@ export default function Settings({
 
   function openEditor() {
     setName(user?.name ?? "");
-    setEmail(user?.email ?? "");
     setPassword("");
     setCurrentPassword("");
     setProfileError("");
@@ -119,17 +117,11 @@ export default function Settings({
     setProfileError("");
     setProfileNotice("");
 
-    if (password && !currentPassword) {
-      setProfileError(t("settings.profileErrorCurrent"));
-      return;
-    }
-
     setSaving(true);
 
     try {
       const updated = await updateProfile({
         name: name.trim(),
-        email: email.trim(),
         password: password || undefined,
         current_password: password ? currentPassword : undefined,
       });
@@ -240,18 +232,6 @@ export default function Settings({
                 </span>
               </div>
               <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-muted-foreground">
-                  {t("settings.email")}
-                </span>
-                <span className="truncate text-sm font-medium text-foreground">
-                  {loading ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : (
-                    user?.email || t("common.unknown")
-                  )}
-                </span>
-              </div>
               {profileNotice && (
                 <p className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
                   {profileNotice}
@@ -316,20 +296,6 @@ export default function Settings({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 autoComplete="name"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="profile-email">
-                {t("settings.profileEmail")}
-              </Label>
-              <Input
-                id="profile-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
                 required
               />
             </div>

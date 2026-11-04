@@ -25,8 +25,7 @@ class SetupController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:190'],
+            'name' => ['nullable', 'string', 'max:100'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
@@ -34,13 +33,13 @@ class SetupController extends Controller
             return DB::transaction(function () use ($validated): User {
                 if (User::query()->lockForUpdate()->exists()) {
                     throw ValidationException::withMessages([
-                        'email' => 'Orqiva sudah memiliki akun. Silakan masuk.',
+                        'password' => 'Orqiva sudah memiliki akun. Silakan masuk.',
                     ]);
                 }
 
                 return User::create([
-                    'name' => trim($validated['name']),
-                    'email' => strtolower(trim($validated['email'])),
+                    'name' => trim($validated['name'] ?? 'Orqiva Admin'),
+                    'email' => null,
                     'password' => $validated['password'],
                 ]);
             });

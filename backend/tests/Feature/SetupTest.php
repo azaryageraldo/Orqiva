@@ -22,7 +22,7 @@ class SetupTest extends TestCase
     {
         User::create([
             'name' => 'Owner',
-            'email' => 'owner@example.com',
+            'email' => null,
             'password' => 'password123',
         ]);
 
@@ -36,22 +36,22 @@ class SetupTest extends TestCase
         $this->withHeader('Origin', 'http://localhost:5173')
             ->postJson('/api/v1/setup', [
                 'name' => 'Orqiva Owner',
-                'email' => 'Owner@Example.com',
                 'password' => 'password123',
                 'password_confirmation' => 'password123',
             ])
             ->assertCreated()
-            ->assertJsonPath('user.email', 'owner@example.com');
+            ->assertJsonPath('user.name', 'Orqiva Owner');
 
         $user = User::query()->firstOrFail();
 
         $this->assertSame('Orqiva Owner', $user->name);
+        $this->assertNull($user->email);
         $this->assertTrue(Hash::check('password123', $user->password));
         $this->assertAuthenticatedAs($user);
 
         $this->getJson('/api/v1/me')
             ->assertOk()
-            ->assertJsonPath('user.email', 'owner@example.com');
+            ->assertJsonPath('user.name', 'Orqiva Owner');
 
         $this->getJson('/api/v1/setup/status')
             ->assertOk()
@@ -62,18 +62,17 @@ class SetupTest extends TestCase
     {
         User::create([
             'name' => 'Owner',
-            'email' => 'owner@example.com',
+            'email' => null,
             'password' => 'password123',
         ]);
 
         $this->postJson('/api/v1/setup', [
             'name' => 'Second Owner',
-            'email' => 'second@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('email');
+            ->assertJsonValidationErrors('password');
 
         $this->assertSame(1, User::query()->count());
     }
@@ -82,12 +81,11 @@ class SetupTest extends TestCase
     {
         $this->postJson('/api/v1/setup', [
             'name' => '',
-            'email' => 'not-an-email',
             'password' => 'short',
             'password_confirmation' => 'different',
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name', 'email', 'password']);
+            ->assertJsonValidationErrors(['password']);
 
         $this->assertSame(0, User::query()->count());
     }

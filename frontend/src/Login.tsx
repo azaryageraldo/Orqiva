@@ -31,7 +31,6 @@ export default function Login({ onLogin }: Props) {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("checking");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -72,13 +71,12 @@ export default function Login({ onLogin }: Props) {
 
         const result = await createFirstAccount({
           name,
-          email,
           password,
           passwordConfirmation,
         });
         currentUser = result.user;
       } else {
-        const result = await login(email, password);
+        const result = await login(password);
         currentUser = result.user;
       }
 
@@ -161,27 +159,6 @@ export default function Login({ onLogin }: Props) {
 
               <div className="space-y-1.5">
                 <Label
-                  htmlFor="email"
-                  className="text-xs font-medium text-muted-foreground"
-                >
-                  {t("login.email")}
-                </Label>
-
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="username"
-                  autoFocus={!setup}
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                  className="h-11 rounded-lg border-border/70 bg-background/50"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label
                   htmlFor="password"
                   className="text-xs font-medium text-muted-foreground"
                 >
@@ -219,6 +196,10 @@ export default function Login({ onLogin }: Props) {
                   </button>
                 </div>
               </div>
+
+              <p className="text-xs leading-5 text-muted-foreground/70">
+                {t("login.defaultPasswordHint")}
+              </p>
 
               {setup && (
                 <div className="space-y-1.5">

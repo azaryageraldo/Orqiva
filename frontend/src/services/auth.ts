@@ -6,12 +6,12 @@ const csrfApi = axios.create({
     withXSRFToken: true,
 });
 
-export async function login(email: string, password: string) {
+export async function login(password: string) {
     await csrfApi.get('/sanctum/csrf-cookie', {
         baseURL: '',
     });
 
-    const response = await api.post('/login', { email, password });
+    const response = await api.post('/login', { password });
     return response.data;
 }
 
