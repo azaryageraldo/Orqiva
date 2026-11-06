@@ -1,32 +1,12 @@
 import {
-  Activity,
-  Globe2,
-  Inbox,
-  KeyRound,
-  LayoutDashboard,
-  LifeBuoy,
+  LayoutList,
+  List,
   Server,
-  Settings,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
-import {
-  Sidebar as SidebarRoot,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarRail,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import OrqivaLogo from "@/components/brand/OrqivaLogo";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/constants";
 
 export type Health = "checking" | "online" | "offline";
@@ -43,14 +23,7 @@ export type NavKey =
 interface SidebarProps {
   health: Health;
   activeNav: NavKey;
-  onDashboardClick: () => void;
-  onWorkflowsClick: () => void;
-  onInboxClick: () => void;
-  onChannelClick: () => void;
-  onActivityClick: () => void;
-  onAiProvidersClick: () => void;
-  onHelpClick: () => void;
-  onSettingsClick: () => void;
+  onNavigate: (key: NavKey) => void;
 }
 
 const HEALTH_STYLES: Record<Health, { dot: string; text: string }> = {
@@ -59,163 +32,112 @@ const HEALTH_STYLES: Record<Health, { dot: string; text: string }> = {
   checking: { dot: "bg-amber-400 animate-pulse", text: "text-amber-400" },
 };
 
-const MENU_BUTTON =
-  "relative h-10 gap-3 rounded-xl px-3 text-[13px] font-medium text-sidebar-foreground/70 transition-all duration-200 before:pointer-events-none before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary before:opacity-0 before:transition-opacity [&_svg]:size-[18px] hover:bg-sidebar-accent/60 hover:text-sidebar-foreground data-active:bg-primary/10 data-active:font-semibold data-active:text-primary data-active:before:opacity-100";
-
-const GROUP_LABEL =
-  "mb-1.5 h-6 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40";
-
-const MAIN_NAV: Array<{
-  key: NavKey;
+type SidebarItem = {
   labelKey: string;
   icon: LucideIcon;
-}> = [
-  { key: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { key: "workflows", labelKey: "nav.workflows", icon: Workflow },
-  { key: "inbox", labelKey: "nav.inbox", icon: Inbox },
-  { key: "channel", labelKey: "nav.channel", icon: Globe2 },
-  { key: "activity", labelKey: "nav.activity", icon: Activity },
+  nav: NavKey;
+};
+
+const WORKFLOW_ITEMS: SidebarItem[] = [
+  { labelKey: "side.workflow", icon: LayoutList, nav: "workflows" },
+  { labelKey: "side.auditLog", icon: List, nav: "activity" },
 ];
 
-const PREFERENCES_NAV: Array<{
-  key: NavKey;
-  labelKey: string;
-  icon: LucideIcon;
-}> = [
-  { key: "ai-providers", labelKey: "nav.apiKeys", icon: KeyRound },
-  { key: "settings", labelKey: "nav.settings", icon: Settings },
-  { key: "help", labelKey: "nav.help", icon: LifeBuoy },
-];
+const ITEM_CLASS =
+  "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors";
+const ACTIVE_CLASS = "bg-white/[0.06] text-zinc-100";
+const IDLE_CLASS =
+  "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300";
+
+function SidebarSection({
+  label,
+  items,
+  activeNav,
+  onNavigate,
+}: {
+  label: string;
+  items: SidebarItem[];
+  activeNav: NavKey;
+  onNavigate: (key: NavKey) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div>
+      <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase">
+        {t(label)}
+      </p>
+
+      <div className="space-y-0.5">
+        {items.map((item) => {
+          const active = activeNav === item.nav;
+
+          return (
+            <button
+              key={item.labelKey}
+              type="button"
+              onClick={() => onNavigate(item.nav)}
+              aria-current={active ? "page" : undefined}
+              className={cn(ITEM_CLASS, active ? ACTIVE_CLASS : IDLE_CLASS)}
+            >
+              <item.icon size={14} strokeWidth={1.5} />
+              <span className="font-medium">{t(item.labelKey)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function Sidebar({
   health,
   activeNav,
-  onDashboardClick,
-  onWorkflowsClick,
-  onInboxClick,
-  onChannelClick,
-  onActivityClick,
-  onAiProvidersClick,
-  onHelpClick,
-  onSettingsClick,
+  onNavigate,
 }: SidebarProps) {
   const { t } = useI18n();
-  const { isMobile, setOpenMobile } = useSidebar();
   const status = HEALTH_STYLES[health];
   const statusLabel = {
     online: t("health.operational"),
     offline: t("health.offline"),
     checking: t("health.checking"),
   }[health];
-  const navHandlers: Record<NavKey, () => void> = {
-    dashboard: onDashboardClick,
-    workflows: onWorkflowsClick,
-    inbox: onInboxClick,
-    channel: onChannelClick,
-    activity: onActivityClick,
-    "ai-providers": onAiProvidersClick,
-    settings: onSettingsClick,
-    help: onHelpClick,
-  };
-  const runNav = (handler: () => void) => () => {
-    handler();
-    if (isMobile) setOpenMobile(false);
-  };
 
   return (
-    <SidebarRoot collapsible="offcanvas">
-      <SidebarHeader className="h-16 justify-center border-b border-sidebar-border/70 px-4">
-        <a
-          href="/"
-          aria-label="Orqiva"
-          className="group flex w-fit items-center"
-        >
-          <span className="relative flex size-10 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-primary/25 via-primary/10 to-transparent shadow-[0_10px_30px_-12px_var(--primary)] transition-transform duration-200 group-hover:scale-[1.04]">
-            <OrqivaLogo
-              showWordmark={false}
-              markClassName="size-8 drop-shadow-[0_0_10px_rgba(56,189,248,0.35)]"
-            />
+    <aside className="flex h-full min-h-0 w-full flex-col bg-[#0a0b0f]">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+        <SidebarSection
+          label="side.workflowGroup"
+          items={WORKFLOW_ITEMS}
+          activeNav={activeNav}
+          onNavigate={onNavigate}
+        />
+      </div>
+
+      <div className="border-t border-white/[0.04] px-3 py-3">
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-white/[0.04] bg-white/[0.02] px-2.5 py-2.5">
+          <span className="relative flex size-7 shrink-0 items-center justify-center rounded-[5px] border border-white/[0.04] bg-white/[0.03]">
+            <Server size={13} className="text-zinc-500" />
             <span
-              title={statusLabel}
-              className={`absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-sidebar ${status.dot}`}
+              className={cn(
+                "absolute -right-0.5 -bottom-0.5 size-2 rounded-full border-2 border-[#0a0b0f]",
+                status.dot,
+              )}
             />
           </span>
-        </a>
-      </SidebarHeader>
-
-      <SidebarContent className="py-3">
-        <SidebarGroup className="px-3 py-1">
-          <SidebarGroupLabel className={GROUP_LABEL}>
-            {t("nav.workspace")}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              {MAIN_NAV.map((item) => (
-                <SidebarMenuItem key={item.key}>
-                  <SidebarMenuButton
-                    isActive={activeNav === item.key}
-                    onClick={runNav(navHandlers[item.key])}
-                    className={MENU_BUTTON}
-                  >
-                    <item.icon />
-                    <span>{t(item.labelKey)}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <div className="mx-3 my-3 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent" />
-
-        <SidebarGroup className="px-3 py-1">
-          <SidebarGroupLabel className={GROUP_LABEL}>
-            {t("nav.preferences")}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              {PREFERENCES_NAV.map((item) => (
-                <SidebarMenuItem key={item.key}>
-                  <SidebarMenuButton
-                    isActive={activeNav === item.key}
-                    onClick={runNav(navHandlers[item.key])}
-                    className={MENU_BUTTON}
-                  >
-                    <item.icon />
-                    <span>{t(item.labelKey)}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter className="border-t border-sidebar-border/70 p-3">
-        <div className="rounded-2xl border border-sidebar-border/80 bg-gradient-to-br from-sidebar-accent/40 to-transparent p-3">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-background/50 ring-1 ring-sidebar-border">
-              <Server className="size-4 text-muted-foreground" />
-              <span
-                className={`absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-sidebar ${status.dot}`}
-              />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60">
-                {t("settings.serviceLabel")}
-              </p>
-              <p className={`truncate text-xs font-medium ${status.text}`}>
-                {statusLabel}
-              </p>
-            </div>
-            <span className="shrink-0 rounded-md border border-sidebar-border/80 bg-background/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70">
-              v{APP_VERSION}
-            </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[9px] font-medium tracking-[0.14em] text-zinc-600 uppercase">
+              {t("settings.serviceLabel")}
+            </p>
+            <p className={cn("truncate text-[11px] font-medium", status.text)}>
+              {statusLabel}
+            </p>
           </div>
+          <span className="shrink-0 text-[9px] font-medium text-zinc-600">
+            v{APP_VERSION}
+          </span>
         </div>
-      </SidebarFooter>
-
-      <SidebarRail />
-    </SidebarRoot>
+      </div>
+    </aside>
   );
 }

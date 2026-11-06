@@ -1,52 +1,31 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity as ActivityIcon,
   ChevronRight,
-  LoaderCircle,
-  RefreshCw,
+  Search,
   X,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
+import { Table, TableContainer, TableWrapper, Tbody, Td, Th, Thead, Tr } from "@/components/table";
 import { formatLocale, useI18n } from "@/lib/i18n";
-import {
-  getActivity,
-  type ActivityExecution,
-  type ActivityFilters,
-  type ActivityStats,
-  type ExecutionStatus,
-} from "../services/stats";
+import { getActivity } from "../services/stats";
 import { getErrorMessage } from "../services/api";
 
 interface ActivityProps {
-  onOpenWorkflow: (workflowId: string) => void;
-  onOpenExecution: (execution: ActivityExecution) => void;
+  onOpenExecution: (executionId: number, workflowId: string) => void;
 }
 
-const STATUS_LABELS: Record<ExecutionStatus, string> = {
-  success: "activity.success",
-  failed: "activity.failed",
-  waiting: "activity.waiting",
-  running: "activity.running",
-  escalated: "activity.escalated",
-};
-
-const DATE_PRESETS = [
-  { labelKey: "activity.presetToday", days: 0 },
-  { labelKey: "activity.preset7", days: 6 },
-  { labelKey: "activity.preset30", days: 29 },
-] as const;
+interface ActivityExecution {
+  id: number;
+  session_id: number | null;
+  contact_id: string | null;
+  contact_name: string | null;
+  workflow_id: number;
+  workflow_name: string | null;
+  status: string;
+  started_at: string | null;
+}
 
 function formatDate(value: string | null, locale: string): string {
   if (!value) return "—";
@@ -59,512 +38,328 @@ function formatDate(value: string | null, locale: string): string {
   }).format(date);
 }
 
-function toDateInput(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
 export default function Activity({
-  onOpenWorkflow,
   onOpenExecution,
 }: ActivityProps) {
-  const { t } = useI18n();
-  const [stats, setStats] = useState<ActivityStats | null>(null);
+  const { language, t } = useI18n();
+  const locale = formatLocale(language);
+  const [workflows, setWorkflows] = useState<ActivityExecution[]>([]);
+  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
-  const [filters, setFilters] = useState<ActivityFilters>({});
-  const [draft, setDraft] = useState<ActivityFilters>({});
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const requestRef = useRef(0);
 
-  async function loadPage(
-    next: ActivityFilters,
-    page: number,
-    append = false,
-  ) {
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
+  const loadPage = useCallback(async (targetPage = 1) => {
+    const requestId = ++requestRef.current;
 
+    setLoading(true);
     setError("");
 
     try {
-      const result = await getActivity(20, next, page);
+      const result = await getActivity(20, {}, targetPage);
 
-      setStats((current) =>
-        append && current
-          ? {
-              ...result,
-              executions: [...current.executions, ...result.executions],
-            }
-          : result,
-      );
+      if (requestId !== requestRef.current) return;
+
+      setWorkflows(result.executions);
+      setPage(result.meta.page);
+      setLastPage(Math.ceil(result.summary.total / 20));
+      setTotal(result.summary.total);
     } catch (caught) {
-      setError(
-        getErrorMessage(
-          caught,
-          t("activity.loadError"),
-        ),
-      );
+      setError(getErrorMessage(caught, t("activity.loadError")));
     } finally {
-      if (append) {
-        setLoadingMore(false);
-      } else {
-        setLoading(false);
-      }
+      if (requestId === requestRef.current) setLoading(false);
     }
-  }
+  }, [t]);
 
-  function refresh() {
-    void loadPage(filters, 1);
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchQuery(search), 300);
 
-  function applyFilters() {
-    setFilters(draft);
-    void loadPage(draft, 1);
-  }
-
-  function resetFilters() {
-    setDraft({});
-    setFilters({});
-    void loadPage({}, 1);
-  }
-
-  function applyPreset(days: number) {
-    const to = new Date();
-    const from = new Date();
-    from.setDate(to.getDate() - days);
-
-    const next: ActivityFilters = {
-      ...draft,
-      from: toDateInput(from),
-      to: toDateInput(to),
-    };
-
-    setDraft(next);
-    setFilters(next);
-    void loadPage(next, 1);
-  }
-
-  function loadMore() {
-    if (!stats || loadingMore) return;
-
-    void loadPage(filters, stats.meta.page + 1, true);
-  }
-
-  const hasFilters = Boolean(filters.status || filters.from || filters.to);
-  const hasDraft = Boolean(
-    draft.status ||
-      draft.from ||
-      draft.to ||
-      filters.status ||
-      filters.from ||
-      filters.to,
-  );
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     let active = true;
+    const requestId = ++requestRef.current;
 
     getActivity(20, {}, 1)
       .then((result) => {
-        if (active) setStats(result);
+        if (!active || requestId !== requestRef.current) return;
+
+        setWorkflows(result.executions);
+        setPage(result.meta.page);
+        setLastPage(Math.ceil(result.summary.total / 20));
+        setTotal(result.summary.total);
+        setError("");
       })
       .catch((caught: unknown) => {
-        if (active) {
-          setError(
-            getErrorMessage(
-              caught,
-              t("activity.loadError"),
-            ),
-          );
-        }
+        if (!active || requestId !== requestRef.current) return;
+
+        setError(getErrorMessage(caught, t("activity.loadError")));
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && requestId === requestRef.current) setLoading(false);
       });
 
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [searchQuery, t]);
+
+  const allSelected =
+    workflows.length > 0 &&
+    workflows.every((item) => selectedIds.has(item.id));
+
+  function toggleAll() {
+    setSelectedIds(
+      allSelected ? new Set() : new Set(workflows.map((item) => item.id)),
+    );
+  }
+
+  function toggleSelected(id: number) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }
+
+  function formatStatus(status: string): string {
+    const labels: Record<string, string> = {
+      success: t("activity.success"),
+      failed: t("activity.failed"),
+      waiting: t("activity.waiting"),
+      running: t("activity.running"),
+      escalated: t("activity.escalated"),
+    };
+
+    return labels[status] || status;
+  }
+
+  const from = total === 0 ? 0 : (page - 1) * 20 + 1;
+  const to = workflows.length === 0 ? 0 : Math.min(total, from + workflows.length - 1);
 
   return (
-    <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="w-full space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-              <ActivityIcon className="size-4" />
-              {t("nav.workspace")}
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {t("activity.title")}
-            </h1>
-            <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              {t("activity.subtitle")}
-            </p>
-          </div>
+    <section className="min-h-[calc(100vh-4rem)] px-4 py-5 sm:px-6">
+      <div className="w-full">
+        <h1 className="sr-only">{t("activity.title")}</h1>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={refresh}
-            disabled={loading}
-            className="h-10 px-4"
-          >
-            <RefreshCw className={loading ? "animate-spin" : undefined} />
-            {t("activity.refresh")}
-          </Button>
-        </div>
-
-        {error && (
-          <div
-            role="alert"
-            className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            <span>{error}</span>
-            <Button type="button" variant="ghost" size="sm" onClick={refresh}>
-              {t("common.retry")}
-            </Button>
-          </div>
-        )}
-
-        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-5">
-          {(
-            [
-              [t("activity.total"), stats?.summary.total],
-              [t("activity.success"), stats?.summary.success],
-              [t("activity.failed"), stats?.summary.failed],
-              [t("activity.waiting"), stats?.summary.waiting],
-              [t("activity.escalated"), stats?.summary.escalated],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label} className="bg-card p-5">
-              <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
-                {loading || value === undefined ? (
-                  <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
-                ) : (
-                  value
-                )}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <Card className="gap-0 py-0">
-          <div className="border-b border-border px-5 py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-foreground">
-                  {t("activity.latestTitle")}
-                </h2>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {t("activity.latestDescription")}
-                </p>
-              </div>
-
-              <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
-                {t("activity.loadedCount", { count: stats?.executions.length ?? 0 })}
-              </span>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-border bg-background/40 p-3">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_180px_180px_auto] xl:items-end">
-                <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
-                  <Label
-                    htmlFor="activity-status"
-                    className="text-xs font-normal text-muted-foreground"
-                  >
-                    {t("activity.statusLabel")}
-                  </Label>
-                  <Select
-                    value={draft.status || "all"}
-                    onValueChange={(value) =>
-                      setDraft((current) => ({
-                        ...current,
-                        status:
-                          value === "all" || value === null
-                            ? ""
-                            : (value as ExecutionStatus),
-                      }))
-                    }
-                  >
-                    <SelectTrigger
-                      id="activity-status"
-                      className="h-9 w-full dark:bg-input/30"
-                    >
-                      <SelectValue>
-                        {(value) =>
-                          value && value !== "all"
-                            ? t(STATUS_LABELS[value as ExecutionStatus])
-                            : t("activity.allStatus")
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("activity.allStatus")}</SelectItem>
-                      <SelectItem value="success">{t("activity.success")}</SelectItem>
-                      <SelectItem value="failed">{t("activity.failed")}</SelectItem>
-                      <SelectItem value="waiting">{t("activity.waiting")}</SelectItem>
-                      <SelectItem value="running">{t("activity.running")}</SelectItem>
-                      <SelectItem value="escalated">{t("activity.escalated")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="activity-from"
-                    className="text-xs font-normal text-muted-foreground"
-                  >
-                    {t("activity.fromDate")}
-                  </Label>
-                  <Input
-                    id="activity-from"
-                    type="date"
-                    value={draft.from ?? ""}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        from: event.target.value,
-                      }))
-                    }
-                    className="h-9 [color-scheme:dark]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="activity-to"
-                    className="text-xs font-normal text-muted-foreground"
-                  >
-                    {t("activity.toDate")}
-                  </Label>
-                  <Input
-                    id="activity-to"
-                    type="date"
-                    value={draft.to ?? ""}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        to: event.target.value,
-                      }))
-                    }
-                    className="h-9 [color-scheme:dark]"
-                  />
-                </div>
-
-                <div className="flex gap-2 sm:col-span-2 xl:col-span-1">
-                  <Button
-                    type="button"
-                    onClick={applyFilters}
-                    disabled={loading}
-                    className="h-9 flex-1 xl:flex-none"
-                  >
-                    {t("activity.apply")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={resetFilters}
-                    disabled={loading || !hasDraft}
-                    className="h-9"
-                  >
-                    {t("activity.reset")}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {t("activity.quickRange")}
-                </span>
-                {DATE_PRESETS.map((preset) => (
-                  <Button
-                    key={preset.labelKey}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => applyPreset(preset.days)}
-                    disabled={loading}
-                    className="h-7 rounded-full px-3 text-xs"
-                  >
-                    {t(preset.labelKey)}
-                  </Button>
-                ))}
-              </div>
-
-              {hasFilters && (
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/70 pt-3 text-xs">
-                  <span className="text-muted-foreground">{t("activity.activeFilter")}</span>
-                  {filters.status && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-primary">
-                      {t(STATUS_LABELS[filters.status])}
-                      <button
-                        type="button"
-                        aria-label={t("activity.removeStatus")}
-                        onClick={() => {
-                          const next = { ...draft, status: "" as const };
-                          setDraft(next);
-                          setFilters(next);
-                          void loadPage(next, 1);
-                        }}
-                        className="rounded-full hover:text-foreground"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  )}
-                  {(filters.from || filters.to) && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-muted-foreground">
-                      {filters.from || t("activity.dateStart")} – {filters.to || t("activity.dateEnd")}
-                      <button
-                        type="button"
-                        aria-label={t("activity.removeDate")}
-                        onClick={() => {
-                          const next = { ...draft, from: "", to: "" };
-                          setDraft(next);
-                          setFilters(next);
-                          void loadPage(next, 1);
-                        }}
-                        className="rounded-full hover:text-foreground"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  )}
-                </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="relative w-full lg:max-w-[320px]">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-600"
+                strokeWidth={1.5}
+                size={14}
+                width={14}
+                height={14}
+                fill="none"
+                stroke="currentColor"
+              />
+              <Input
+                type="search"
+                placeholder={t("activity.detail.searchPlaceholder")}
+                aria-label={t("activity.detail.searchAria")}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-9 rounded-md border-white/[0.1] bg-[#0d0e11] pr-8 pl-8 text-[12.5px] text-zinc-200 placeholder:text-zinc-600 dark:bg-[#0d0e11] [&::-webkit-search-cancel-button]:hidden"
+              />
+              {search && (
+                <button
+                  type="button"
+                  aria-label="Hapus pencarian"
+                  onClick={() => setSearch("")}
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 text-zinc-500 transition hover:text-zinc-200"
+                >
+                  <X className="size-3.5" />
+                </button>
               )}
             </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-zinc-500">
+                {t("activity.detail.range", { from, to, total })}
+              </span>
+            </div>
           </div>
 
-          {loading ? (
-            <div className="flex min-h-56 items-center justify-center">
-              <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start justify-between gap-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[12.5px] text-destructive"
+            >
+              <p>{error}</p>
+              <button
+                type="button"
+                onClick={() => setError("")}
+                aria-label="Batalkan pesan error"
+                className="text-destructive/70 transition hover:text-destructive"
+              >
+                <X className="size-4" />
+              </button>
             </div>
-          ) : !stats || stats.executions.length === 0 ? (
-            <div className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
-              <span className="mb-4 flex size-12 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
-                <ActivityIcon className="size-5" />
-              </span>
-              <p className="text-sm font-medium text-foreground">
-                {hasFilters
-                  ? t("activity.noMatch")
-                  : t("activity.empty")}
-              </p>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                {hasFilters
-                  ? t("activity.noMatchHint")
-                  : t("activity.emptyHint")}
-              </p>
-            </div>
-          ) : (
-            <>
-              <ul className="divide-y divide-border">
-                {stats.executions.map((execution) => (
-                  <ActivityRow
-                    key={execution.id}
-                    execution={execution}
-                    onOpenWorkflow={onOpenWorkflow}
-                    onOpenExecution={onOpenExecution}
-                  />
-                ))}
-              </ul>
-
-              {stats.meta.has_more && (
-                <div className="border-t border-border p-4 text-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    className="h-9 px-4"
-                  >
-                    {loadingMore && (
-                      <LoaderCircle className="animate-spin" />
-                    )}
-                    {t("activity.loadMore")}
-                  </Button>
-                </div>
-              )}
-            </>
           )}
-        </Card>
+
+          <TableContainer>
+            <TableWrapper>
+              <Table>
+                <Thead>
+                  <Tr className="border-b border-white/[0.07] bg-white/[0.02]">
+                    <Th className="w-10 text-right last:border-r-0">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={() => toggleAll()}
+                        aria-label={t("activity.col.no")}
+                        className="size-3.5 cursor-pointer rounded-[3px] border-white/20 bg-transparent accent-[var(--primary)]"
+                      />
+                    </Th>
+                    <Th className="w-10 text-center">{t("activity.col.no")}</Th>
+                    <Th className="min-w-[140px] text-center">{t("activity.col.sessionId")}</Th>
+                    <Th className="min-w-[140px] text-center">{t("activity.col.contactId")}</Th>
+                    <Th className="min-w-[160px] text-center">{t("activity.col.contactName")}</Th>
+                    <Th className="min-w-[140px] text-center">{t("activity.col.sessionCreated")}</Th>
+                    <Th className="w-32 text-center">{t("activity.col.logStatus")}</Th>
+                    <Th className="min-w-[160px] text-center">{t("activity.col.workflow")}</Th>
+                    <Th className="w-28 text-center">{t("activity.col.actions")}</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {loading ? (
+                    Array.from({ length: 8 }).map((_, index) => (
+                      <Tr key={`skeleton-${index}`} className="border-t border-white/[0.06]">
+                        <Td colSpan={9} className="px-3 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="size-3.5 animate-pulse rounded-[3px] bg-white/[0.06]" />
+                            <div className="size-7 animate-pulse rounded-md bg-white/[0.06]" />
+                            <div className="h-3 w-40 animate-pulse rounded bg-white/[0.06]" />
+                            <div className="ml-auto h-3 w-24 animate-pulse rounded bg-white/[0.06]" />
+                          </div>
+                        </Td>
+                      </Tr>
+                    ))
+                  ) : workflows.length === 0 ? (
+                    <Tr>
+                      <Td colSpan={9}>
+                        <div className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
+                          <span className="mb-3 flex size-10 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] text-zinc-500">
+                            <ActivityIcon className="size-5" />
+                          </span>
+                          <h2 className="text-sm font-medium text-zinc-200">
+                            {search ? t("activity.noMatch") : t("activity.empty")}
+                          </h2>
+                          <p className="mt-1 max-w-sm text-[12.5px] text-zinc-500">
+                            {search ? t("activity.noMatchHint") : t("activity.emptyHint")}
+                          </p>
+                        </div>
+                      </Td>
+                    </Tr>
+                  ) : (
+                    workflows.map((execution, index) => {
+                      const rowNumber = (page - 1) * 20 + index + 1;
+
+                      return (
+                        <Tr
+                          key={execution.id}
+                          className="group cursor-pointer border-t border-white/[0.06] transition-colors hover:bg-white/[0.025]"
+                          onClick={() => onOpenExecution(execution.id, String(execution.workflow_id))}
+                        >
+                          <Td className="w-10 text-right">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(execution.id)}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={() => toggleSelected(execution.id)}
+                              className="size-3.5 cursor-pointer rounded-[3px] border-white/20 bg-transparent accent-[var(--primary)]"
+                            />
+                          </Td>
+                          <Td className="w-10 text-center font-mono text-xs text-zinc-400">
+                            {rowNumber}
+                          </Td>
+                          <Td className="min-w-[140px] text-center font-mono text-xs text-muted-foreground">
+                            {execution.session_id ?? `#${execution.id}`}
+                          </Td>
+                          <Td className="min-w-[140px] text-center font-mono text-xs text-muted-foreground">
+                            {execution.contact_id ?? "—"}
+                          </Td>
+                          <Td className="min-w-[160px] text-center text-center">
+                            {execution.contact_name ?? t("activity.contactMissing")}
+                          </Td>
+                          <Td className="min-w-[140px] text-center font-mono text-xs text-muted-foreground">
+                            {formatDate(execution.started_at, locale)}
+                          </Td>
+                          <Td className="w-32 text-center">
+                            <span className="text-[11px] font-medium text-zinc-500">
+                              {formatStatus(execution.status)}
+                            </span>
+                          </Td>
+                          <Td className="min-w-[160px] text-center text-center">
+                            <span className="text-zinc-600">—</span>
+                          </Td>
+                          <Td className="w-28 text-right">
+                            <button
+                              type="button"
+                              title={t("activity.detail.title")}
+                              aria-label={t("activity.detail.title")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenExecution(execution.id, String(execution.workflow_id));
+                              }}
+                              className="flex size-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
+                            >
+                              <ChevronRight size={15} />
+                            </button>
+                          </Td>
+                        </Tr>
+                      );
+                    })
+                  )}
+                </Tbody>
+              </Table>
+            </TableWrapper>
+          </TableContainer>
+
+          <div className="flex flex-col gap-2 border-t border-white/[0.07] bg-white/[0.015] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11px] text-zinc-500">
+              {t("activity.detail.range", { from, to, total })}
+            </p>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => void loadPage(page - 1)}
+                disabled={loading || page <= 1}
+                aria-label={t("activity.previous")}
+                className="flex size-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-zinc-200 disabled:opacity-35 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
+              >
+                <ChevronRight size={14} />
+              </button>
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-[4px] border border-white/[0.1] bg-white/[0.05] px-1.5 text-[11px] font-medium text-zinc-200">
+                {page}
+              </span>
+              <button
+                type="button"
+                onClick={() => void loadPage(page + 1)}
+                disabled={loading || page >= lastPage}
+                aria-label={t("activity.next")}
+                className="flex size-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.07] hover:text-zinc-200 disabled:opacity-35 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
-  );
-}
-
-function ActivityRow({
-  execution,
-  onOpenWorkflow,
-  onOpenExecution,
-}: {
-  execution: ActivityExecution;
-  onOpenWorkflow: (workflowId: string) => void;
-  onOpenExecution: (execution: ActivityExecution) => void;
-}) {
-  const { language, t } = useI18n();
-  const locale = formatLocale(language);
-
-  return (
-    <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
-      <ExecutionStatusBadge status={execution.status} />
-
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => onOpenWorkflow(String(execution.workflow_id))}
-          className="truncate text-sm font-medium text-foreground hover:underline focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          {execution.workflow_name || t("activity.workflowFallback", { id: execution.workflow_id })}
-        </button>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {t("activity.session", {
-            id: execution.session_id ?? `#${execution.id}`,
-          })}{" "}
-          · {formatDate(execution.started_at, locale)}
-          {execution.steps_count > 0
-            ? ` · ${t("activity.steps", { count: execution.steps_count })}`
-            : ""}
-        </p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {execution.contact_id
-            ? t("activity.contact", {
-                name: execution.contact_name || execution.contact_id,
-              })
-            : t("activity.contactMissing")}
-        </p>
-        {execution.error && (
-          <p className="mt-1 line-clamp-2 text-xs text-destructive">
-            {execution.error}
-          </p>
-        )}
-      </div>
-
-      <span className="shrink-0 text-xs text-muted-foreground">
-        {execution.total_tokens > 0
-          ? t("activity.tokens", {
-              count: execution.total_tokens.toLocaleString(locale),
-            })
-          : t("activity.noTokens")}
-      </span>
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => onOpenExecution(execution)}
-        className="shrink-0 text-muted-foreground hover:text-foreground"
-      >
-        {t("activity.detail")}
-        <ChevronRight className="size-4" />
-      </Button>
-    </li>
   );
 }

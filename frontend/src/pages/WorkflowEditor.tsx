@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -14,60 +12,43 @@ import {
   applyNodeChanges,
   Background,
   Controls,
-  EdgeLabelRenderer,
-  getSmoothStepPath,
-  Handle,
   MiniMap,
-  Position,
   ReactFlow,
   type Connection,
   type Edge,
-  type EdgeProps,
-  type Node,
-  type NodeChange,
-  type NodeProps,
   type EdgeChange,
+  type NodeChange,
+  type ReactFlowInstance,
+  type OnSelectionChangeParams,
+  SelectionMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-
 import {
-  ArrowLeft,
   Check,
-  ListPlus,
   MousePointer2,
   Plus,
-  Save,
   Settings2,
   TriangleAlert,
   Trash2,
   Variable,
-  Webhook,
-  Workflow as WorkflowIcon,
+  Wand2,
   X,
 } from "lucide-react";
 import {
-  ArrowBendUpRight,
   ChatCircleDots,
-  GitFork,
   Handshake,
-  Lightning,
   PauseCircle,
-  Robot,
   Sparkle,
-  type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
 
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n";
+import { edgeConnectionKey, tidyLayout } from "@/lib/workflowLayout";
 import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
-
+  getAiSettings,
+  type AiModelOption,
+  type AiProvider,
+} from "../services/aiSettings";
 import {
   getWorkflow,
   getWorkflowOptions,
@@ -75,471 +56,53 @@ import {
 } from "../services/workflow";
 import type { WorkflowOption } from "../services/channel";
 import { getErrorMessage } from "../services/api";
-import { useI18n } from "@/lib/i18n";
+
+import AutomationNode from "./workflow-editor/AutomationNode";
+import FlowEdge from "./workflow-editor/FlowEdge";
+import NodeLibraryPanel from "./workflow-editor/NodeLibraryPanel";
+import CanvasToolbar from "./workflow-editor/CanvasToolbar";
+import EditorHeader from "./workflow-editor/EditorHeader";
 import {
-  getAiSettings,
-  type AiModelOption,
-  type AiProvider,
-} from "../services/aiSettings";
-
-type NodeKind =
-  | "Trigger"
-  | "AI Agent"
-  | "Send Message"
-  | "Condition"
-  | "Go To"
-  | "Relocate"
-  | "Stopper";
-type MessageMode = "template" | "smart_value";
-type VariableType = "string" | "boolean" | "array";
-type AgentVerbosity = "concise" | "balanced" | "detailed";
-
-type OutputVariable = {
-  name: string;
-  type: VariableType;
-  description: string;
-  itemField?: string;
-};
-
-type AutomationNodeData = {
-  label: NodeKind;
-  description: string;
-  systemMessage?: string;
-  variables?: string;
-  nodeName?: string;
-  variableDefinitions?: Array<{
-    name: string;
-    type: string;
-    description: string;
-    sourceValue: string;
-  }>;
-  outputVariables?: OutputVariable[];
-  provider?: string;
-  model?: string;
-  temperature?: number;
-  verbosity?: AgentVerbosity;
-  contextMessages?: number;
-  messageMode?: MessageMode;
-  messageTemplate?: string;
-  conditionVariable?: string;
-  conditionOperator?: string;
-  conditionValue?: string;
-  targetNodeId?: string;
-  targetWorkflowId?: string;
-  endFlow?: boolean;
-  setStartingPoint?: boolean;
-  triggerType?: string;
-  [key: string]: unknown;
-};
-
-type FlowNode = Node<AutomationNodeData>;
-
-type ValidationIssue = {
-  nodeId?: string;
-  title: string;
-  message: string;
-  fix: string;
-};
+  geminiModels,
+  initialEdges,
+  initialNodes,
+  PROMPT_BUILTINS,
+} from "./workflow-editor/nodeMeta";
+import {
+  EditorActionsContext,
+  NodeActionsContext,
+} from "./workflow-editor/contexts";
+import type {
+  AutomationNodeData,
+  FlowNode,
+  NodeKind,
+  OutputVariable,
+  ValidationIssue,
+  VariableType,
+  AgentVerbosity,
+  AgentVariable,
+  WorkflowDefinition,
+  WorkflowEditorProps,
+} from "./workflow-editor/types";
 
 const VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SMART_PATH_PATTERN =
   /^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
-type WorkflowDefinition = {
-  nodes: Array<{
-    id: string;
-    type: NodeKind;
-    position: { x: number; y: number };
-    data: AutomationNodeData;
-  }>;
-  edges: Edge[];
-};
-
-type WorkflowEditorProps = {
-  workflowId?: string;
-  onBack: () => void;
-};
 
 const panelClass = "rounded-xl border border-border bg-card";
 const inputClass =
   "mt-2.5 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
-
 const labelClass = "text-sm font-medium leading-6 text-muted-foreground";
 const compactInputClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
 const buttonClass =
   "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
-const nodeOptions: {
-  label: NodeKind;
-  descriptionKey: string;
-  icon: PhosphorIcon;
-}[] = [
-  { label: "Trigger", descriptionKey: "editor.node.triggerDesc", icon: Lightning },
-  { label: "AI Agent", descriptionKey: "editor.node.agentDesc", icon: Robot },
-  {
-    label: "Send Message",
-    descriptionKey: "editor.node.outputDesc",
-    icon: ChatCircleDots,
-  },
-  {
-    label: "Condition",
-    descriptionKey: "editor.node.conditionDesc",
-    icon: GitFork,
-  },
-  {
-    label: "Go To",
-    descriptionKey: "editor.node.goToDesc",
-    icon: ArrowBendUpRight,
-  },
-  {
-    label: "Relocate",
-    descriptionKey: "editor.node.relocateDesc",
-    icon: Handshake,
-  },
-  {
-    label: "Stopper",
-    descriptionKey: "editor.node.stopperDesc",
-    icon: PauseCircle,
-  },
+const APPENDABLE_LABELS: AutomationNodeData["label"][] = [
+  "Trigger",
+  "AI Agent",
+  "Send Message",
 ];
-
-const PROMPT_BUILTINS = [
-  {
-    token: "customer_message",
-    descriptionKey: "editor.token.customerMessage",
-  },
-  { token: "customer_name", descriptionKey: "editor.token.customerName" },
-];
-
-const geminiModels = [
-  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash · Recommended" },
-  { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite" },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-];
-
-const NodeActionsContext = createContext<((nodeId: string) => void) | null>(null);
-
-const initialNodes: FlowNode[] = [
-  {
-    id: "trigger-1",
-    type: "automation",
-    position: { x: 260, y: 40 },
-    data: {
-      label: "Trigger",
-      nodeName: "Incoming message",
-      description: "Start when a visitor sends a message",
-      triggerType: "chat_message",
-    },
-  },
-  {
-    id: "ai-1",
-    type: "automation",
-    position: { x: 260, y: 280 },
-    data: {
-      label: "AI Agent",
-      nodeName: "AI response",
-      description: "Generate a response with AI",
-      systemMessage:
-        "You are a helpful assistant. Answer the visitor clearly and politely.",
-      variables: "customer_message\ncustomer_name",
-      outputVariables: [
-        {
-          name: "respond",
-          type: "array",
-          itemField: "replies",
-          description: "Balasan AI; setiap item dikirim sebagai bubble",
-        },
-      ],
-      variableDefinitions: [
-        {
-          name: "customer_message",
-          type: "string",
-          description: "Message sent by the visitor",
-          sourceValue: "input.message",
-        },
-        {
-          name: "customer_name",
-          type: "string",
-          description: "Visitor name",
-          sourceValue: "input.customer_name",
-        },
-      ],
-      provider: "gemini",
-      model: "gemini-3.8-flash",
-      temperature: 0.7,
-      verbosity: "concise",
-      contextMessages: 10,
-    },
-  },
-  {
-    id: "message-1",
-    type: "automation",
-    position: { x: 260, y: 520 },
-    data: {
-      label: "Send Message",
-      nodeName: "Send AI reply",
-      description: "Send the AI response to the visitor",
-      messageMode: "smart_value",
-      messageTemplate: "{{ai-response.respond.replies}}",
-    },
-  },
-];
-
-const initialEdges: Edge[] = [
-  {
-    id: "edge-1",
-    source: "trigger-1",
-    target: "ai-1",
-    type: "flow",
-  },
-  {
-    id: "edge-2",
-    source: "ai-1",
-    target: "message-1",
-    type: "flow",
-  },
-];
-
-const NODE_ICONS: Record<NodeKind, PhosphorIcon> = {
-  Trigger: Lightning,
-  "AI Agent": Robot,
-  "Send Message": ChatCircleDots,
-  Condition: GitFork,
-  "Go To": ArrowBendUpRight,
-  Relocate: Handshake,
-  Stopper: PauseCircle,
-};
-
-const NODE_TONES: Record<NodeKind, { tile: string; glow: string }> = {
-  Trigger: {
-    tile: "bg-amber-400/15 text-amber-300",
-    glow: "shadow-[0_0_16px_-6px_rgba(251,191,36,0.7)]",
-  },
-  "AI Agent": {
-    tile: "bg-violet-400/15 text-violet-200",
-    glow: "shadow-[0_0_20px_-4px_rgba(167,139,250,0.7)]",
-  },
-  "Send Message": {
-    tile: "bg-primary/15 text-primary",
-    glow: "shadow-[0_0_16px_-6px_var(--primary)]",
-  },
-  Condition: {
-    tile: "bg-orange-400/15 text-orange-300",
-    glow: "shadow-[0_0_16px_-6px_rgba(251,146,60,0.65)]",
-  },
-  "Go To": {
-    tile: "bg-sky-400/15 text-sky-300",
-    glow: "shadow-[0_0_16px_-6px_rgba(56,189,248,0.65)]",
-  },
-  Relocate: {
-    tile: "bg-teal-400/15 text-teal-300",
-    glow: "shadow-[0_0_16px_-6px_rgba(45,212,191,0.65)]",
-  },
-  Stopper: {
-    tile: "bg-rose-400/15 text-rose-300",
-    glow: "shadow-[0_0_16px_-6px_rgba(251,113,133,0.65)]",
-  },
-};
-
-function AutomationNode({ id, data, selected }: NodeProps<FlowNode>) {
-  const { t } = useI18n();
-  const deleteNode = useContext(NodeActionsContext);
-  const Icon = NODE_ICONS[data.label] ?? WorkflowIcon;
-  const tone = NODE_TONES[data.label] ?? NODE_TONES["Send Message"];
-  const isCondition = data.label === "Condition";
-  const isAgent = data.label === "AI Agent";
-  const hasSourceHandle = !["Relocate", "Go To"].includes(data.label);
-  const nodeTitle = data.nodeName?.trim() || t("editor.untitledStep");
-  const conditionVariable = data.conditionVariable?.trim();
-
-  return (
-    <div
-      className={`group relative w-[224px] overflow-hidden rounded-xl border bg-card shadow-lg shadow-black/20 transition ${
-        selected
-          ? "border-primary/70 ring-2 ring-primary/20"
-          : "border-border hover:border-ring/40"
-      } ${
-        isAgent
-          ? "bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.12),transparent_58%)]"
-          : ""
-      }`}
-    >
-      <button
-        type="button"
-        aria-label={t("editor.deleteNodeNamed", { name: nodeTitle })}
-        title={t("editor.deleteNode")}
-        onClick={(event) => {
-          event.stopPropagation();
-          deleteNode?.(id);
-        }}
-        className={`nodrag absolute top-1.5 right-1.5 z-10 flex size-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive ${
-          selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        }`}
-      >
-        <Trash2 size={13} />
-      </button>
-
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!size-2.5 !rounded-full !border-2 !border-background !bg-muted-foreground/70"
-      />
-
-      <div className="flex items-center gap-2.5 py-2.5 pr-8 pl-3">
-        <span
-          className={`relative flex size-8 shrink-0 items-center justify-center rounded-lg ${tone.tile} ${tone.glow}`}
-        >
-          <Icon size={17} weight="duotone" />
-          {isAgent && (
-            <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-violet-300 shadow-[0_0_6px_rgba(196,181,253,0.9)]" />
-          )}
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <p
-            className="truncate text-[13px] font-semibold text-foreground"
-            title={nodeTitle}
-          >
-            {nodeTitle}
-          </p>
-          {isCondition && (
-            <p
-              className={`mt-0.5 truncate font-mono text-[10px] ${
-                conditionVariable ? "text-primary" : "text-muted-foreground/70"
-              }`}
-              title={
-                conditionVariable
-                  ? `{{${conditionVariable}}}`
-                  : t("editor.chooseBoolean")
-              }
-            >
-              {conditionVariable
-                ? `{{${conditionVariable}}}`
-                : t("editor.chooseVariable")}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {isAgent && (
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
-      )}
-
-      {isCondition ? (
-        <>
-          <Handle
-            id="true"
-            type="source"
-            position={Position.Right}
-            title={t("editor.ifMatch")}
-            style={{ top: "50%", background: "#34d399" }}
-            className="!size-2.5 !rounded-full !border-2 !border-background"
-          />
-          <Handle
-            id="false"
-            type="source"
-            position={Position.Bottom}
-            title={t("editor.else")}
-            style={{ left: "50%", background: "#fb7185" }}
-            className="!size-2.5 !rounded-full !border-2 !border-background"
-          />
-        </>
-      ) : hasSourceHandle ? (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="!size-2.5 !rounded-full !border-2 !border-background !bg-primary"
-        />
-      ) : null}
-    </div>
-  );
-}
-
-const EDGE_CHIPS: Record<string, string> = {
-  true: "border-emerald-400/40 bg-card text-emerald-300",
-  false: "border-rose-400/40 bg-card text-rose-300",
-};
-
-const EDGE_LABELS: Record<string, string> = {
-  true: "editor.ifMatch",
-  false: "editor.else",
-};
-
-function FlowEdge({
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  sourceHandleId,
-}: EdgeProps) {
-  const { t } = useI18n();
-  const [path, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    borderRadius: 18,
-  });
-
-  const branch = sourceHandleId ?? "";
-  const stroke =
-    branch === "true"
-      ? "#34d399"
-      : branch === "false"
-        ? "#fb7185"
-        : "var(--primary)";
-  const labelKey = EDGE_LABELS[branch];
-  const label = labelKey ? t(labelKey) : undefined;
-
-  return (
-    <>
-      <path
-        d={path}
-        fill="none"
-        style={{ stroke }}
-        strokeWidth={6}
-        strokeLinecap="round"
-        opacity={0.12}
-      />
-      <path
-        d={path}
-        fill="none"
-        style={{ stroke }}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeDasharray="7 9"
-        className="flow-edge-dash"
-      />
-      {label && (
-        <EdgeLabelRenderer>
-          <span
-            className={`absolute rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur ${EDGE_CHIPS[branch]}`}
-            style={{
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 13}px)`,
-            }}
-          >
-            {label}
-          </span>
-        </EdgeLabelRenderer>
-      )}
-    </>
-  );
-}
-
-const nodeTypes = { automation: AutomationNode };
-const edgeTypes = { flow: FlowEdge };
-
-type AgentVariable = {
-  name: string;
-  token: string;
-  type: string;
-  description: string;
-  itemField?: string;
-};
 
 function nodeVariableNamespace(node: FlowNode): string {
   const base = (node.data.nodeName?.trim() || node.id)
@@ -756,6 +319,7 @@ export default function WorkflowEditor({
   const [aiModels, setAiModels] = useState<AiModelOption[]>([]);
   const [aiDefaultModel, setAiDefaultModel] = useState<AiModelOption | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [blockMode, setBlockMode] = useState(false);
   const [draftData, setDraftData] = useState<AutomationNodeData | null>(null);
   const [agentTab, setAgentTab] = useState<"node" | "prompt" | "variables">("node");
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -766,6 +330,74 @@ export default function WorkflowEditor({
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
     makeSnapshot(initialNodes, initialEdges),
   );
+  const [pendingParentId, setPendingParentId] = useState<string | null>(null);
+  const [pendingAddPosition, setPendingAddPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [pendingFit, setPendingFit] = useState(false);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+  const flowRef = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null);
+
+  const terminalNodeIds = useMemo<Set<string>>(() => {
+    const targets = new Set(edges.map((edge) => edge.target));
+    return new Set(
+      nodes
+        .filter((node) => APPENDABLE_LABELS.includes(node.data.label))
+        .filter((node) => !targets.has(node.id))
+        .map((node) => node.id),
+    );
+  }, [nodes, edges]);
+
+  const requestAddFrom = useCallback(
+    (nodeId: string) => {
+      const parent = nodes.find((node) => node.id === nodeId);
+
+      setAgentTab("node");
+      setSelectedNodeId(null);
+      setDraftData(null);
+      setPendingParentId(nodeId);
+      setPendingAddPosition(
+        parent
+          ? { x: parent.position.x, y: parent.position.y + 176 }
+          : { x: 260, y: 80 },
+      );
+      setShowLibrary(true);
+    },
+    [nodes],
+  );
+
+  const editorActions = {
+    requestAddFrom,
+    terminalNodeIds,
+  };
+
+  useEffect(() => {
+    if (!pendingFit) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const instance = flowRef.current;
+
+      if (!instance) {
+        setPendingFit(false);
+        return;
+      }
+
+      void instance
+        .fitView({ padding: 0.2, minZoom: 0.55, duration: 350 })
+        .then(() => {
+          const viewport = instance.getViewport();
+
+          if (viewport.y < 72) {
+            void instance.setViewport({ ...viewport, y: 72 });
+          }
+
+          setPendingFit(false);
+        });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingFit]);
 
   const changeSelection = useCallback((id: string | null) => {
     setAgentTab("node");
@@ -865,6 +497,8 @@ export default function WorkflowEditor({
         setNodes(loadedNodes);
         setEdges(loadedEdges);
         setSavedSnapshot(makeSnapshot(loadedNodes, loadedEdges));
+        setSelectedNodeIds(new Set());
+        setPendingFit(true);
 
         changeSelection(null);
       } catch (error) {
@@ -1013,6 +647,14 @@ export default function WorkflowEditor({
   }, []);
 
   const onConnect = useCallback((connection: Connection) => {
+    const key = edgeConnectionKey(connection);
+
+    if (edges.some((edge) => edgeConnectionKey(edge) === key)) {
+      setNoticeTone("error");
+      setNotice(tRef.current("editor.duplicateEdge"));
+      return;
+    }
+
     setEdges((current) =>
       addEdge(
         {
@@ -1023,7 +665,17 @@ export default function WorkflowEditor({
         current,
       ),
     );
-  }, []);
+  }, [edges]);
+
+  const onSelectionChange = useCallback(
+    (change: OnSelectionChangeParams<FlowNode, Edge>) => {
+      const nodeIds = new Set(
+        change.nodes.map((selection) => selection.id),
+      );
+      setSelectedNodeIds(nodeIds);
+    },
+    [],
+  );
 
   const availableAiModels: AiModelOption[] = aiModels.length > 0
     ? aiModels
@@ -1112,19 +764,68 @@ export default function WorkflowEditor({
     const newNode: FlowNode = {
       id,
       type: "automation",
-      position: {
-        x: 260 + (nodes.length % 2) * 320,
-        y: 80 + nodes.length * 150,
-      },
+      position:
+        pendingAddPosition !== null
+          ? pendingAddPosition
+          : {
+              x: 260 + (nodes.length % 2) * 320,
+              y: 80 + nodes.length * 150,
+            },
       data: defaults[label],
     };
 
     setNodes((current) => [...current, newNode]);
+
+    if (pendingParentId) {
+      setEdges((current) => [
+        ...current,
+        {
+          id: `edge-${crypto.randomUUID()}`,
+          source: pendingParentId,
+          target: id,
+          type: "flow",
+          animated: false,
+        },
+      ]);
+    }
+
     setDraftData({ ...newNode.data });
     changeSelection(id);
     setShowLibrary(false);
+    setPendingParentId(null);
+    setPendingAddPosition(null);
     setNotice("");
     setValidationIssues([]);
+  }
+
+  function tidyCanvas() {
+    const result = tidyLayout(nodes, edges);
+
+    setNodes(result.nodes);
+    setEdges(result.edges);
+    setNoticeTone("success");
+    setNotice(
+      result.removedEdges > 0
+        ? t("editor.tidyNotice", { count: result.removedEdges })
+        : t("editor.tidyClean"),
+    );
+    setPendingFit(true);
+  }
+
+  function deleteSelectedNodes() {
+    setNodes((current) =>
+      current.filter((node) => !selectedNodeIds.has(node.id)),
+    );
+    setEdges((current) =>
+      current.filter(
+        (edge) =>
+          !selectedNodeIds.has(edge.source) &&
+          !selectedNodeIds.has(edge.target),
+      ),
+    );
+    setSelectedNodeIds(new Set());
+    setDraftData(null);
+    changeSelection(null);
   }
 
   function updateNode(patch: Partial<AutomationNodeData>) {
@@ -1227,6 +928,13 @@ export default function WorkflowEditor({
       ),
     );
     setSelectedNodeId((current) => (current === nodeId ? null : current));
+    setSelectedNodeIds((current) => {
+      if (!current.has(nodeId)) return current;
+
+      const next = new Set(current);
+      next.delete(nodeId);
+      return next;
+    });
     setAgentTab("node");
     setDraftData(null);
   }, []);
@@ -1538,44 +1246,15 @@ export default function WorkflowEditor({
   return (
     <section className="relative flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-background text-foreground">
       {/* Editor header */}
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border bg-card px-5 py-3.5 lg:px-7">
-        <div className="flex min-w-0 items-center gap-4">
-          <button
-            type="button"
-            onClick={requestBack}
-            className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}
-          >
-            <ArrowLeft size={16} />
-            <span className="hidden sm:inline">{t("editor.backAll")}</span>
-          </button>
-
-          <div className="h-8 w-px bg-muted" />
-
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-foreground">
-              {workflowName || t("editor.title")}
-            </h1>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              {t("editor.canvasMeta", { count: nodes.length })}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
-            <span className={`size-1.5 rounded-full ${isDirty ? "bg-amber-400" : "bg-emerald-400"}`} />
-            {isLoading ? t("editor.loading") : isDirty ? t("editor.unsaved") : t("editor.saved")}
-          </span>
-          <button
-            type="button"
-            onClick={() => void saveWorkflow()}
-            disabled={isSaving || isLoading || !isDirty}
-            className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}
-          >
-            <Save size={16} />
-            {isSaving ? t("editor.saving") : t("editor.save")}
-          </button>
-        </div>
-      </header>
+      <EditorHeader
+        workflowName={workflowName}
+        onBack={requestBack}
+        isDirty={isDirty}
+        isSaving={isSaving}
+        isLoading={isLoading}
+        onSave={() => void saveWorkflow()}
+        nodeCount={nodes.length}
+      />
 
       {validationIssues.length > 0 && (
         <div
@@ -1626,41 +1305,54 @@ export default function WorkflowEditor({
       {/* Workspace */}
       <div className="flex h-0 min-h-0 flex-1 overflow-hidden">
         <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
+          <CanvasToolbar
+            blockMode={blockMode}
+            selectedCount={selectedNodeIds.size}
+            isLoading={isLoading}
+            isDisabled={nodes.length === 0}
+            onTidy={tidyCanvas}
+            onToggleBlockMode={() => setBlockMode((prev) => !prev)}
+            onDeleteSelected={deleteSelectedNodes}
+          />
           <button
             type="button"
             onClick={() => {
               if (showLibrary) {
                 setShowLibrary(false);
+                setPendingParentId(null);
+                setPendingAddPosition(null);
               } else {
                 if (selectedNode) saveNodeChanges();
+                setPendingParentId(null);
+                setPendingAddPosition(null);
                 setShowLibrary(true);
               }
             }}
-            className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-lg border border-border bg-card/95 px-3 py-2 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur transition hover:border-ring/50 hover:bg-muted hover:text-foreground"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center size-9 rounded-full border border-primary/30 bg-primary text-primary-foreground shadow-lg backdrop-blur transition hover:bg-primary/90"
             aria-expanded={showLibrary}
             aria-label={showLibrary ? t("editor.closeLibrary") : t("editor.openLibrary")}
           >
-            {showLibrary ? <X size={15} /> : <ListPlus size={15} />}
-            {showLibrary ? t("editor.closeLibraryShort") : t("editor.nodeLibrary")}
+            {showLibrary ? <X size={15} /> : <Wand2 size={15} />}
           </button>
           {isLoading && (
-            <div role="status" className="absolute left-4 top-4 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">
+            <div role="status" className="absolute left-4 top-14 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">
               {t("editor.loadingWorkflow")}
             </div>
           )}
-          {!isLoading && !selectedNode && (
-            <div className="pointer-events-none absolute left-4 top-4 z-10 hidden items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground shadow-lg sm:flex">
+          {!isLoading && !selectedNode && !showLibrary && (
+            <div className="pointer-events-none absolute left-16 bottom-4 z-10 hidden items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground shadow-lg sm:flex">
               <MousePointer2 size={14} className="text-muted-foreground" />
               {t("editor.canvasHint")}
             </div>
           )}
 
+          <EditorActionsContext.Provider value={editorActions}>
           <NodeActionsContext.Provider value={removeNode}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
+            nodeTypes={{ automation: AutomationNode }}
+            edgeTypes={{ flow: FlowEdge }}
             defaultEdgeOptions={{
               type: "flow",
               animated: false,
@@ -1668,11 +1360,16 @@ export default function WorkflowEditor({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onSelectionChange={onSelectionChange}
+            onInit={(instance) => {
+              flowRef.current = instance;
+            }}
             onNodeClick={(_, node) => selectNode(node as FlowNode)}
             onPaneClick={() => selectedNode && saveNodeChanges()}
             deleteKeyCode={["Backspace", "Delete"]}
-            fitView
-            fitViewOptions={{ padding: 0.28 }}
+            selectionOnDrag
+            selectionMode={SelectionMode.Partial}
+            panOnDrag={!blockMode}
             snapToGrid
             snapGrid={[16, 16]}
             minZoom={0.2}
@@ -1701,59 +1398,20 @@ export default function WorkflowEditor({
             />
           </ReactFlow>
           </NodeActionsContext.Provider>
+          </EditorActionsContext.Provider>
         </div>
 
-        {/* Right-side node library */}
-        {showLibrary && !selectedNode && (
-          <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-border bg-card p-4">
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("editor.builder")}</p>
-                <h2 className="mt-2 text-base font-semibold text-foreground">{t("editor.nodeLibrary")}</h2>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("editor.chooseStep")}</p>
-              </div>
-              <button type="button" onClick={() => setShowLibrary(false)} aria-label={t("editor.closeLibrary")} className="rounded-lg p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="grid gap-2">
-              {nodeOptions.map(({ label, descriptionKey, icon: Icon }) => (
-                <button
-                  type="button"
-                  key={label}
-                  onClick={() => addNode(label)}
-                  className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.045]"
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">
-                    <Icon size={17} weight="duotone" />
-                  </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold text-foreground">
-                      {label}
-                    </span>
-                    <span className="mt-1 block truncate text-[10px] leading-4 text-muted-foreground">
-                      {t(descriptionKey)}
-                    </span>
-                  </span>
-
-                  <Plus size={14} className="shrink-0 text-muted-foreground/70 group-hover:text-primary" />
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-5 rounded-xl border border-border bg-muted/40 p-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Webhook size={14} className="text-primary" />
-                {t("editor.chatWidget")}
-              </div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                {t("editor.triggerWidgetHint")}
-              </p>
-            </div>
-          </aside>
-        )}
+        {/* Right-side node library slide-over */}
+        <NodeLibraryPanel
+          open={showLibrary}
+          onClose={() => {
+            setShowLibrary(false);
+            setPendingParentId(null);
+            setPendingAddPosition(null);
+          }}
+          onAdd={addNode}
+          parentNodeId={pendingParentId}
+        />
         {/* Node settings inspector */}
 
         {selectedNode && (
@@ -2556,10 +2214,6 @@ export default function WorkflowEditor({
 
       {/* Editor footer */}
       <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-5 py-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <span className="size-1.5 rounded-full bg-amber-400" />
-          {t("editor.draft")}
-        </span>
         <span>
           {t("editor.steps", { count: nodes.length })}{" "}
           <span className="mx-2 text-muted-foreground/50">·</span>{" "}
@@ -2601,51 +2255,28 @@ export default function WorkflowEditor({
         </div>
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={confirmLeave}
         onOpenChange={(open) => {
           if (!open && !isSaving) setConfirmLeave(false);
         }}
-      >
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogMedia className="bg-amber-400/10 text-amber-300">
-              <Save />
-            </AlertDialogMedia>
-            <AlertDialogTitle>{t("editor.unsavedTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("editor.unsavedHint")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="sm:flex-nowrap">
-            <AlertDialogCancel disabled={isSaving} className="h-9 whitespace-nowrap px-3">
-              {t("editor.continueEditing")}
-            </AlertDialogCancel>
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={() => {
-                setConfirmLeave(false);
-                onBack();
-              }}
-              className={`${buttonClass} h-9 whitespace-nowrap border border-border bg-transparent px-3 text-muted-foreground hover:bg-muted/60`}
-            >
-              {t("editor.discardLeave")}
-            </button>
-            <button
-              type="button"
-              disabled={isSaving || isLoading}
-              onClick={() => void saveAndLeave()}
-              className={`${buttonClass} h-9 whitespace-nowrap bg-primary px-3 text-primary-foreground hover:bg-primary/90`}
-            >
-              {isSaving && (
-                <span className="size-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
-              )}
-              {t("editor.saveLeave")}
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        tone="warning"
+        title={t("editor.unsavedTitle")}
+        description={t("editor.unsavedHint")}
+        cancelLabel={t("editor.continueEditing")}
+        confirmLabel={isSaving ? t("editor.saving") : t("editor.saveLeave")}
+        confirmVariant="default"
+        loading={isSaving || isLoading}
+        onConfirm={() => void saveAndLeave()}
+        secondaryAction={{
+          label: t("editor.discardLeave"),
+          onClick: () => {
+            setConfirmLeave(false);
+            onBack();
+          },
+          variant: "outline",
+        }}
+      />
     </section>
   );
 }

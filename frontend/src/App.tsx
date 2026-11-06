@@ -7,7 +7,7 @@ import { UNAUTHORIZED_EVENT } from "./services/api";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import { Button } from "./components/ui/button";
 import Dashboard from "./pages/Dashboard";
-import Workflows from "./pages/Workflows";
+import Workflows from "./pages/workflows";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import Activity from "./pages/Activity";
 import Inbox from "./pages/Inbox";
@@ -31,7 +31,7 @@ type View =
   | "settings"
   | "help";
 
-type CurrentUser = { name: string };
+type CurrentUser = { name: string; email?: string };
 
 function ErrorBanner({
   message,
@@ -69,7 +69,15 @@ export default function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("orqiva_view");
+      if (saved && ["dashboard","workflows","inbox","channel","activity","ai-providers","settings","help"].includes(saved)) {
+        return saved as View;
+      }
+    }
+    return "dashboard";
+  });
 
   const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(
     null,
@@ -79,6 +87,10 @@ export default function App() {
     workflowId: string;
     executionId: number;
   } | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem("orqiva_view", view);
+  }, [view]);
 
   useEffect(() => {
     let active = true;
@@ -226,8 +238,6 @@ export default function App() {
   if (editingWorkflowId !== null) {
     return (
       <DashboardLayout
-        title={t("nav.workflows")}
-        icon="editor"
         activeNav="workflows"
         {...layoutProps}
       >
@@ -245,8 +255,6 @@ export default function App() {
   if (viewingExecution !== null) {
     return (
       <DashboardLayout
-        title={t("nav.activity")}
-        icon="activity"
         activeNav="activity"
         {...layoutProps}
       >
@@ -256,6 +264,7 @@ export default function App() {
           workflowId={viewingExecution.workflowId}
           executionId={viewingExecution.executionId}
           onBack={() => goTo("activity")}
+          onNavigate={(key) => goTo(key as View)}
         />
       </DashboardLayout>
     );
@@ -264,8 +273,6 @@ export default function App() {
   if (view === "dashboard") {
     return (
       <DashboardLayout
-        title={t("nav.dashboard")}
-        icon="dashboard"
         activeNav="dashboard"
         {...layoutProps}
       >
@@ -279,8 +286,6 @@ export default function App() {
   if (view === "inbox") {
     return (
       <DashboardLayout
-        title={t("nav.inbox")}
-        icon="inbox"
         activeNav="inbox"
         {...layoutProps}
       >
@@ -294,8 +299,6 @@ export default function App() {
   if (view === "channel") {
     return (
       <DashboardLayout
-        title={t("nav.channel")}
-        icon="channel"
         activeNav="channel"
         {...layoutProps}
       >
@@ -309,21 +312,18 @@ export default function App() {
   if (view === "activity") {
     return (
       <DashboardLayout
-        title={t("nav.activity")}
-        icon="activity"
         activeNav="activity"
         {...layoutProps}
       >
         {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
         <Activity
-          onOpenWorkflow={openWorkflow}
-          onOpenExecution={(execution) => {
+          onOpenExecution={(executionId, workflowId) => {
             setError("");
             setEditingWorkflowId(null);
             setViewingExecution({
-              workflowId: String(execution.workflow_id),
-              executionId: execution.id,
+              workflowId,
+              executionId,
             });
           }}
         />
@@ -334,8 +334,6 @@ export default function App() {
   if (view === "ai-providers") {
     return (
       <DashboardLayout
-        title={t("nav.apiKeys")}
-        icon="keys"
         activeNav="ai-providers"
         {...layoutProps}
       >
@@ -349,8 +347,6 @@ export default function App() {
   if (view === "help") {
     return (
       <DashboardLayout
-        title={t("nav.help")}
-        icon="help"
         activeNav="help"
         {...layoutProps}
       >
@@ -368,8 +364,6 @@ export default function App() {
   if (view === "settings") {
     return (
       <DashboardLayout
-        title={t("nav.settings")}
-        icon="settings"
         activeNav="settings"
         {...layoutProps}
       >
@@ -387,14 +381,15 @@ export default function App() {
   // Halaman daftar workflow
   return (
     <DashboardLayout
-      title={t("nav.workflows")}
-      icon="workflows"
       activeNav="workflows"
       {...layoutProps}
     >
       {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
-      <Workflows onOpenWorkflow={openWorkflow} />
+      <Workflows
+        onOpenWorkflow={openWorkflow}
+        currentUserName={user?.name ?? ""}
+      />
     </DashboardLayout>
   );
 }

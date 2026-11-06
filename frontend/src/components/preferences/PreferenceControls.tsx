@@ -4,10 +4,9 @@ import { cn } from "@/lib/utils";
 const LANGUAGES: Array<{
   code: Language;
   label: string;
-  flag: string;
 }> = [
-  { code: "id", label: "ID", flag: "🇮🇩" },
-  { code: "en", label: "EN", flag: "🇬🇧" },
+  { code: "id", label: "ID" },
+  { code: "en", label: "EN" },
 ];
 
 interface PreferenceControlsProps {
@@ -24,7 +23,7 @@ export default function PreferenceControls({
       role="group"
       aria-label={t("pref.language")}
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-full border border-border bg-background/60 p-0.5",
+        "inline-flex items-center gap-0.5 rounded-md border border-white/[0.08] bg-white/[0.02] p-0.5",
         className,
       )}
     >
@@ -39,15 +38,12 @@ export default function PreferenceControls({
             aria-pressed={active}
             title={`${t("pref.toggleLanguage")}: ${item.label}`}
             className={cn(
-              "inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-semibold transition",
+              "inline-flex h-6 items-center rounded-[4px] px-2 text-[10px] font-semibold tracking-wide transition",
               active
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? "bg-white/[0.09] text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-200",
             )}
           >
-            <span aria-hidden="true" className="text-[13px] leading-none">
-              {item.flag}
-            </span>
             {item.label}
           </button>
         );
