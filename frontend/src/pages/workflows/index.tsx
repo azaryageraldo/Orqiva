@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { X } from "lucide-react";
 
-import { Plus } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import {
   createWorkflow,
@@ -14,7 +12,9 @@ import {
 import { getErrorMessage } from "@/services/api";
 import type { Workflow as WorkflowItem } from "@/types/workflow";
 
-import WorkflowToolbar from "./components/WorkflowToolbar";
+import WorkflowToolbar, {
+  type WorkflowFilterStatus,
+} from "./components/WorkflowToolbar";
 import WorkflowTable from "./components/WorkflowTable";
 import WorkflowPagination from "./components/WorkflowPagination";
 import WorkflowCreateDialog from "./components/WorkflowCreateDialog";
@@ -31,10 +31,10 @@ interface WorkflowsProps {
 
 export default function Workflows({
   onOpenWorkflow,
-  currentUserName = "",
 }: WorkflowsProps) {
   const { language, t } = useI18n();
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
+  const [statusFilter, setStatusFilter] = useState<WorkflowFilterStatus>("all");
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -73,8 +73,6 @@ export default function Workflows({
       }),
     [language],
   );
-
-  const ownerName = currentUserName || t("header.workspaceAdmin");
 
   function formatDate(value: string): string {
     const date = new Date(value);
@@ -326,10 +324,33 @@ export default function Workflows({
     [workflows, selectedIds],
   );
 
+  const filteredWorkflows = useMemo(() => {
+    if (statusFilter === "all") return workflows;
+    return workflows.filter((item) => item.status === statusFilter);
+  }, [workflows, statusFilter]);
+
+  const activeCount = useMemo(
+    () => workflows.filter((w) => w.status === "active").length,
+    [workflows],
+  );
+  const inactiveCount = useMemo(
+    () => workflows.filter((w) => w.status !== "active").length,
+    [workflows],
+  );
+
   return (
     <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="w-full space-y-6">
-        <h1 className="sr-only">{t("nav.workflows")}</h1>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+              {t("nav.workflows")}
+            </h1>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              {t("wf.subtitle")}
+            </p>
+          </div>
+        </div>
 
         {workflowToEdit ? (
           <WorkflowEditDialog
@@ -355,18 +376,22 @@ export default function Workflows({
               search={search}
               onSearchChange={setSearch}
               onClearSearch={() => setSearch("")}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              totalCount={workflows.length}
+              activeCount={activeCount}
+              inactiveCount={inactiveCount}
               onCreate={() => setShowCreate(true)}
               onDeleteSelected={handleDeleteSelected}
               selectedCount={selectedIds.size}
               t={t}
-              className="mb-6"
               deletingSelected={deletingSelected}
             />
 
             {error && (
               <div
                 role="alert"
-                className="flex items-start justify-between gap-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[12.5px] text-destructive mb-4"
+                className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
               >
                 <p>{error}</p>
                 <button
@@ -375,7 +400,7 @@ export default function Workflows({
                   aria-label={t("wf.dismissError")}
                   className="text-destructive/70 transition hover:text-destructive"
                 >
-                  <XIcon />
+                  <X className="size-4" />
                 </button>
               </div>
             )}
@@ -383,7 +408,7 @@ export default function Workflows({
             {success && (
               <div
                 role="status"
-                className="flex items-start justify-between gap-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2.5 text-[12.5px] text-primary mb-4"
+                className="flex items-start justify-between gap-4 rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-xs text-primary"
               >
                 <p>{success}</p>
                 <button
@@ -392,19 +417,16 @@ export default function Workflows({
                   aria-label="Dismiss success message"
                   className="text-primary/70 transition hover:text-primary"
                 >
-                  <XIcon />
+                  <X className="size-4" />
                 </button>
               </div>
             )}
 
             <WorkflowTable
-              workflows={workflows}
+              workflows={filteredWorkflows}
               loading={loading}
-              page={page}
-              perPage={PER_PAGE}
               isSelected={isSelectedMap}
               isUpdating={statusUpdatingId}
-              ownerName={ownerName}
               formatDate={formatDate}
               t={t}
               onSelectAll={toggleAll}
@@ -413,7 +435,9 @@ export default function Workflows({
               onEdit={beginEdit}
               onDelete={setWorkflowToDelete}
               onToggleStatus={toggleStatus}
+              onCreateNew={() => setShowCreate(true)}
               allSelected={allSelected}
+              searchQuery={searchQuery}
             />
 
             <WorkflowPagination
@@ -465,39 +489,7 @@ export default function Workflows({
           onConfirm={() => void handleDeleteSelected()}
           t={t}
         />
-
-        {!workflowToEdit && workflows.length === 0 && !search && (
-          <div className="mt-6 flex justify-center">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCreate(true)}
-              className="h-9 rounded-md border-white/[0.1] bg-transparent px-3 text-[12.5px] font-medium text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100"
-            >
-              <Plus />
-              {t("wf.createShort")}
-            </Button>
-          </div>
-        )}
       </div>
     </section>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6l6 12" />
-      <path d="M6 6l12 12" />
-    </svg>
   );
 }

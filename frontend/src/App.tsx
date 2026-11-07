@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   Navigate,
   Route,
@@ -15,19 +15,28 @@ import { UNAUTHORIZED_EVENT } from "./services/api";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import type { NavKey } from "./components/layout/Sidebar";
 import { Button } from "./components/ui/button";
-import Dashboard from "./pages/Dashboard";
-import Workflows from "./pages/workflows";
-import WorkflowEditor from "./pages/WorkflowEditor";
-import Activity from "./pages/Activity";
-import Inbox from "./pages/Inbox";
-import Channel from "./pages/Channel";
-import AiProviders from "./pages/AiProviders";
-import PublicChatWidget from "./pages/PublicChatWidget";
-import ExecutionDetail from "./pages/ExecutionDetail";
-import Settings from "./pages/Settings";
-import Help from "./pages/Help";
 import { useI18n } from "./lib/i18n";
 import "./App.css";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Workflows = lazy(() => import("./pages/workflows"));
+const WorkflowEditor = lazy(() => import("./pages/WorkflowEditor"));
+const Activity = lazy(() => import("./pages/Activity"));
+const Inbox = lazy(() => import("./pages/Inbox"));
+const Channel = lazy(() => import("./pages/Channel"));
+const AiProviders = lazy(() => import("./pages/AiProviders"));
+const PublicChatWidget = lazy(() => import("./pages/PublicChatWidget"));
+const ExecutionDetail = lazy(() => import("./pages/ExecutionDetail"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Help = lazy(() => import("./pages/Help"));
+
+function PageLoader() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-12 text-muted-foreground">
+      <LoaderCircle className="size-6 animate-spin text-primary" />
+    </div>
+  );
+}
 
 type Health = "checking" | "online" | "offline";
 type CurrentUser = { name: string; email?: string };
@@ -192,9 +201,11 @@ export default function App() {
   // Standalone public chat widget route
   if (location.pathname.startsWith("/widget/")) {
     return (
-      <Routes>
-        <Route path="/widget/:token" element={<PublicWidgetWrapper />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/widget/:token" element={<PublicWidgetWrapper />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -236,69 +247,71 @@ export default function App() {
     >
       {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route
-          path="/dashboard"
-          element={
-            <Dashboard
-              health={health}
-              onViewActivity={() => navigate("/activity")}
-            />
-          }
-        />
-        <Route
-          path="/workflows"
-          element={
-            <Workflows
-              onOpenWorkflow={(id) => navigate(`/workflows/${id}`)}
-              currentUserName={user?.name ?? ""}
-            />
-          }
-        />
-        <Route
-          path="/workflows/:workflowId"
-          element={<WorkflowEditorWrapper />}
-        />
-        <Route path="/inbox" element={<Inbox />} />
-        <Route path="/channel" element={<Channel />} />
-        <Route
-          path="/activity"
-          element={
-            <Activity
-              onOpenExecution={(executionId, workflowId) =>
-                navigate(`/activity/${workflowId}/${executionId}`)
-              }
-            />
-          }
-        />
-        <Route
-          path="/activity/:workflowId/:executionId"
-          element={<ExecutionDetailWrapper />}
-        />
-        <Route path="/ai-providers" element={<AiProviders />} />
-        <Route
-          path="/settings"
-          element={
-            <Settings
-              health={health}
-              onOpenAiProviders={() => navigate("/ai-providers")}
-              onProfileUpdated={setUser}
-            />
-          }
-        />
-        <Route
-          path="/help"
-          element={
-            <Help
-              onOpenAiProviders={() => navigate("/ai-providers")}
-              onOpenWorkflows={() => navigate("/workflows")}
-              onOpenChannel={() => navigate("/channel")}
-            />
-          }
-        />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/dashboard"
+            element={
+              <Dashboard
+                health={health}
+                onViewActivity={() => navigate("/activity")}
+              />
+            }
+          />
+          <Route
+            path="/workflows"
+            element={
+              <Workflows
+                onOpenWorkflow={(id) => navigate(`/workflows/${id}`)}
+                currentUserName={user?.name ?? ""}
+              />
+            }
+          />
+          <Route
+            path="/workflows/:workflowId"
+            element={<WorkflowEditorWrapper />}
+          />
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/channel" element={<Channel />} />
+          <Route
+            path="/activity"
+            element={
+              <Activity
+                onOpenExecution={(executionId, workflowId) =>
+                  navigate(`/activity/${workflowId}/${executionId}`)
+                }
+              />
+            }
+          />
+          <Route
+            path="/activity/:workflowId/:executionId"
+            element={<ExecutionDetailWrapper />}
+          />
+          <Route path="/ai-providers" element={<AiProviders />} />
+          <Route
+            path="/settings"
+            element={
+              <Settings
+                health={health}
+                onOpenAiProviders={() => navigate("/ai-providers")}
+                onProfileUpdated={setUser}
+              />
+            }
+          />
+          <Route
+            path="/help"
+            element={
+              <Help
+                onOpenAiProviders={() => navigate("/ai-providers")}
+                onOpenWorkflows={() => navigate("/workflows")}
+                onOpenChannel={() => navigate("/channel")}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Suspense>
     </DashboardLayout>
   );
 }
