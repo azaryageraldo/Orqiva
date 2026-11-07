@@ -7,10 +7,12 @@ import {
   Coins,
   Copy,
   GitFork,
+  History,
   Layers,
   LoaderCircle,
   MessageSquare,
   Sparkles,
+  User,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -86,6 +88,7 @@ export default function ExecutionDetail({
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [showRawPayload, setShowRawPayload] = useState(false);
   const [copiedPayload, setCopiedPayload] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -116,6 +119,33 @@ export default function ExecutionDetail({
   );
 
   const diagnostic = detail?.diagnostic ?? null;
+
+  const customerInputText = useMemo(() => {
+    if (!detail?.input) return null;
+    const input = detail.input;
+    if (typeof input.customer_message === "string" && input.customer_message.trim()) {
+      return input.customer_message.trim();
+    }
+    if (typeof input.message === "string" && input.message.trim()) {
+      return input.message.trim();
+    }
+    if (typeof input.text === "string" && input.text.trim()) {
+      return input.text.trim();
+    }
+    return null;
+  }, [detail]);
+
+  const conversationHistory = useMemo(() => {
+    if (!detail?.input?.conversation_history || !Array.isArray(detail.input.conversation_history)) {
+      return [];
+    }
+    return detail.input.conversation_history.filter(
+      (item): item is { role: string; content: string } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { content?: unknown }).content === "string",
+    );
+  }, [detail]);
 
   const allMessages = useMemo(
     () =>
@@ -309,13 +339,91 @@ export default function ExecutionDetail({
                   {t("activity.detail.chatTranscript")}
                 </h2>
               </div>
-              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] font-mono text-zinc-400">
-                {allMessages.length} pesan terkirim
-              </span>
+              <div className="flex items-center gap-2">
+                {conversationHistory.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                  >
+                    <History className="size-3 text-zinc-400" />
+                    <span>
+                      {showHistory
+                        ? "Sembunyikan Riwayat"
+                        : `Riwayat (${conversationHistory.length})`}
+                    </span>
+                  </button>
+                )}
+                <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] font-mono text-zinc-400">
+                  {(customerInputText ? 1 : 0) + allMessages.length} pesan
+                </span>
+              </div>
             </div>
 
-            <div className="flex-1 min-h-[380px] max-h-[560px] overflow-y-auto p-4 space-y-3">
-              {allMessages.length === 0 ? (
+            <div className="flex-1 min-h-[380px] max-h-[560px] overflow-y-auto p-4 space-y-3.5">
+              {/* Riwayat percakapan sebelumnya jika dibuka */}
+              {showHistory && conversationHistory.length > 0 && (
+                <div className="space-y-3 pb-2 border-b border-white/10">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Riwayat Sesi Sebelumnya ({conversationHistory.length})
+                  </p>
+                  {conversationHistory.map((item, index) => {
+                    const isCustomer = item.role === "customer";
+                    const isAdmin = item.role === "admin";
+                    const isSystem = item.role === "system";
+
+                    if (isSystem) {
+                      return (
+                        <div
+                          key={`hist-${index}`}
+                          className="flex justify-center my-1"
+                        >
+                          <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-500 italic">
+                            {item.content}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={`hist-${index}`}
+                        className={cn(
+                          "flex flex-col space-y-1",
+                          isCustomer ? "items-end" : "items-start"
+                        )}
+                      >
+                        <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                          {isCustomer ? (
+                            <span>{detail.contact_name || "Pelanggan"}</span>
+                          ) : isAdmin ? (
+                            <span className="text-amber-400 font-medium">Admin</span>
+                          ) : (
+                            <span>AI Assistant</span>
+                          )}
+                        </div>
+                        <div
+                          className={cn(
+                            "rounded-xl p-2.5 text-xs max-w-[85%] whitespace-pre-wrap",
+                            isCustomer
+                              ? "bg-white/5 text-zinc-300 border border-white/5"
+                              : "bg-primary/[0.04] text-zinc-300 border border-primary/10"
+                          )}
+                        >
+                          {item.content}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="my-3 flex items-center gap-2 text-[10px] text-zinc-500 font-medium tracking-wider uppercase">
+                    <div className="h-px flex-1 bg-white/10" />
+                    <span>Eksekusi Ini Dimulai</span>
+                    <div className="h-px flex-1 bg-white/10" />
+                  </div>
+                </div>
+              )}
+
+              {!customerInputText && allMessages.length === 0 ? (
                 <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center">
                   <div className="mb-2 flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-500">
                     <MessageSquare className="size-5" />
@@ -325,21 +433,47 @@ export default function ExecutionDetail({
                   </p>
                 </div>
               ) : (
-                allMessages.map(({ step, message }, idx) => (
-                  <div key={`${step.id}-${idx}`} className="space-y-1">
-                    <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-                      <span className="flex items-center gap-1 font-medium text-zinc-400">
-                        <Sparkles className="size-3 text-primary" />
-                        {stepNodeLabel(step, t)}
-                      </span>
-                      <span>·</span>
-                      <span className="font-mono">Langkah #{step.step}</span>
+                <>
+                  {/* Pesan Masuk dari Manusia / Pelanggan (Pemicu Turn Ini) */}
+                  {customerInputText && (
+                    <div className="flex flex-col items-end space-y-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                        <span className="font-medium text-zinc-200">
+                          {detail.contact_name || "Pelanggan"}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.2 text-[9px] font-medium text-zinc-300">
+                          <User className="size-2.5 text-zinc-400" />
+                          Pesan Masuk (Pemicu)
+                        </span>
+                      </div>
+                      <div className="rounded-2xl rounded-tr-sm border border-white/15 bg-white/10 p-3 text-xs leading-relaxed text-zinc-100 max-w-[85%] whitespace-pre-wrap shadow-sm">
+                        {customerInputText}
+                      </div>
                     </div>
-                    <div className="rounded-xl border border-primary/20 bg-primary/[0.07] p-3 text-xs leading-relaxed text-zinc-100 max-w-[90%] whitespace-pre-wrap">
-                      {message}
+                  )}
+
+                  {/* Pesan Balasan dari Workflow / AI */}
+                  {allMessages.map(({ step, message }, idx) => (
+                    <div
+                      key={`${step.id}-${idx}`}
+                      className="flex flex-col items-start space-y-1"
+                    >
+                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+                        <span className="flex items-center gap-1 font-medium text-primary">
+                          <Sparkles className="size-3" />
+                          {stepNodeLabel(step, t)}
+                        </span>
+                        <span>·</span>
+                        <span className="font-mono text-zinc-400">
+                          Langkah #{step.step}
+                        </span>
+                      </div>
+                      <div className="rounded-2xl rounded-tl-sm border border-primary/20 bg-primary/[0.08] p-3 text-xs leading-relaxed text-zinc-100 max-w-[85%] whitespace-pre-wrap">
+                        {message}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </div>
