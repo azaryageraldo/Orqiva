@@ -2,12 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity as ActivityIcon,
   AlertCircle,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
   GitFork,
-  Headphones,
   RefreshCw,
   Search,
   User,
@@ -151,42 +148,42 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
     switch (status) {
       case "success":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-emerald-400">
-            <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+            <span className="size-1.5 rounded-full bg-emerald-400" />
             <span>{t("activity.success")}</span>
           </span>
         );
       case "running":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/25 bg-sky-500/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-sky-400">
-            <span className="size-1.5 animate-pulse rounded-full bg-sky-400" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-400">
+            <span className="size-1.5 rounded-full bg-sky-400" />
             <span>{t("activity.running")}</span>
           </span>
         );
       case "waiting":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-amber-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
             <span className="size-1.5 rounded-full bg-amber-400" />
             <span>{t("activity.waiting")}</span>
           </span>
         );
       case "escalated":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-indigo-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[11px] font-medium text-indigo-400">
             <span className="size-1.5 rounded-full bg-indigo-400" />
             <span>{t("activity.escalated")}</span>
           </span>
         );
       case "failed":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/25 bg-rose-500/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-rose-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-400">
             <span className="size-1.5 rounded-full bg-rose-400" />
             <span>{t("activity.failed")}</span>
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-zinc-400">
             <span>{status}</span>
           </span>
         );
@@ -194,8 +191,8 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
   }
 
   return (
-    <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="w-full space-y-6">
+    <section className="min-h-[calc(100vh-4rem)] px-4 py-5 sm:px-6 lg:px-8">
+      <div className="w-full space-y-4">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -203,14 +200,14 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
               {t("activity.title")}
             </h1>
             <p className="mt-0.5 text-xs text-zinc-400">
-              Pantau jalannya percakapan otomatis, status eksekusi alur, dan intervensi admin secara langsung.
+              Pantau riwayat sesi percakapan, eksekusi alur AI, dan eskalasi ke admin.
             </p>
           </div>
           <button
             type="button"
             onClick={() => void loadData(page, statusFilter, true)}
             disabled={loading || refreshing}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#0c0d11] px-3 text-xs font-medium text-zinc-300 transition hover:bg-white/[0.04] hover:text-zinc-100 disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/10 bg-[#0d0e11] px-3 text-xs font-medium text-zinc-300 transition hover:bg-white/5 hover:text-zinc-100 disabled:opacity-50"
           >
             <RefreshCw
               className={cn("size-3.5", refreshing && "animate-spin text-primary")}
@@ -219,53 +216,10 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
           </button>
         </div>
 
-        {/* 4 Summary Stat Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-white/[0.08] bg-[#0c0d11]/80 p-3.5 backdrop-blur-sm">
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-xs font-medium">Total Eksekusi</span>
-              <ActivityIcon className="size-4 text-zinc-500" />
-            </div>
-            <div className="mt-2 text-xl font-semibold font-mono tracking-tight text-zinc-100">
-              {summary.total}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-3.5 backdrop-blur-sm">
-            <div className="flex items-center justify-between text-emerald-400">
-              <span className="text-xs font-medium">Berhasil</span>
-              <CheckCircle2 className="size-4 text-emerald-400" />
-            </div>
-            <div className="mt-2 text-xl font-semibold font-mono tracking-tight text-emerald-300">
-              {summary.success}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.03] p-3.5 backdrop-blur-sm">
-            <div className="flex items-center justify-between text-sky-400">
-              <span className="text-xs font-medium">Berjalan & Menunggu</span>
-              <Clock className="size-4 text-sky-400" />
-            </div>
-            <div className="mt-2 text-xl font-semibold font-mono tracking-tight text-sky-300">
-              {summary.running + summary.waiting}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.03] p-3.5 backdrop-blur-sm">
-            <div className="flex items-center justify-between text-indigo-400">
-              <span className="text-xs font-medium">Ke Admin</span>
-              <Headphones className="size-4 text-indigo-400" />
-            </div>
-            <div className="mt-2 text-xl font-semibold font-mono tracking-tight text-indigo-300">
-              {summary.escalated}
-            </div>
-          </div>
-        </div>
-
-        {/* Toolbar & Filters */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {/* Toolbar & Filter Tabs */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Status Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#0c0d11] p-1">
+          <div className="flex flex-wrap items-center gap-1 rounded-md border border-white/10 bg-[#0d0e11] p-1">
             {filterTabs.map((tab) => {
               const isActive = statusFilter === tab.id;
               return (
@@ -277,19 +231,19 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                     setPage(1);
                   }}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                    "inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
                     isActive
-                      ? "bg-white/[0.1] text-zinc-100 shadow-sm"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]",
+                      ? "bg-white/10 text-zinc-100"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5",
                   )}
                 >
                   <span>{tab.label}</span>
                   <span
                     className={cn(
-                      "rounded px-1.5 py-0.2 text-[10px] font-mono",
+                      "rounded px-1.5 text-[10px] font-mono",
                       isActive
-                        ? "bg-white/[0.14] text-zinc-200"
-                        : "bg-white/[0.05] text-zinc-500",
+                        ? "bg-white/10 text-zinc-200"
+                        : "bg-white/5 text-zinc-500",
                     )}
                   >
                     {tab.count}
@@ -300,7 +254,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
           </div>
 
           {/* Search Box */}
-          <div className="relative min-w-[240px] max-w-[320px]">
+          <div className="relative min-w-[220px] sm:max-w-[280px]">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-500" />
             <Input
               type="search"
@@ -308,7 +262,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
               aria-label={t("activity.detail.searchAria")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 rounded-lg border-white/[0.08] bg-[#0c0d11] pr-7 pl-8 text-xs text-zinc-200 placeholder:text-zinc-500 focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/30 [&::-webkit-search-cancel-button]:hidden"
+              className="h-8 rounded-md border-white/10 bg-[#0d0e11] pr-7 pl-8 text-xs text-zinc-200 placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:hidden"
             />
             {search && (
               <button
@@ -327,7 +281,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         {error && (
           <div
             role="alert"
-            className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
+            className="flex items-start justify-between gap-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
           >
             <p>{error}</p>
             <button
@@ -341,27 +295,27 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         )}
 
         {/* Table Container */}
-        <TableContainer className="rounded-xl border border-white/[0.08] bg-[#0c0d11]/80 backdrop-blur-sm shadow-xl shadow-black/40">
+        <TableContainer className="rounded-md border border-white/10 bg-[#0e0f12]">
           <TableWrapper>
             <Table>
               <Thead>
-                <Tr className="border-b border-white/[0.08] bg-white/[0.02]">
-                  <Th className="w-12 px-4 py-3 text-left font-medium text-xs text-zinc-400">
+                <Tr className="border-b border-white/10 bg-white/[0.02]">
+                  <Th className="w-12 px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
                     #
                   </Th>
-                  <Th className="px-4 py-3 text-left font-medium text-xs text-zinc-400">
-                    Pelanggan & Kontak
+                  <Th className="px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
+                    Pelanggan & Sesi
                   </Th>
-                  <Th className="min-w-[180px] px-4 py-3 text-left font-medium text-xs text-zinc-400">
-                    Alur Kerja (Workflow)
+                  <Th className="min-w-[180px] px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
+                    Alur Kerja
                   </Th>
-                  <Th className="w-36 px-4 py-3 text-left font-medium text-xs text-zinc-400">
+                  <Th className="w-32 px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
                     {t("activity.col.logStatus")}
                   </Th>
-                  <Th className="w-48 px-4 py-3 text-left font-medium text-xs text-zinc-400">
+                  <Th className="w-48 px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
                     Waktu Sesi
                   </Th>
-                  <Th className="w-24 px-4 py-3 text-right font-medium text-xs text-zinc-400">
+                  <Th className="w-20 px-4 py-2.5 text-right font-medium text-xs text-zinc-400">
                     Aksi
                   </Th>
                 </Tr>
@@ -373,14 +327,14 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                       key={`skeleton-${index}`}
                       className="border-t border-white/[0.06]"
                     >
-                      <Td colSpan={6} className="px-4 py-3.5">
+                      <Td colSpan={6} className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="size-8 animate-pulse rounded-full bg-white/[0.06]" />
+                          <div className="size-7 animate-pulse rounded-full bg-white/[0.06]" />
                           <div className="space-y-1.5 flex-1">
-                            <div className="h-3.5 w-44 animate-pulse rounded bg-white/[0.06]" />
-                            <div className="h-2.5 w-28 animate-pulse rounded bg-white/[0.04]" />
+                            <div className="h-3 w-40 animate-pulse rounded bg-white/[0.06]" />
+                            <div className="h-2 w-24 animate-pulse rounded bg-white/[0.04]" />
                           </div>
-                          <div className="h-5 w-20 animate-pulse rounded-full bg-white/[0.04]" />
+                          <div className="h-4 w-16 animate-pulse rounded-full bg-white/[0.04]" />
                         </div>
                       </Td>
                     </Tr>
@@ -388,31 +342,22 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                 ) : filteredExecutions.length === 0 ? (
                   <Tr>
                     <Td colSpan={6}>
-                      <div className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
-                        <div className="mb-3 flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-zinc-500">
+                      <div className="flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center">
+                        <span className="mb-2.5 flex size-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-500">
                           {search ? (
-                            <AlertCircle className="size-6 text-zinc-400" />
+                            <AlertCircle className="size-5 text-zinc-400" />
                           ) : (
-                            <ActivityIcon className="size-6 text-primary/70" />
+                            <ActivityIcon className="size-5 text-zinc-400" />
                           )}
-                        </div>
-                        <h3 className="text-sm font-semibold text-zinc-200">
+                        </span>
+                        <h3 className="text-sm font-medium text-zinc-200">
                           {search ? t("activity.noMatch") : t("activity.empty")}
                         </h3>
-                        <p className="mt-1 max-w-sm text-xs text-zinc-400 leading-relaxed">
+                        <p className="mt-1 max-w-sm text-xs text-zinc-500">
                           {search
                             ? t("activity.noMatchHint")
-                            : "Belum ada sesi percakapan atau alur kerja yang dijalankan saat ini."}
+                            : "Belum ada sesi percakapan atau alur kerja yang dijalankan."}
                         </p>
-                        {statusFilter !== "all" && (
-                          <button
-                            type="button"
-                            onClick={() => setStatusFilter("all")}
-                            className="mt-4 inline-flex items-center gap-1 rounded-md border border-white/[0.1] bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-white/[0.08] hover:text-zinc-100 transition-colors"
-                          >
-                            <span>Tampilkan semua status</span>
-                          </button>
-                        )}
                       </div>
                     </Td>
                   </Tr>
@@ -432,87 +377,61 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                             String(execution.workflow_id),
                           )
                         }
-                        className="group cursor-pointer border-t border-white/[0.06] transition-colors hover:bg-white/[0.025]"
+                        className="group cursor-pointer border-t border-white/[0.06] transition-colors hover:bg-white/[0.02]"
                       >
                         {/* No */}
-                        <Td className="w-12 px-4 py-3 font-mono text-xs text-zinc-500">
+                        <Td className="w-12 px-4 py-2.5 font-mono text-xs text-zinc-500">
                           {rowNumber}
                         </Td>
 
                         {/* Customer & Contact Info */}
-                        <Td className="px-4 py-3 align-middle">
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/[0.1] bg-gradient-to-br from-white/[0.08] to-white/[0.02] text-[11px] font-semibold text-zinc-200">
+                        <Td className="px-4 py-2.5 align-middle">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] font-medium text-zinc-300">
                               {execution.contact_name ? (
                                 initials
                               ) : (
-                                <User className="size-3.5 text-zinc-500" />
+                                <User className="size-3 text-zinc-500" />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-zinc-100 group-hover:text-primary transition-colors">
+                              <p className="truncate text-xs font-medium text-zinc-200 group-hover:text-primary transition-colors">
                                 {contactName}
                               </p>
-                              <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500">
-                                <span>
-                                  Sesi #{execution.session_id ?? execution.id}
-                                </span>
-                                {execution.contact_id && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="truncate max-w-[120px]">
-                                      {execution.contact_id}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
+                              <p className="text-[11px] font-mono text-zinc-500">
+                                #{execution.session_id ?? execution.id}
+                                {execution.contact_id && ` · ${execution.contact_id}`}
+                              </p>
                             </div>
                           </div>
                         </Td>
 
                         {/* Workflow */}
-                        <Td className="min-w-[180px] px-4 py-3 align-middle">
-                          <div className="flex items-center gap-2">
-                            <GitFork className="size-3.5 rotate-90 text-zinc-500 shrink-0" />
-                            <span className="truncate text-xs font-medium text-zinc-200">
+                        <Td className="min-w-[180px] px-4 py-2.5 align-middle">
+                          <div className="flex items-center gap-1.5">
+                            <GitFork className="size-3 rotate-90 text-zinc-500 shrink-0" />
+                            <span className="truncate text-xs text-zinc-300">
                               {execution.workflow_name ||
                                 `Workflow #${execution.workflow_id}`}
                             </span>
                           </div>
-                          {execution.steps_count > 0 && (
-                            <p className="mt-0.5 text-[10px] text-zinc-500">
-                              {execution.steps_count} langkah dijalankan
-                            </p>
-                          )}
                         </Td>
 
                         {/* Status */}
-                        <Td className="w-36 px-4 py-3 align-middle">
+                        <Td className="w-32 px-4 py-2.5 align-middle">
                           {renderStatusBadge(execution.status)}
                         </Td>
 
                         {/* Started At */}
-                        <Td className="w-48 px-4 py-3 align-middle text-xs text-zinc-400 whitespace-nowrap">
+                        <Td className="w-48 px-4 py-2.5 align-middle text-xs text-zinc-400 whitespace-nowrap">
                           {formatDate(execution.started_at, locale)}
                         </Td>
 
                         {/* Actions */}
-                        <Td className="w-24 px-4 py-3 align-middle text-right">
-                          <button
-                            type="button"
-                            title={t("activity.detail.title")}
-                            aria-label={t("activity.detail.title")}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenExecution(
-                                execution.id,
-                                String(execution.workflow_id),
-                              );
-                            }}
-                            className="inline-flex size-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-zinc-100 focus-visible:outline-none"
-                          >
-                            <ChevronRight className="size-4" />
-                          </button>
+                        <Td className="w-20 px-4 py-2.5 align-middle text-right">
+                          <span className="text-xs text-zinc-500 group-hover:text-zinc-200 transition-colors">
+                            Buka →
+                          </span>
                         </Td>
                       </Tr>
                     );
@@ -526,26 +445,26 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         {/* Pagination Bar */}
         <div className="flex items-center justify-between px-1 text-xs text-zinc-400">
           <div>
-            Menampilkan halaman <span className="font-mono text-zinc-200">{page}</span>
+            Halaman <span className="font-mono text-zinc-200">{page}</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => void loadData(page - 1, statusFilter)}
               disabled={loading || page <= 1}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0c0d11] px-2.5 text-xs text-zinc-300 transition hover:bg-white/[0.04] hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex h-7 items-center gap-1 rounded border border-white/10 bg-[#0d0e11] px-2 text-xs text-zinc-300 transition hover:bg-white/5 hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="size-3.5" />
+              <ChevronLeft className="size-3" />
               <span>Sebelumnya</span>
             </button>
             <button
               type="button"
               onClick={() => void loadData(page + 1, statusFilter)}
               disabled={loading || !hasMore}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0c0d11] px-2.5 text-xs text-zinc-300 transition hover:bg-white/[0.04] hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex h-7 items-center gap-1 rounded border border-white/10 bg-[#0d0e11] px-2 text-xs text-zinc-300 transition hover:bg-white/5 hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span>Berikutnya</span>
-              <ChevronRight className="size-3.5" />
+              <ChevronRight className="size-3" />
             </button>
           </div>
         </div>

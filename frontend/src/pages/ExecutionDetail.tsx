@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Bot,
-  ChevronRight,
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Clock,
+  Coins,
+  Copy,
+  GitFork,
   Layers,
   LoaderCircle,
+  MessageSquare,
+  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import ExecutionStatusBadge from "@/components/ExecutionStatusBadge";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import ErrorSummaryCard from "@/components/execution/ErrorSummaryCard";
 import StepNodeCard from "@/components/execution/StepNodeCard";
 import { formatLocale, useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { getErrorMessage } from "../services/api";
 import {
   getExecution,
@@ -78,11 +79,13 @@ export default function ExecutionDetail({
 }: ExecutionDetailProps) {
   const { language, t } = useI18n();
   const locale = formatLocale(language);
+
   const [detail, setDetail] = useState<ExecutionDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
-  const [isInputOutputExpanded, setIsInputOutputExpanded] = useState(false);
+  const [showRawPayload, setShowRawPayload] = useState(false);
+  const [copiedPayload, setCopiedPayload] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -114,15 +117,52 @@ export default function ExecutionDetail({
 
   const diagnostic = detail?.diagnostic ?? null;
 
-  const allMessages = (detail?.steps ?? []).flatMap((step) =>
-    (step.messages ?? []).map((message) => ({ step, message })),
+  const allMessages = useMemo(
+    () =>
+      (detail?.steps ?? []).flatMap((step) =>
+        (step.messages ?? []).map((message) => ({ step, message })),
+      ),
+    [detail],
   );
+
+  const totalTokens = useMemo(
+    () => steps.reduce((sum, s) => sum + (s.total_tokens || 0), 0),
+    [steps],
+  );
+
+  const totalDurationMs = useMemo(
+    () => steps.reduce((sum, s) => sum + (s.duration_ms || 0), 0),
+    [steps],
+  );
+
+  function handleCopyPayload() {
+    if (!detail) return;
+    const payload = JSON.stringify(
+      {
+        id: detail.id,
+        session_id: detail.chat_session_id,
+        workflow_id: detail.workflow_id,
+        workflow_name: detail.workflow_name,
+        contact_id: detail.contact_public_id,
+        contact_name: detail.contact_name,
+        input: detail.input,
+        output: detail.output,
+        steps: detail.steps,
+      },
+      null,
+      2,
+    );
+    navigator.clipboard.writeText(payload);
+    setCopiedPayload(true);
+    setTimeout(() => setCopiedPayload(false), 2000);
+  }
 
   if (loading && !detail) {
     return (
-      <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex min-h-72 items-center justify-center">
-          <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+      <section className="min-h-[calc(100vh-4rem)] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex min-h-72 flex-col items-center justify-center gap-3">
+          <LoaderCircle className="size-6 animate-spin text-primary" />
+          <p className="text-xs text-zinc-500">Memuat detail eksekusi sesi...</p>
         </div>
       </section>
     );
@@ -130,66 +170,126 @@ export default function ExecutionDetail({
 
   if (!detail) {
     return (
-      <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-        <Card className="p-8 text-center text-sm text-muted-foreground">
-          {error || t("execution.detailUnavailable")}
-        </Card>
+      <section className="min-h-[calc(100vh-4rem)] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-xl border border-white/10 bg-[#0e0f12] p-8 text-center text-sm text-zinc-400">
+          <p>{error || t("execution.detailUnavailable")}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onBack}
+            className="mt-4 gap-1.5 border-white/10"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>Kembali ke Aktivitas</span>
+          </Button>
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
+    <section className="min-h-[calc(100vh-4rem)] px-4 py-5 sm:px-6 lg:px-8">
       <div className="w-full space-y-4">
-        {/* Breadcrumb */}
-        <Breadcrumb className="flex flex-wrap items-center gap-1 text-xs">
-          <BreadcrumbItem className="flex items-center gap-1">
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onNavigate("workflows");
-              }}
-              className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+        {/* Top Navigation & Breadcrumbs */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-[#0d0e11] px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/5 hover:text-zinc-100 transition-colors"
             >
-              <Bot className="size-3" /> Agent
-            </a>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator className="text-zinc-600">
-            <ChevronRight className="size-3" />
-          </BreadcrumbSeparator>
-          <BreadcrumbItem className="flex items-center gap-1">
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onBack();
-              }}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors"
+              <ArrowLeft className="size-3" />
+              <span>Aktivitas</span>
+            </button>
+            <span className="text-zinc-600">/</span>
+            <button
+              type="button"
+              onClick={() => onNavigate("workflows")}
+              className="text-zinc-400 hover:text-zinc-200 transition-colors"
             >
-              Audit Log
-            </a>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator className="text-zinc-600">
-            <ChevronRight className="size-3" />
-          </BreadcrumbSeparator>
-          <BreadcrumbPage className="text-zinc-300 truncate max-w-[220px]">
-            {detail.chat_session_id ?? `#${detail.id}`} :{" "}
-            {detail.workflow_name || t("activity.workflowFallback", { id: detail.workflow_id })}
-          </BreadcrumbPage>
-        </Breadcrumb>
-
-        {/* Execution load error */}
-        {error && (
-          <div
-            role="alert"
-            className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            <span>{error}</span>
+              {detail.workflow_name || `Workflow #${detail.workflow_id}`}
+            </button>
+            <span className="text-zinc-600">/</span>
+            <span className="font-mono text-zinc-200">
+              Sesi #{detail.chat_session_id ?? detail.id}
+            </span>
           </div>
-        )}
 
-        {/* Error Summary - shows when any node failed */}
+          <div className="flex items-center gap-2">
+            <ExecutionStatusBadge status={detail.status} />
+            <button
+              type="button"
+              onClick={handleCopyPayload}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-[#0d0e11] px-2.5 py-1 text-xs text-zinc-400 hover:bg-white/5 hover:text-zinc-200 transition-colors"
+              title="Salin JSON payload eksekusi"
+            >
+              {copiedPayload ? (
+                <>
+                  <Check className="size-3 text-emerald-400" />
+                  <span className="text-emerald-400">Tersalin</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3" />
+                  <span>Salin Payload</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Header Summary Card */}
+        <div className="rounded-xl border border-white/10 bg-[#0e0f12] p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-primary">
+                <GitFork className="size-5 rotate-90" />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold text-zinc-100">
+                  {detail.workflow_name || `Workflow #${detail.workflow_id}`}
+                </h1>
+                <p className="text-xs text-zinc-400">
+                  Kontak:{" "}
+                  <span className="font-medium text-zinc-200">
+                    {detail.contact_name || "Pelanggan Baru"}
+                  </span>
+                  {detail.contact_public_id && (
+                    <span className="font-mono text-zinc-500">
+                      {" "}
+                      ({detail.contact_public_id})
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Micro Stats */}
+            <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400">
+              <div className="flex items-center gap-1.5">
+                <Clock className="size-3.5 text-zinc-500" />
+                <span>{formatDate(detail.started_at, locale)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Layers className="size-3.5 text-zinc-500" />
+                <span>{steps.length} langkah</span>
+                {totalDurationMs > 0 && (
+                  <span className="text-zinc-500 font-mono">
+                    ({totalDurationMs} ms)
+                  </span>
+                )}
+              </div>
+              {totalTokens > 0 && (
+                <div className="flex items-center gap-1.5 font-mono">
+                  <Coins className="size-3.5 text-zinc-500" />
+                  <span>{totalTokens.toLocaleString()} token</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Execution Error Banner */}
         {errorStep && diagnostic && (
           <ErrorSummaryCard
             errorStep={errorStep}
@@ -198,223 +298,145 @@ export default function ExecutionDetail({
           />
         )}
 
-        {/* Info cards row */}
-        <div className="grid gap-4 sm:grid-cols-5">
-          <div className="rounded-xl border border-border bg-background p-4">
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase mb-1">
-              Session Id
-            </p>
-            <p className="text-sm font-mono text-foreground">
-              {detail.chat_session_id ?? `#${detail.id}`}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-4">
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase mb-1">
-              Session Create
-            </p>
-            <p className="text-sm font-mono text-foreground">
-              {formatDate(detail.started_at, locale)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-4">
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase mb-1">
-              Contact Id
-            </p>
-            <p className="text-sm font-mono text-foreground truncate">
-              {detail.contact_public_id ?? "—"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-4">
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase mb-1">
-              Contact Name
-            </p>
-            <p className="text-sm font-mono text-foreground truncate">
-              {detail.contact_name ?? "—"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-4 flex flex-col justify-center">
-            <p className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase mb-1">
-              Status
-            </p>
-            <ExecutionStatusBadge status={detail.status} />
-          </div>
-        </div>
-
-        {/* 3-Panel Layout */}
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Left Panel: Chat Transcript */}
-          <div className="flex-1 lg:w-[50%] flex flex-col gap-4">
-            <Card className="gap-0 py-0">
-              <div className="border-b border-border px-5 py-3">
-                <h2 className="text-sm font-semibold text-foreground">
+        {/* 2-Panel Main Grid */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Panel 1: Chat Transcript */}
+          <div className="flex flex-col rounded-xl border border-white/10 bg-[#0e0f12] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-3">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="size-4 text-primary" />
+                <h2 className="text-xs font-semibold text-zinc-200">
                   {t("activity.detail.chatTranscript")}
                 </h2>
               </div>
-              <div className="p-5 flex-1 min-h-[400px] max-h-[calc(100vh-400px)] overflow-y-auto">
-                {allMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <span className="mb-2 flex size-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
-                      <svg className="size-5" />
-                    </span>
-                    <p className="text-sm text-muted-foreground">
-                      {t("execution.noSummaryLogs")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {allMessages.map(({ step, message }, index) => {
-                      const isBot = index % 2 === 1;
+              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] font-mono text-zinc-400">
+                {allMessages.length} pesan terkirim
+              </span>
+            </div>
 
-                      return (
-                        <div
-                          key={`${step.id}-${index}`}
-                          className={`rounded-xl p-3 ${
-                            isBot
-                              ? "bg-primary text-primary-foreground self-end ml-auto max-w-[80%]"
-                              : "bg-muted text-foreground self-start max-w-[80%]"
-                          }`}
-                        >
-                          <p className="text-sm leading-6 whitespace-pre-wrap">
-                            {message}
-                          </p>
-                          <p className="mt-1 text-[10px] text-muted-foreground self-end">
-                            {stepNodeLabel(step, t)}
-                          </p>
-                        </div>
-                      );
-                    })}
+            <div className="flex-1 min-h-[380px] max-h-[560px] overflow-y-auto p-4 space-y-3">
+              {allMessages.length === 0 ? (
+                <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center">
+                  <div className="mb-2 flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-500">
+                    <MessageSquare className="size-5" />
                   </div>
-                )}
-              </div>
-            </Card>
+                  <p className="text-xs text-zinc-400">
+                    Tidak ada respon percakapan yang dihasilkan pada sesi ini.
+                  </p>
+                </div>
+              ) : (
+                allMessages.map(({ step, message }, idx) => (
+                  <div key={`${step.id}-${idx}`} className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                      <span className="flex items-center gap-1 font-medium text-zinc-400">
+                        <Sparkles className="size-3 text-primary" />
+                        {stepNodeLabel(step, t)}
+                      </span>
+                      <span>·</span>
+                      <span className="font-mono">Langkah #{step.step}</span>
+                    </div>
+                    <div className="rounded-xl border border-primary/20 bg-primary/[0.07] p-3 text-xs leading-relaxed text-zinc-100 max-w-[90%] whitespace-pre-wrap">
+                      {message}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
-          {/* Right Panel: Activity Log */}
-          <div className="flex-1 lg:w-[50%] flex flex-col gap-4">
-            <Card className="gap-0 py-0">
-              <div className="border-b border-border px-5 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-foreground">
-                    {t("activity.detail.activityLog")}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setExpandedStep(null)}
-                      className="h-7 px-2 text-[10px]"
-                    >
-                      {t("activity.detail.expandAll")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-[10px]"
-                    >
-                      {t("activity.detail.export")}
-                    </Button>
-                  </div>
-                </div>
+          {/* Panel 2: Execution Step Timeline */}
+          <div className="flex flex-col rounded-xl border border-white/10 bg-[#0e0f12] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Layers className="size-4 text-primary" />
+                <h2 className="text-xs font-semibold text-zinc-200">
+                  {t("activity.detail.activityLog")}
+                </h2>
               </div>
-              <div className="p-5 flex-1 min-h-[400px] max-h-[calc(100vh-400px)] overflow-y-auto">
-                {steps.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      {t("execution.noMatchingSteps")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {steps.map((step) => {
-                      const stepDiagnostic =
-                        step.status === "error" && diagnostic
-                          ? diagnostic
-                          : null;
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExpandedStep(null)}
+                  className="rounded px-2 py-0.5 text-[11px] text-zinc-400 hover:bg-white/5 hover:text-zinc-200 transition-colors"
+                >
+                  Tutup Semua
+                </button>
+              </div>
+            </div>
 
-                      return (
-                        <StepNodeCard
-                          key={step.id}
-                          step={step}
-                          diagnostic={stepDiagnostic}
-                          isExpanded={expandedStep === step.id}
-                          onExpand={() =>
-                            setExpandedStep(
-                              expandedStep === step.id ? null : step.id,
-                            )
-                          }
-                          t={t}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </Card>
+            <div className="flex-1 min-h-[380px] max-h-[560px] overflow-y-auto p-4 space-y-2.5">
+              {steps.length === 0 ? (
+                <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center">
+                  <p className="text-xs text-zinc-400">
+                    {t("execution.noMatchingSteps")}
+                  </p>
+                </div>
+              ) : (
+                steps.map((step) => {
+                  const stepDiagnostic =
+                    step.status === "error" && diagnostic ? diagnostic : null;
+
+                  return (
+                    <StepNodeCard
+                      key={step.id}
+                      step={step}
+                      diagnostic={stepDiagnostic}
+                      isExpanded={expandedStep === step.id}
+                      onExpand={() =>
+                        setExpandedStep(
+                          expandedStep === step.id ? null : step.id,
+                        )
+                      }
+                      t={t}
+                    />
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Input/Output Section - Collapsible */}
-        <details className="group">
-          <summary
-            className="flex items-center justify-between cursor-pointer text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase py-3 hover:text-foreground"
-            onClick={() => setIsInputOutputExpanded(!isInputOutputExpanded)}
+        {/* Collapsible Payload Section */}
+        <div className="rounded-xl border border-white/10 bg-[#0e0f12] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowRawPayload(!showRawPayload)}
+            className="flex w-full items-center justify-between px-4 py-3 text-xs font-medium text-zinc-300 hover:bg-white/[0.02] transition-colors"
           >
-            <span>
-              <Layers className="size-3 mr-1" /> {t("execution.inputOutput")}
-            </span>
-            <ChevronRight
-              size={14}
-              strokeWidth={1.5}
-              className={`transition-transform duration-200 ${isInputOutputExpanded ? "rotate-90" : ""}`}
+            <div className="flex items-center gap-2">
+              <Layers className="size-3.5 text-zinc-500" />
+              <span>Data Input & Final Output (Raw Payload)</span>
+            </div>
+            <ChevronDown
+              className={cn(
+                "size-4 text-zinc-500 transition-transform duration-200",
+                showRawPayload && "rotate-180",
+              )}
             />
-          </summary>
+          </button>
 
-          <div className="grid gap-4 lg:grid-cols-2 pt-4 pb-6">
-            <Card className="p-5">
-              <h2 className="text-sm font-semibold text-foreground">
-                {t("execution.input")}
-              </h2>
-              <div className="mt-3">
-                <pre className="max-h-64 overflow-auto rounded-md bg-muted/50 p-3 text-xs text-foreground">
+          {showRawPayload && (
+            <div className="grid gap-4 border-t border-white/10 p-4 lg:grid-cols-2">
+              <div>
+                <p className="text-xs font-medium text-zinc-400 mb-2">
+                  Input Payload:
+                </p>
+                <pre className="max-h-60 overflow-auto rounded-lg border border-white/10 bg-[#08090b] p-3 text-[11px] font-mono text-zinc-300">
                   {JSON.stringify(detail.input, null, 2)}
                 </pre>
               </div>
-            </Card>
-            <Card className="p-5">
-              <h2 className="text-sm font-semibold text-foreground">
-                {t("execution.finalOutput")}
-              </h2>
-              <div className="mt-3">
-                {detail.output ? (
-                  Array.isArray(detail.output.messages) &&
-                  detail.output.messages.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {detail.status === "escalated"
-                        ? t("execution.escalatedNoReply")
-                        : t("execution.finishedNoMessage")}
-                    </p>
-                  ) : (
-                    <pre className="max-h-64 overflow-auto rounded-md bg-muted/50 p-3 text-xs text-foreground">
-                      {JSON.stringify(
-                        detail.output.messages ??
-                          detail.output.output ??
-                          detail.output,
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  )
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {t("execution.noOutput")}
-                  </p>
-                )}
+
+              <div>
+                <p className="text-xs font-medium text-zinc-400 mb-2">
+                  Final Output:
+                </p>
+                <pre className="max-h-60 overflow-auto rounded-lg border border-white/10 bg-[#08090b] p-3 text-[11px] font-mono text-zinc-300">
+                  {JSON.stringify(detail.output ?? {}, null, 2)}
+                </pre>
               </div>
-            </Card>
-          </div>
-        </details>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

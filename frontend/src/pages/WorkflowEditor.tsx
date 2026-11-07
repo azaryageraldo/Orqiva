@@ -1193,6 +1193,12 @@ export default function WorkflowEditor({
             onTidy={tidyCanvas}
             onToggleBlockMode={() => setBlockMode((prev) => !prev)}
             onDeleteSelected={deleteSelectedNodes}
+            onOpenLibrary={() => {
+              if (selectedNode) saveNodeChanges();
+              setPendingParentId(null);
+              setPendingAddPosition(null);
+              setShowLibrary(true);
+            }}
           />
           <button
             type="button"
