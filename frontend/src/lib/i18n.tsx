@@ -383,6 +383,8 @@ const ID: Dictionary = {
   "editor.unsavedTitle": "Perubahan workflow belum disimpan",
   "editor.unsavedHint":
     "Anda memiliki perubahan yang belum disimpan. Simpan sebelum meninggalkan halaman?",
+  "editor.unsavedWarningCallout":
+    "Konfigurasi langkah dan koneksi yang baru diubah akan hilang jika Anda keluar tanpa menyimpan.",
   "editor.continueEditing": "Lanjut mengedit",
   "editor.discardLeave": "Buang & keluar",
   "editor.saveLeave": "Simpan & keluar",
@@ -1415,6 +1417,8 @@ const EN: Dictionary = {
   "editor.unsavedTitle": "Unsaved workflow changes",
   "editor.unsavedHint":
     "You have changes that are not saved yet. Save them before leaving?",
+  "editor.unsavedWarningCallout":
+    "Any unsaved step configurations or connection changes will be lost if you leave without saving.",
   "editor.continueEditing": "Continue editing",
   "editor.discardLeave": "Discard & leave",
   "editor.saveLeave": "Save & leave",

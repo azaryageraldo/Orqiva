@@ -1387,7 +1387,17 @@ export default function WorkflowEditor({
         }}
         tone="warning"
         title={t("editor.unsavedTitle")}
-        description={t("editor.unsavedHint")}
+        description={
+          <div className="space-y-3 pt-0.5">
+            <p className="text-muted-foreground">
+              {t("editor.unsavedHint")}
+            </p>
+            <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300/90 leading-relaxed">
+              <span className="mt-1 size-1.5 shrink-0 rounded-full bg-amber-400" />
+              <span>{t("editor.unsavedWarningCallout")}</span>
+            </div>
+          </div>
+        }
         cancelLabel={t("editor.continueEditing")}
         confirmLabel={isSaving ? t("editor.saving") : t("editor.saveLeave")}
         confirmVariant="default"
@@ -1399,7 +1409,7 @@ export default function WorkflowEditor({
             setConfirmLeave(false);
             onBack();
           },
-          variant: "outline",
+          variant: "destructive",
         }}
       />
     </section>
