@@ -5,9 +5,7 @@ import {
   AlertDialog,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -78,11 +76,11 @@ export default function ConfirmDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
         className={cn(
-          "gap-0 p-0 sm:max-w-md border border-border/80 bg-background/95 dark:bg-[#0c0d12] shadow-2xl backdrop-blur-md overflow-hidden",
+          "w-[calc(100%-2rem)] max-w-[520px] rounded-2xl border border-white/10 bg-[#0e1015] p-0 shadow-2xl shadow-black/80 overflow-hidden",
           className
         )}
       >
-        <AlertDialogHeader className="flex flex-row items-start gap-4 p-5 sm:p-6 text-left border-b border-border/30">
+        <div className="flex items-start gap-4 p-6 sm:p-7">
           <div
             className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-xl",
@@ -91,21 +89,21 @@ export default function ConfirmDialog({
           >
             <Icon className="size-5" />
           </div>
-          <div className="min-w-0 flex-1 space-y-1">
-            <AlertDialogTitle className="text-base font-semibold leading-tight text-foreground tracking-tight">
+          <div className="min-w-0 flex-1 space-y-2">
+            <AlertDialogTitle className="text-base font-semibold leading-snug tracking-tight text-zinc-100">
               {title}
             </AlertDialogTitle>
             {description ? (
-              <AlertDialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed mt-1">
+              <div className="text-sm text-zinc-400 leading-relaxed">
                 {description}
-              </AlertDialogDescription>
+              </div>
             ) : null}
           </div>
-        </AlertDialogHeader>
+        </div>
 
         <AlertDialogFooter
           className={cn(
-            "m-0 flex flex-col-reverse gap-2 sm:gap-2.5 bg-muted/20 px-5 py-4",
+            "border-t border-white/10 bg-white/[0.02] px-6 py-4",
             secondaryAction
               ? "sm:flex-row sm:items-center sm:justify-between"
               : "sm:flex-row sm:justify-end"
@@ -113,12 +111,12 @@ export default function ConfirmDialog({
         >
           <AlertDialogCancel
             disabled={loading}
-            className="h-9 px-4 text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="h-9 px-4 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border border-white/10 bg-transparent shrink-0"
           >
             {cancelLabel}
           </AlertDialogCancel>
 
-          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="flex items-center justify-end gap-2.5 shrink-0">
             {secondaryAction ? (
               <Button
                 type="button"
@@ -126,9 +124,9 @@ export default function ConfirmDialog({
                 disabled={loading || secondaryAction.disabled}
                 onClick={secondaryAction.onClick}
                 className={cn(
-                  "h-9 px-4 text-xs font-medium",
+                  "h-9 px-3.5 text-xs font-medium shrink-0",
                   secondaryAction.variant === "destructive" &&
-                    "border border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/20"
+                    "border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200"
                 )}
               >
                 {secondaryAction.label}
@@ -141,9 +139,11 @@ export default function ConfirmDialog({
               disabled={loading}
               onClick={onConfirm}
               className={cn(
-                "h-9 px-4 text-xs font-medium shadow-sm",
+                "h-9 px-4 text-xs font-medium shrink-0 shadow-sm",
+                resolvedConfirmVariant === "default" &&
+                  "bg-primary text-primary-foreground hover:bg-primary/90",
                 resolvedConfirmVariant === "destructive" &&
-                  "bg-destructive/15 text-destructive hover:bg-destructive/25"
+                  "border border-rose-500/30 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30"
               )}
             >
               {loading ? (
