@@ -1,10 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { LoaderCircle } from "lucide-react";
 
 import Login from "./Login";
 import { getCurrentUser, logout } from "./services/auth";
 import { UNAUTHORIZED_EVENT } from "./services/api";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import type { NavKey } from "./components/layout/Sidebar";
 import { Button } from "./components/ui/button";
 import Dashboard from "./pages/Dashboard";
 import Workflows from "./pages/workflows";
@@ -21,16 +30,6 @@ import { useI18n } from "./lib/i18n";
 import "./App.css";
 
 type Health = "checking" | "online" | "offline";
-type View =
-  | "dashboard"
-  | "workflows"
-  | "inbox"
-  | "channel"
-  | "activity"
-  | "ai-providers"
-  | "settings"
-  | "help";
-
 type CurrentUser = { name: string; email?: string };
 
 function ErrorBanner({
@@ -61,36 +60,61 @@ function ErrorBanner({
   );
 }
 
+function WorkflowEditorWrapper() {
+  const { workflowId } = useParams<{ workflowId: string }>();
+  const navigate = useNavigate();
+  return (
+    <WorkflowEditor
+      workflowId={workflowId!}
+      onBack={() => navigate("/workflows")}
+    />
+  );
+}
+
+function ExecutionDetailWrapper() {
+  const { workflowId, executionId } = useParams<{
+    workflowId: string;
+    executionId: string;
+  }>();
+  const navigate = useNavigate();
+  return (
+    <ExecutionDetail
+      workflowId={workflowId!}
+      executionId={Number(executionId)}
+      onBack={() => navigate("/activity")}
+      onNavigate={(key) => navigate(`/${key}`)}
+    />
+  );
+}
+
+function PublicWidgetWrapper() {
+  const { token } = useParams<{ token: string }>();
+  return <PublicChatWidget token={token!} />;
+}
+
 export default function App() {
   const { t } = useI18n();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [health, setHealth] = useState<Health>("checking");
   const [authChecking, setAuthChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
-  const [view, setView] = useState<View>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("orqiva_view");
-      if (saved && ["dashboard","workflows","inbox","channel","activity","ai-providers","settings","help"].includes(saved)) {
-        return saved as View;
-      }
-    }
+
+  const activeNav: NavKey = useMemo(() => {
+    const path = location.pathname;
+    if (path.startsWith("/workflows")) return "workflows";
+    if (path.startsWith("/activity")) return "activity";
+    if (path.startsWith("/inbox")) return "inbox";
+    if (path.startsWith("/channel")) return "channel";
+    if (path.startsWith("/ai-providers")) return "ai-providers";
+    if (path.startsWith("/settings")) return "settings";
+    if (path.startsWith("/help")) return "help";
     return "dashboard";
-  });
-
-  const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(
-    null,
-  );
-
-  const [viewingExecution, setViewingExecution] = useState<{
-    workflowId: string;
-    executionId: number;
-  } | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem("orqiva_view", view);
-  }, [view]);
+  }, [location.pathname]);
 
   useEffect(() => {
     let active = true;
@@ -119,9 +143,7 @@ export default function App() {
     const handleUnauthorized = () => {
       setAuthenticated(false);
       setUser(null);
-      setEditingWorkflowId(null);
-      setViewingExecution(null);
-      setView("dashboard");
+      navigate("/dashboard");
     };
 
     window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
@@ -129,7 +151,7 @@ export default function App() {
     return () => {
       window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
     };
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -159,9 +181,7 @@ export default function App() {
       await logout();
       setAuthenticated(false);
       setUser(null);
-      setEditingWorkflowId(null);
-      setViewingExecution(null);
-      setView("dashboard");
+      navigate("/dashboard");
     } catch {
       setError(t("auth.logoutError"));
     } finally {
@@ -169,34 +189,13 @@ export default function App() {
     }
   }
 
-  const goTo = (next: View, section?: string) => {
-    setError("");
-    setEditingWorkflowId(null);
-    setViewingExecution(null);
-    setView(next);
-
-    if (section) {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          document
-            .getElementById(section)
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      });
-    }
-  };
-
-  const openWorkflow = (workflowId: string) => {
-    setError("");
-    setViewingExecution(null);
-    setEditingWorkflowId(workflowId);
-  };
-
-  const publicWidgetToken =
-    window.location.pathname.match(/^\/widget\/([^/]+)\/?$/)?.[1] ?? null;
-
-  if (publicWidgetToken) {
-    return <PublicChatWidget token={publicWidgetToken} />;
+  // Standalone public chat widget route
+  if (location.pathname.startsWith("/widget/")) {
+    return (
+      <Routes>
+        <Route path="/widget/:token" element={<PublicWidgetWrapper />} />
+      </Routes>
+    );
   }
 
   if (authChecking) {
@@ -219,177 +218,87 @@ export default function App() {
     );
   }
 
-  const layoutProps = {
-    health,
-    user,
-    loggingOut,
-    onLogout: () => void handleLogout(),
-    onDashboardClick: () => goTo("dashboard"),
-    onWorkflowsClick: () => goTo("workflows"),
-    onInboxClick: () => goTo("inbox"),
-    onChannelClick: () => goTo("channel"),
-    onActivityClick: () => goTo("activity"),
-    onAiProvidersClick: () => goTo("ai-providers"),
-    onHelpClick: () => goTo("help"),
-    onSettingsClick: () => goTo("settings"),
-  };
-
-  // Halaman editor workflow
-  if (editingWorkflowId !== null) {
-    return (
-      <DashboardLayout
-        activeNav="workflows"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <WorkflowEditor
-          workflowId={editingWorkflowId}
-          onBack={() => goTo("workflows")}
-        />
-      </DashboardLayout>
-    );
-  }
-
-  // Halaman detail eksekusi (audit per langkah)
-  if (viewingExecution !== null) {
-    return (
-      <DashboardLayout
-        activeNav="activity"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <ExecutionDetail
-          workflowId={viewingExecution.workflowId}
-          executionId={viewingExecution.executionId}
-          onBack={() => goTo("activity")}
-          onNavigate={(key) => goTo(key as View)}
-        />
-      </DashboardLayout>
-    );
-  }
-
-  if (view === "dashboard") {
-    return (
-      <DashboardLayout
-        activeNav="dashboard"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <Dashboard health={health} onViewActivity={() => goTo("activity")} />
-      </DashboardLayout>
-    );
-  }
-
-  if (view === "inbox") {
-    return (
-      <DashboardLayout
-        activeNav="inbox"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <Inbox />
-      </DashboardLayout>
-    );
-  }
-
-  if (view === "channel") {
-    return (
-      <DashboardLayout
-        activeNav="channel"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <Channel />
-      </DashboardLayout>
-    );
-  }
-
-  if (view === "activity") {
-    return (
-      <DashboardLayout
-        activeNav="activity"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <Activity
-          onOpenExecution={(executionId, workflowId) => {
-            setError("");
-            setEditingWorkflowId(null);
-            setViewingExecution({
-              workflowId,
-              executionId,
-            });
-          }}
-        />
-      </DashboardLayout>
-    );
-  }
-
-  if (view === "ai-providers") {
-    return (
-      <DashboardLayout
-        activeNav="ai-providers"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <AiProviders />
-      </DashboardLayout>
-    );
-  }
-
-  if (view === "help") {
-    return (
-      <DashboardLayout
-        activeNav="help"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <Help
-          onOpenAiProviders={() => goTo("ai-providers")}
-          onOpenWorkflows={() => goTo("workflows")}
-          onOpenChannel={() => goTo("channel")}
-        />
-      </DashboardLayout>
-    );
-  }
-
-  if (view === "settings") {
-    return (
-      <DashboardLayout
-        activeNav="settings"
-        {...layoutProps}
-      >
-        {error && <ErrorBanner message={error} onClose={() => setError("")} />}
-
-        <Settings
-          health={health}
-          onOpenAiProviders={() => goTo("ai-providers")}
-          onProfileUpdated={setUser}
-        />
-      </DashboardLayout>
-    );
-  }
-
-  // Halaman daftar workflow
   return (
     <DashboardLayout
-      activeNav="workflows"
-      {...layoutProps}
+      activeNav={activeNav}
+      health={health}
+      user={user}
+      loggingOut={loggingOut}
+      onLogout={() => void handleLogout()}
+      onDashboardClick={() => navigate("/dashboard")}
+      onWorkflowsClick={() => navigate("/workflows")}
+      onInboxClick={() => navigate("/inbox")}
+      onChannelClick={() => navigate("/channel")}
+      onActivityClick={() => navigate("/activity")}
+      onAiProvidersClick={() => navigate("/ai-providers")}
+      onHelpClick={() => navigate("/help")}
+      onSettingsClick={() => navigate("/settings")}
     >
       {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 
-      <Workflows
-        onOpenWorkflow={openWorkflow}
-        currentUserName={user?.name ?? ""}
-      />
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route
+          path="/dashboard"
+          element={
+            <Dashboard
+              health={health}
+              onViewActivity={() => navigate("/activity")}
+            />
+          }
+        />
+        <Route
+          path="/workflows"
+          element={
+            <Workflows
+              onOpenWorkflow={(id) => navigate(`/workflows/${id}`)}
+              currentUserName={user?.name ?? ""}
+            />
+          }
+        />
+        <Route
+          path="/workflows/:workflowId"
+          element={<WorkflowEditorWrapper />}
+        />
+        <Route path="/inbox" element={<Inbox />} />
+        <Route path="/channel" element={<Channel />} />
+        <Route
+          path="/activity"
+          element={
+            <Activity
+              onOpenExecution={(executionId, workflowId) =>
+                navigate(`/activity/${workflowId}/${executionId}`)
+              }
+            />
+          }
+        />
+        <Route
+          path="/activity/:workflowId/:executionId"
+          element={<ExecutionDetailWrapper />}
+        />
+        <Route path="/ai-providers" element={<AiProviders />} />
+        <Route
+          path="/settings"
+          element={
+            <Settings
+              health={health}
+              onOpenAiProviders={() => navigate("/ai-providers")}
+              onProfileUpdated={setUser}
+            />
+          }
+        />
+        <Route
+          path="/help"
+          element={
+            <Help
+              onOpenAiProviders={() => navigate("/ai-providers")}
+              onOpenWorkflows={() => navigate("/workflows")}
+              onOpenChannel={() => navigate("/channel")}
+            />
+          }
+        />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </DashboardLayout>
   );
 }

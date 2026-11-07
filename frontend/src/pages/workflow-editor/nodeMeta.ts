@@ -138,7 +138,7 @@ export const LIBRARY_GROUPS: Array<{
     titleKey: "editor.addTrigger",
     descriptionKey: "editor.addTriggerDesc",
     icon: Lightning,
-    tone: "border-amber-400/25 bg-amber-400/[0.06] text-amber-300",
+    tone: "border-amber-400/25 bg-amber-400/10 text-amber-300",
     labels: ["Trigger"],
   },
   {
@@ -146,7 +146,7 @@ export const LIBRARY_GROUPS: Array<{
     titleKey: "editor.addAction",
     descriptionKey: "editor.addActionDesc",
     icon: SquaresFour,
-    tone: "border-primary/25 bg-primary/[0.06] text-primary",
+    tone: "border-primary/25 bg-primary/10 text-primary",
     labels: ["AI Agent", "Send Message", "Go To", "Relocate", "Stopper"],
   },
   {
@@ -154,7 +154,7 @@ export const LIBRARY_GROUPS: Array<{
     titleKey: "editor.addCondition",
     descriptionKey: "editor.addConditionDesc",
     icon: GitFork,
-    tone: "border-emerald-400/25 bg-emerald-400/[0.06] text-emerald-300",
+    tone: "border-orange-400/25 bg-orange-400/10 text-orange-300",
     labels: ["Condition"],
   },
 ];

@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from "react";
 import {
   addEdge,
@@ -27,19 +26,9 @@ import {
   Check,
   MousePointer2,
   Plus,
-  Settings2,
   TriangleAlert,
-  Trash2,
-  Variable,
-  Wand2,
   X,
 } from "lucide-react";
-import {
-  ChatCircleDots,
-  Handshake,
-  PauseCircle,
-  Sparkle,
-} from "@phosphor-icons/react";
 
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { useI18n } from "@/lib/i18n";
@@ -62,6 +51,7 @@ import FlowEdge from "./workflow-editor/FlowEdge";
 import NodeLibraryPanel from "./workflow-editor/NodeLibraryPanel";
 import CanvasToolbar from "./workflow-editor/CanvasToolbar";
 import EditorHeader from "./workflow-editor/EditorHeader";
+import NodeInspector from "./workflow-editor/NodeInspector";
 import {
   geminiModels,
   initialEdges,
@@ -78,8 +68,6 @@ import type {
   NodeKind,
   OutputVariable,
   ValidationIssue,
-  VariableType,
-  AgentVerbosity,
   AgentVariable,
   WorkflowDefinition,
   WorkflowEditorProps,
@@ -88,15 +76,6 @@ import type {
 const VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SMART_PATH_PATTERN =
   /^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
-
-const panelClass = "rounded-xl border border-border bg-card";
-const inputClass =
-  "mt-2.5 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
-const labelClass = "text-sm font-medium leading-6 text-muted-foreground";
-const compactInputClass =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/60 focus:ring-2 focus:ring-primary/10";
-const buttonClass =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
 const APPENDABLE_LABELS: AutomationNodeData["label"][] = [
   "Trigger",
@@ -202,109 +181,11 @@ function makeSnapshot(nodes: FlowNode[], edges: Edge[]): string {
   });
 }
 
-function SmartValueTextarea({
-  value,
-  onChange,
-  variables,
-  rows = 5,
-  placeholder,
-  textareaRef,
-  showVariables = true,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  variables: Array<{ token: string; description?: string; type?: string }>;
-  rows?: number;
-  placeholder?: string;
-  textareaRef?: RefObject<HTMLTextAreaElement | null>;
-  showVariables?: boolean;
-}) {
-  const { t } = useI18n();
-  const localRef = useRef<HTMLTextAreaElement>(null);
-  const inputRef = textareaRef ?? localRef;
-  const highlightRef = useRef<HTMLPreElement>(null);
-  const parts = value.split(/(\{\{\s*[\w.-]+\s*\}\})/g);
-
-  function insertVariable(name: string) {
-    const input = inputRef.current;
-    const token = `{{${name}}}`;
-    const start = input?.selectionStart ?? value.length;
-    const end = input?.selectionEnd ?? value.length;
-    const next = `${value.slice(0, start)}${token}${value.slice(end)}`;
-    onChange(next);
-    requestAnimationFrame(() => {
-      input?.focus();
-      input?.setSelectionRange(start + token.length, start + token.length);
-    });
-  }
-
-  return (
-    <div>
-      <div className="relative mt-2.5 overflow-hidden rounded-xl border border-border bg-background transition focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10">
-        <pre
-          ref={highlightRef}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6 text-foreground"
-        >
-          {parts.map((part, index) =>
-            /^\{\{\s*[\w.-]+\s*\}\}$/.test(part) ? (
-              <span key={index} className="rounded bg-primary/10 text-primary">
-                {part}
-              </span>
-            ) : (
-              <span key={index}>{part}</span>
-            ),
-          )}
-          {"\n"}
-        </pre>
-        <textarea
-          ref={inputRef}
-          rows={rows}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onScroll={(event) => {
-            if (highlightRef.current) {
-              highlightRef.current.scrollTop = event.currentTarget.scrollTop;
-              highlightRef.current.scrollLeft = event.currentTarget.scrollLeft;
-            }
-          }}
-          placeholder={placeholder}
-          className="relative block w-full resize-y bg-transparent px-4 py-3 text-sm leading-6 text-transparent caret-primary outline-none selection:bg-primary/20 placeholder:text-muted-foreground/70"
-          spellCheck={false}
-        />
-      </div>
-      {showVariables &&
-        (variables.length > 0 ? (
-          <div className="mt-3">
-            <p className="text-xs font-medium text-muted-foreground">{t("editor.availableValues")}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {variables.map((variable) => (
-                <button
-                  key={variable.token}
-                  type="button"
-                  onClick={() => insertVariable(variable.token)}
-                  title={variable.description || variable.type}
-                  className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-xs text-primary transition hover:border-primary/40 hover:bg-primary/15"
-                >
-                  {`{{${variable.token}}}`}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            {t("editor.noVariablesSuggestion")}
-          </p>
-        ))}
-    </div>
-  );
-}
-
 export default function WorkflowEditor({
   workflowId,
   onBack,
 }: WorkflowEditorProps) {
-  const { language, t } = useI18n();
+  const { t } = useI18n();
   const tRef = useRef(t);
   useEffect(() => {
     tRef.current = t;
@@ -340,11 +221,11 @@ export default function WorkflowEditor({
   const flowRef = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null);
 
   const terminalNodeIds = useMemo<Set<string>>(() => {
-    const targets = new Set(edges.map((edge) => edge.target));
+    const sources = new Set(edges.map((edge) => edge.source));
     return new Set(
       nodes
         .filter((node) => APPENDABLE_LABELS.includes(node.data.label))
-        .filter((node) => !targets.has(node.id))
+        .filter((node) => !sources.has(node.id))
         .map((node) => node.id),
     );
   }, [nodes, edges]);
@@ -1253,7 +1134,6 @@ export default function WorkflowEditor({
         isSaving={isSaving}
         isLoading={isLoading}
         onSave={() => void saveWorkflow()}
-        nodeCount={nodes.length}
       />
 
       {validationIssues.length > 0 && (
@@ -1303,7 +1183,7 @@ export default function WorkflowEditor({
       )}
 
       {/* Workspace */}
-      <div className="flex h-0 min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex h-0 min-h-0 flex-1 overflow-hidden">
         <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
           <CanvasToolbar
             blockMode={blockMode}
@@ -1331,8 +1211,9 @@ export default function WorkflowEditor({
             className="absolute right-4 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center size-9 rounded-full border border-primary/30 bg-primary text-primary-foreground shadow-lg backdrop-blur transition hover:bg-primary/90"
             aria-expanded={showLibrary}
             aria-label={showLibrary ? t("editor.closeLibrary") : t("editor.openLibrary")}
+            title={showLibrary ? t("editor.closeLibrary") : t("editor.openLibrary")}
           >
-            {showLibrary ? <X size={15} /> : <Wand2 size={15} />}
+            {showLibrary ? <X size={15} /> : <Plus size={16} />}
           </button>
           {isLoading && (
             <div role="status" className="absolute left-4 top-14 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">
@@ -1365,7 +1246,14 @@ export default function WorkflowEditor({
               flowRef.current = instance;
             }}
             onNodeClick={(_, node) => selectNode(node as FlowNode)}
-            onPaneClick={() => selectedNode && saveNodeChanges()}
+            onPaneClick={() => {
+              if (selectedNode) saveNodeChanges();
+              if (showLibrary) {
+                setShowLibrary(false);
+                setPendingParentId(null);
+                setPendingAddPosition(null);
+              }
+            }}
             deleteKeyCode={["Backspace", "Delete"]}
             selectionOnDrag
             selectionMode={SelectionMode.Partial}
@@ -1403,6 +1291,7 @@ export default function WorkflowEditor({
 
         {/* Right-side node library slide-over */}
         <NodeLibraryPanel
+          key={showLibrary ? "open" : "closed"}
           open={showLibrary}
           onClose={() => {
             setShowLibrary(false);
@@ -1413,802 +1302,32 @@ export default function WorkflowEditor({
           parentNodeId={pendingParentId}
         />
         {/* Node settings inspector */}
-
         {selectedNode && (
-          <aside className="flex h-full max-h-full w-[min(460px,92vw)] max-w-[92vw] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
-            <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-5">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Settings2 size={17} />
-                </span>
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">
-                    {t("editor.nodeSettings")}
-                  </h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {inspectorData?.label}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={saveNodeChanges}
-                aria-label={t("editor.closeNodeSettings")}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto overscroll-contain px-6 py-6">
-              {inspectorData?.label !== "AI Agent" && (
-                <>
-                  <label className="block">
-                    <span className={labelClass}>{t("editor.nodeName")}</span>
-                    <input
-                      className={inputClass}
-                      value={String(inspectorData?.nodeName ?? inspectorData?.label ?? "")}
-                      onChange={(event) => updateNode({ nodeName: event.target.value })}
-                      placeholder={t("editor.giveName")}
-                      aria-label={t("editor.nodeName")}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{t("editor.description")}</span>
-                    <textarea
-                      rows={2}
-                      maxLength={500}
-                      className={inputClass}
-                      value={String(inspectorData?.description ?? "")}
-                      onChange={(event) => updateNode({ description: event.target.value })}
-                    />
-                  </label>
-                </>
-              )}
-              {inspectorData?.label === "Trigger" && (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {t("editor.triggerTitle")}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {t("editor.triggerDescription")}
-                    </p>
-                  </div>
-
-                  <div className={`${panelClass} p-3.5`}>
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <ChatCircleDots size={16} className="text-primary" />
-                      {t("editor.customerMessage")}
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      {t("editor.triggerTokenHint", {
-                        message: "{{customer_message}}",
-                        name: "{{customer_name}}",
-                      })}
-                    </p>
-                  </div>
-
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    {t("editor.triggerNote")}
-                  </p>
-                </div>
-              )}
-              {inspectorData?.label === "AI Agent" && (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{t("editor.aiSettings")}</p>
-                    <div className="mt-4 grid grid-cols-3 rounded-lg border border-border bg-muted/40 p-1">
-                      {([
-                        ["node", t("editor.tabNode")],
-                        ["prompt", t("editor.tabPrompt")],
-                        ["variables", t("editor.tabVariables")],
-                      ] as const).map(([tab, label]) => (
-                        <button
-                          key={tab}
-                          type="button"
-                          onClick={() => setAgentTab(tab)}
-                          className={`rounded-md px-2 py-2 text-xs font-medium transition ${agentTab === tab ? "bg-muted text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {agentTab === "prompt" && (
-                    <div className="space-y-4">
-                      <div className={`${panelClass} p-4`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                              <Sparkle
-                                size={16}
-                                weight="duotone"
-                                className="text-violet-300"
-                              />
-                              {t("editor.systemPrompt")}
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              {t("editor.systemPromptHint")}
-                            </p>
-                          </div>
-                          <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2 py-1 text-[10px] text-muted-foreground">
-                            {t("editor.characters", {
-                              count: String(
-                                inspectorData?.systemMessage ?? "",
-                              ).length.toLocaleString(language === "en" ? "en-US" : "id-ID"),
-                            })}
-                          </span>
-                        </div>
-
-                        <div className="mt-3">
-                          <SmartValueTextarea
-                            textareaRef={promptRef}
-                            rows={12}
-                            value={String(inspectorData?.systemMessage ?? "")}
-                            onChange={(value) =>
-                              updateNode({ systemMessage: value })
-                            }
-                            variables={promptVariables}
-                            showVariables={false}
-                            placeholder={t("editor.systemPromptPlaceholder")}
-                          />
-                        </div>
-                      </div>
-
-                      <div className={`${panelClass} p-3.5`}>
-                        <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-                          {t("editor.insertDynamic")}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {promptVariables.map((variable) => (
-                            <button
-                              key={variable.token}
-                              type="button"
-                              onClick={() => insertPromptToken(variable.token)}
-                              title={variable.description}
-                              className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 font-mono text-[11px] text-primary transition hover:border-primary/40 hover:bg-primary/15"
-                            >
-                              {`{{${variable.token}}}`}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                          {t("editor.clickToken")}
-                        </p>
-                      </div>
-
-                      <div className="flex items-start gap-2 rounded-xl border border-primary/15 bg-primary/[0.04] p-3 text-xs leading-5 text-muted-foreground">
-                        <Sparkle
-                          size={14}
-                          weight="duotone"
-                          className="mt-0.5 shrink-0 text-primary"
-                        />
-                        <p>
-                          {t("editor.promptTip")}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {agentTab === "variables" && (
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                            <Variable size={15} className="text-primary" />
-                            {t("editor.outputVariables")}
-                            <span className="rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                              {(inspectorData?.outputVariables ?? []).length}
-                            </span>
-                          </p>
-                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            {t("editor.outputVariablesHint")}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
-                          onClick={addOutputVariable}
-                        >
-                          <Plus size={13} />
-                          {t("editor.add")}
-                        </button>
-                      </div>
-
-                      {(inspectorData?.outputVariables ?? []).map(
-                        (variable, index) => {
-                          const name = variable.name.trim();
-                          const itemField =
-                            variable.itemField?.trim() || "replies";
-                          const preview =
-                            variable.type === "array"
-                              ? `${name || "respond"}.${itemField}`
-                              : name || "respond";
-
-                          return (
-                            <div
-                              key={`output-variable-${index}`}
-                              className={`${panelClass} overflow-hidden`}
-                            >
-                              <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/20 px-3 py-2">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-muted-foreground">
-                                    {index + 1}
-                                  </span>
-                                  <code
-                                    className="truncate font-mono text-[11px] text-primary"
-                                    title={`{{${preview}}}`}
-                                  >
-                                    {`{{${preview}}}`}
-                                  </code>
-                                </div>
-                                <button
-                                  type="button"
-                                  aria-label={t("editor.removeVariable")}
-                                  onClick={() => removeOutputVariable(index)}
-                                  className="rounded p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-
-                              <div className="space-y-2.5 p-3">
-                                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_138px]">
-                                  <label className="block min-w-0">
-                                    <span className="text-[11px] text-muted-foreground">
-                                      Name
-                                    </span>
-                                    <input
-                                      className={`${compactInputClass} mt-1 font-mono`}
-                                      value={variable.name}
-                                      onChange={(event) =>
-                                        updateOutputVariable(index, {
-                                          name: event.target.value,
-                                        })
-                                      }
-                                      placeholder="respond"
-                                    />
-                                    {name && !VARIABLE_NAME_PATTERN.test(name) && (
-                                      <span className="mt-1 block text-[10px] leading-4 text-destructive">
-                                        {t("editor.variableNameError")}
-                                      </span>
-                                    )}
-                                  </label>
-
-                                  <label className="block">
-                                    <span className="text-[11px] text-muted-foreground">
-                                      Type
-                                    </span>
-                                    <select
-                                      className={`${compactInputClass} mt-1`}
-                                      value={variable.type}
-                                      onChange={(event) => {
-                                        const type =
-                                          event.target.value as VariableType;
-
-                                        updateOutputVariable(index, {
-                                          type,
-                                          itemField:
-                                            type === "array"
-                                              ? variable.itemField || "replies"
-                                              : variable.itemField,
-                                        });
-                                      }}
-                                    >
-                                      <option value="string">{t("editor.typeText")}</option>
-                                      <option value="boolean">
-                                        {t("editor.typeBoolean")}
-                                      </option>
-                                      <option value="array">
-                                        {t("editor.typeArray")}
-                                      </option>
-                                    </select>
-                                  </label>
-                                </div>
-
-                                {variable.type === "array" && (
-                                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                                    <label className="block min-w-0">
-                                      <span className="text-[11px] text-muted-foreground">
-                                        Item field
-                                      </span>
-                                      <input
-                                        className={`${compactInputClass} mt-1 font-mono`}
-                                        value={variable.itemField ?? "replies"}
-                                        onChange={(event) =>
-                                          updateOutputVariable(index, {
-                                            itemField: event.target.value,
-                                          })
-                                        }
-                                        placeholder="replies"
-                                      />
-                                      {itemField &&
-                                        !VARIABLE_NAME_PATTERN.test(itemField) && (
-                                          <span className="mt-1 block text-[10px] leading-4 text-destructive">
-                                            Item field tidak boleh mengandung
-                                            spasi.
-                                          </span>
-                                        )}
-                                    </label>
-                                    <span className="rounded-lg border border-border bg-muted/30 px-2.5 py-2 font-mono text-[10px] text-primary">
-                                      {`{{${name || "respond"}.${itemField}}}`}
-                                    </span>
-                                  </div>
-                                )}
-
-                                <label className="block">
-                                  <span className="text-[11px] text-muted-foreground">
-                                    Description{" "}
-                                    <span className="text-muted-foreground/60">
-                                      (dipakai AI)
-                                    </span>
-                                  </span>
-                                  <input
-                                    className={`${compactInputClass} mt-1`}
-                                    value={variable.description}
-                                    onChange={(event) =>
-                                      updateOutputVariable(index, {
-                                        description: event.target.value,
-                                      })
-                                    }
-                                    placeholder={t("editor.variableDescriptionPlaceholder")}
-                                  />
-                                </label>
-                              </div>
-                            </div>
-                          );
-                        },
-                      )}
-
-                      {(inspectorData?.outputVariables ?? []).length === 0 && (
-                        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-5 text-center">
-                          <Variable
-                            size={20}
-                            className="mx-auto text-muted-foreground"
-                          />
-                          <p className="mt-2 text-sm font-medium text-foreground">
-                            {t("editor.noVariables")}
-                          </p>
-                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            {t("editor.noVariablesHint")}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={addOutputVariable}
-                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-muted/60"
-                          >
-                            <Plus size={13} />
-                            {t("editor.addVariable")}
-                          </button>
-                        </div>
-                      )}
-
-                      <p className="text-[11px] leading-5 text-muted-foreground">
-                        {t("editor.listHint")}
-                      </p>
-                    </div>
-                  )}
-
-                  {agentTab === "node" && <div className="space-y-5">
-                    <label className="block">
-                      <span className={labelClass}>{t("editor.nodeName")}</span>
-                      <input
-                        className={inputClass}
-                        value={String(inspectorData?.nodeName ?? "")}
-                        onChange={(event) => updateNode({ nodeName: event.target.value })}
-                        placeholder={t("editor.nodeNameExample")}
-                      />
-                    </label>
-
-                    <div className={`${panelClass} p-4`}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{t("editor.aiModel")}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {t("editor.aiModelHint")}
-                          </p>
-                        </div>
-                        <span className="rounded-md border border-primary/20 bg-primary/[0.07] px-2 py-1 text-xs font-medium text-primary">
-                          {availableAiModels.find(
-                            (model) =>
-                              model.id === String(inspectorData?.model ?? "") &&
-                              model.provider === String(inspectorData?.provider ?? "gemini"),
-                          )?.provider_label ?? "Gemini"}
-                        </span>
-                      </div>
-                      <select
-                        className={inputClass}
-                        value={`${String(inspectorData?.provider ?? "gemini")}::${String(inspectorData?.model ?? defaultAiModel.id)}`}
-                        onChange={(event) => {
-                          const [provider, model] = event.target.value.split("::");
-                          updateNode({ provider, model });
-                        }}
-                      >
-                        {availableAiModels.map((model) => (
-                          <option
-                            key={`${model.provider}:${model.id}`}
-                            value={`${model.provider}::${model.id}`}
-                          >
-                            {model.provider_label} · {model.id}
-                          </option>
-                        ))}
-                        {!availableAiModels.some(
-                          (model) =>
-                            model.id === String(inspectorData?.model ?? "") &&
-                            model.provider === String(inspectorData?.provider ?? "gemini"),
-                        ) && inspectorData?.model && (
-                          <option
-                            value={`${String(inspectorData?.provider ?? "gemini")}::${String(inspectorData.model)}`}
-                          >
-                            {String(inspectorData?.provider ?? "gemini")} · {String(inspectorData.model)}
-                          </option>
-                        )}
-                      </select>
-                      {aiModels.length === 0 && (
-                        <p className="mt-2 text-xs leading-5 text-amber-300/90">
-                          {t("editor.noApiKey")}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="block">
-                        <span className={labelClass}>{t("editor.verbosity")}</span>
-                        <select
-                          className={inputClass}
-                          value={String(inspectorData?.verbosity ?? "concise")}
-                          onChange={(event) =>
-                            updateNode({
-                              verbosity: event.target
-                                .value as AgentVerbosity,
-                            })
-                          }
-                        >
-                          <option value="concise">{t("editor.verbosityConcise")}</option>
-                          <option value="balanced">{t("editor.verbosityBalanced")}</option>
-                          <option value="detailed">{t("editor.verbosityDetailed")}</option>
-                        </select>
-                        <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                          {t("editor.verbosityHint")}
-                        </span>
-                      </label>
-
-                      <label className="block">
-                        <span className={labelClass}>{t("editor.contextMemory")}</span>
-                        <select
-                          className={inputClass}
-                          value={String(inspectorData?.contextMessages ?? 10)}
-                          onChange={(event) =>
-                            updateNode({
-                              contextMessages: Number(event.target.value),
-                            })
-                          }
-                        >
-                          <option value="0">{t("editor.contextNone")}</option>
-                          <option value="4">{t("editor.contextMessages", { count: 4 })}</option>
-                          <option value="8">{t("editor.contextMessages", { count: 8 })}</option>
-                          <option value="12">{t("editor.contextMessages", { count: 12 })}</option>
-                          <option value="20">{t("editor.contextMessages", { count: 20 })}</option>
-                        </select>
-                        <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                          {t("editor.contextHint")}
-                        </span>
-                      </label>
-                    </div>
-
-                    <label className="block">
-                      <span className={labelClass}>
-                        {t("editor.temperature", {
-                          value: Number(
-                            inspectorData?.temperature ?? 0.7,
-                          ).toFixed(1),
-                        })}
-                      </span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.1}
-                        className="mt-3 w-full accent-primary"
-                        value={Number(inspectorData?.temperature ?? 0.7)}
-                        onChange={(event) =>
-                          updateNode({
-                            temperature: Number(event.target.value),
-                          })
-                        }
-                      />
-                      <span className="mt-1 flex justify-between text-xs text-muted-foreground">
-                        <span>{t("editor.moreFocused")}</span>
-                        <span>{t("editor.moreCreative")}</span>
-                      </span>
-                    </label>
-                  </div>}
-                </div>
-              )}
-              {inspectorData?.label === "Send Message" && (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {t("editor.messageConfig")}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {t("editor.messageConfigHint")}
-                    </p>
-                  </div>
-
-                  <label className="block">
-                    <span className={labelClass}>{t("editor.message")}</span>
-                    <SmartValueTextarea
-                      rows={6}
-                      value={String(inspectorData?.messageTemplate ?? "")}
-                      onChange={(value) => updateNode({ messageTemplate: value, messageMode: "smart_value" })}
-                      variables={upstreamVariables}
-                      placeholder={t("editor.messagePlaceholder")}
-                    />
-                  </label>
-
-                  <div className={`${panelClass} p-3.5`}>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Preview
-                    </p>
-                    <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
-                      {String(inspectorData?.messageTemplate ?? "").trim() ? (
-                        String(inspectorData?.messageTemplate ?? "")
-                          .split(/(\{\{\s*[\w.-]+\s*\}\})/g)
-                          .map((part, index) =>
-                            /^\{\{\s*[\w.-]+\s*\}\}$/.test(part) ? (
-                              <span key={index} className="rounded bg-primary/10 px-0.5 text-primary">{part}</span>
-                            ) : (
-                              <span key={index}>{part}</span>
-                            ),
-                          )
-                      ) : (
-                        t("editor.previewEmpty")
-                      )}
-                    </p>
-                  </div>
-
-                  {arrayBubbleVariable && (
-                    <p className="text-xs leading-5 text-primary">
-                      {t("editor.listDetected")}
-                    </p>
-                  )}
-
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    {t("editor.blueTokens")}
-                  </p>
-                </div>
-              )}
-              {inspectorData?.label === "Condition" && (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {t("editor.condition")}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {t("editor.conditionHint")}
-                    </p>
-                  </div>
-
-                  {booleanVariables.length === 0 ? (
-                    <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3.5 text-xs leading-5 text-amber-200">
-                      {t("editor.noBoolean")}
-                    </div>
-                  ) : (
-                    <div className="block">
-                      <span className={labelClass}>{t("editor.booleanSmartValue")}</span>
-
-                      {String(inspectorData?.conditionVariable ?? "").trim() && (
-                        <div className="mt-2.5 rounded-lg border border-primary/25 bg-primary/[0.06] px-3 py-2">
-                          <code className="font-mono text-sm text-primary">
-                            {`{{${String(inspectorData?.conditionVariable)}}}`}
-                          </code>
-                        </div>
-                      )}
-
-                      <div className="mt-2.5 space-y-2">
-                        {booleanVariables.map((variable) => {
-                          const selected =
-                            String(inspectorData?.conditionVariable ?? "") ===
-                            variable.token;
-
-                          return (
-                            <button
-                              key={variable.token}
-                              type="button"
-                              onClick={() =>
-                                updateNode({ conditionVariable: variable.token })
-                              }
-                              className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
-                                selected
-                                  ? "border-primary/35 bg-primary/[0.08]"
-                                  : "border-border bg-background hover:border-primary/25 hover:bg-primary/[0.04]"
-                              }`}
-                            >
-                              <span className="min-w-0 flex-1">
-                                <code className="block truncate font-mono text-xs text-primary">
-                                  {`{{${variable.token}}}`}
-                                </code>
-                                <span className="mt-1 block text-[11px] leading-5 text-muted-foreground">
-                                  {variable.description}
-                                </span>
-                              </span>
-                              {selected && (
-                                <Check size={15} className="mt-0.5 shrink-0 text-primary" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <span className="mt-2 block text-xs leading-5 text-muted-foreground">
-                        {t("editor.conditionVariableHint")}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.05] p-3">
-                      <Check size={15} className="text-emerald-300" />
-                      <div>
-                        <p className="text-sm font-medium text-emerald-300">
-                          {t("editor.ifMatch")}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("editor.ifMatchHint")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/[0.05] p-3">
-                      <X size={15} className="text-destructive" />
-                      <div>
-                        <p className="text-sm font-medium text-destructive">
-                          {t("editor.else")}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("editor.elseHint")}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    {t("editor.conditionPorts")}
-                  </p>
-                </div>
-              )}
-              {inspectorData?.label === "Go To" && (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {t("editor.goTo")}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {t("editor.goToHint")}
-                    </p>
-                  </div>
-
-                  <label className="block">
-                    <span className={labelClass}>{t("editor.targetWorkflow")}</span>
-                    <select
-                      className={inputClass}
-                      value={String(
-                        inspectorData?.targetWorkflowId ||
-                          (currentWorkflowId ?? ""),
-                      )}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        updateNode({
-                          targetWorkflowId:
-                            value === String(currentWorkflowId) ? "" : value,
-                          targetNodeId: "",
-                        });
-                      }}
-                    >
-                      {goToWorkflowOptions.map((option) => (
-                        <option key={option.id} value={String(option.id)}>
-                          {option.id === currentWorkflowId
-                            ? t("editor.currentWorkflowSuffix", { name: option.name })
-                            : option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className={labelClass}>{t("editor.targetNode")}</span>
-                    <select
-                      className={inputClass}
-                      value={String(inspectorData?.targetNodeId ?? "")}
-                      onChange={(event) =>
-                        updateNode({ targetNodeId: event.target.value })
-                      }
-                    >
-                      <option value="">{t("editor.chooseTargetNode")}</option>
-                      {goToTargetNodes
-                        .filter((node) =>
-                          selectedGoToWorkflowId === currentWorkflowId
-                            ? node.id !== selectedNodeId
-                            : true,
-                        )
-                        .map((node) => (
-                          <option key={node.id} value={node.id}>
-                            {node.name || node.id}
-                            {node.type ? ` · ${node.type}` : ""}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 size-4 accent-primary"
-                      checked={Boolean(inspectorData?.endFlow)}
-                      onChange={(event) =>
-                        updateNode({ endFlow: event.target.checked })
-                      }
-                    />
-                    <span>
-                      <span className="block text-sm font-medium text-foreground">
-                        {t("editor.endFlow")}
-                      </span>
-                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                        {t("editor.endFlowHint")}
-                      </span>
-                    </span>
-                  </label>
-
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    {t("editor.goToWorkflowNote")}
-                  </p>
-                </div>
-              )}
-              {inspectorData?.label === "Relocate" && (
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-teal-400/20 bg-teal-400/[0.06] p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-teal-200">
-                      <Handshake size={17} /> {t("editor.handoff")}
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      {t("editor.handoffHint")}
-                    </p>
-                  </div>
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    {t("editor.relocateNote")}
-                  </p>
-                </div>
-              )}
-              {inspectorData?.label === "Stopper" && (
-                <div className="rounded-xl border border-rose-400/15 bg-rose-400/[0.05] p-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-rose-200">
-                    <PauseCircle size={17} /> {t("editor.pausePoint")}
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    {t("editor.pauseHint")}
-                  </p>
-                </div>
-              )}
-              <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-border bg-card pt-4 pb-1">
-                <button
-                  type="button"
-                  onClick={cancelNodeChanges}
-                  className={`${buttonClass} border border-border bg-muted/50 text-muted-foreground hover:bg-muted`}
-                >
-                  <X size={14} /> {t("editor.cancel")}
-                </button>
-                <button
-                  type="button"
-                  onClick={saveNodeChanges}
-                  className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary`}
-                >
-                  <Check size={14} /> {t("editor.saveChanges")}
-                </button>
-              </div>
-            </div>
-          </aside>
+          <NodeInspector
+            inspectorData={inspectorData}
+            updateNode={updateNode}
+            saveNodeChanges={saveNodeChanges}
+            cancelNodeChanges={cancelNodeChanges}
+            agentTab={agentTab}
+            setAgentTab={setAgentTab}
+            promptRef={promptRef}
+            promptVariables={promptVariables}
+            insertPromptToken={insertPromptToken}
+            availableAiModels={availableAiModels}
+            defaultAiModel={defaultAiModel}
+            aiModels={aiModels}
+            addOutputVariable={addOutputVariable}
+            updateOutputVariable={updateOutputVariable}
+            deleteOutputVariable={removeOutputVariable}
+            upstreamVariables={upstreamVariables}
+            arrayBubbleVariable={Boolean(arrayBubbleVariable)}
+            booleanVariables={booleanVariables}
+            goToWorkflowOptions={goToWorkflowOptions}
+            currentWorkflowId={currentWorkflowId}
+            selectedNodeId={selectedNodeId}
+            selectedGoToWorkflowId={selectedGoToWorkflowId}
+            goToTargetNodes={goToTargetNodes}
+          />
         )}
       </div>
 

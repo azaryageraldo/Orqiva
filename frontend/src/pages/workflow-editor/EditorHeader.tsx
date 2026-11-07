@@ -12,7 +12,6 @@ export interface EditorHeaderProps {
   isSaving: boolean;
   isLoading: boolean;
   onSave: () => void;
-  nodeCount: number;
 }
 
 /**
@@ -26,7 +25,6 @@ export default function EditorHeader({
   isSaving,
   isLoading,
   onSave,
-  nodeCount,
 }: EditorHeaderProps) {
   const { t } = useI18n();
 
@@ -58,9 +56,6 @@ export default function EditorHeader({
               {workflowName || t("editor.title")}
             </span>
           </div>
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            {t("editor.canvasMeta", { count: nodeCount })}
-          </p>
         </div>
       </div>
       <div className="flex items-center gap-2">
