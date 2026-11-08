@@ -9,7 +9,6 @@ import {
   Search,
   Send,
   ShieldCheck,
-  User,
   X,
 } from "lucide-react";
 
@@ -200,16 +199,17 @@ export default function Inbox() {
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return contacts;
 
-    return contacts.filter((contact) =>
-      [
+    return contacts.filter((contact) => {
+      if (!needle) return true;
+
+      return [
         contact.name,
         contact.contact_id,
         contact.workflow_name ?? "",
         contact.last_message ?? "",
-      ].some((value) => value.toLowerCase().includes(needle)),
-    );
+      ].some((value) => value.toLowerCase().includes(needle));
+    });
   }, [contacts, query]);
 
   const latestSession = detail?.latest_session ?? null;
@@ -280,178 +280,189 @@ export default function Inbox() {
   }
 
   return (
-    <section className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden px-4 py-5 sm:px-6 lg:px-8">
-      <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
-              {t("inbox.title")}
-            </h1>
-            <p className="mt-0.5 text-xs text-zinc-400">
-              {t("inbox.subtitle")}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="rounded-md border border-white/10 bg-[#0d0e11] px-2.5 py-1 text-xs text-zinc-400">
-              {t("inbox.contactCount", { count: contacts.length })}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                void loadList();
-                if (selectedId !== null) {
-                  setDetailReload((current) => current + 1);
-                }
-              }}
-              disabled={listLoading}
-              className="h-8 gap-1.5 border-white/10 bg-[#0d0e11] text-xs"
-            >
-              <RefreshCw className={cn("size-3.5", listLoading && "animate-spin text-primary")} />
-              <span>{t("inbox.refresh")}</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* 2-Column Chat Workspace Frame */}
-        <div className="grid min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#0e0f12] lg:grid-cols-[320px_minmax(0,1fr)]">
-          {/* Left Column: Contact List */}
-          <aside
-            className={cn(
-              "flex min-h-0 flex-col border-white/10 lg:flex lg:border-r",
-              selectedId !== null ? "hidden" : "flex",
-            )}
-          >
-            {/* Search Box */}
-            <div className="shrink-0 border-b border-white/10 p-2.5">
-              <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-500" />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={t("inbox.searchPlaceholder")}
-                  aria-label={t("inbox.searchAria")}
-                  className="h-8 rounded-lg border-white/10 bg-[#08090b] pr-7 pl-8 text-xs text-zinc-200 placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:hidden"
-                />
-                {query && (
-                  <button
-                    type="button"
-                    onClick={() => setQuery("")}
-                    className="absolute top-1/2 right-2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Contact Items */}
-            <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-white/[0.04]">
-              {listLoading && contacts.length === 0 ? (
-                <div className="flex h-40 items-center justify-center">
-                  <LoaderCircle className="size-5 animate-spin text-primary" />
-                </div>
-              ) : listError ? (
-                <div className="p-4 text-center">
-                  <p className="text-xs text-destructive">{listError}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void loadList()}
-                    className="mt-3 h-7 text-xs border-white/10"
-                  >
-                    {t("common.retry")}
-                  </Button>
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="flex h-52 flex-col items-center justify-center px-6 text-center">
-                  <div className="mb-2 flex size-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-500">
-                    <InboxIcon className="size-5" />
-                  </div>
-                  <p className="text-xs font-medium text-zinc-300">
-                    {query ? t("inbox.emptyQuery") : t("inbox.emptyTitle")}
-                  </p>
-                  <p className="mt-1 text-[11px] text-zinc-500">
-                    {query ? t("inbox.emptyQueryHint") : t("inbox.emptyHint")}
-                  </p>
-                </div>
-              ) : (
-                filtered.map((contact) => {
-                  const selected = contact.id === selectedId;
-                  const meta = CONTACT_STATUS[contact.session_status];
-
-                  return (
-                    <button
-                      key={contact.id}
-                      type="button"
-                      onClick={() => openContact(contact.id)}
-                      className={cn(
-                        "flex w-full items-start gap-3 p-3 text-left transition-colors",
-                        selected
-                          ? "bg-primary/[0.08] border-l-2 border-primary"
-                          : "hover:bg-white/[0.02]",
-                      )}
-                    >
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs font-medium text-zinc-200">
-                        {initials(contact.name)}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-xs font-semibold text-zinc-100">
-                            {contact.name}
-                          </span>
-                          <span className="shrink-0 text-[10px] text-zinc-500">
-                            {listTime(contact.last_activity_at, locale)}
-                          </span>
-                        </div>
-
-                        <p className="mt-0.5 truncate text-xs text-zinc-400">
-                          {contact.last_message || t("inbox.noMessages")}
-                        </p>
-
-                        <div className="mt-1.5 flex items-center gap-2 text-[10px] text-zinc-500">
-                          <span className="inline-flex items-center gap-1">
-                            <span className={cn("size-1.5 rounded-full", meta.dot)} />
-                            <span>{t(meta.labelKey)}</span>
-                          </span>
-                          {contact.workflow_name && (
-                            <>
-                              <span>·</span>
-                              <span className="truncate text-zinc-400">
-                                {contact.workflow_name}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </aside>
-
-          {/* Right Column: Chat View */}
+    <section className="flex h-[calc(100dvh-3rem)] min-h-0 flex-col overflow-hidden bg-background">
+      <div className="flex min-h-0 w-full flex-1 flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
+        {/* Workspace */}
+        <div className="grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
+          {/* Contact list */}
           <div
             className={cn(
-              "flex min-h-0 flex-col bg-[#0b0c0e]",
+              "flex min-h-0 flex-col gap-2",
+              selectedId !== null ? "hidden lg:flex" : "flex",
+            )}
+          >
+            <aside className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card">
+              <div className="shrink-0 space-y-2.5 border-b border-border/70 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-[13px] font-semibold text-foreground">
+                    {t("inbox.conversations")}
+                  </h2>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-muted-foreground">
+                      {filtered.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void loadList();
+                        if (selectedId !== null) {
+                          setDetailReload((current) => current + 1);
+                        }
+                      }}
+                      disabled={listLoading}
+                      aria-label={t("inbox.refresh")}
+                      title={t("inbox.refresh")}
+                      className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        className={cn(
+                          "size-3.5",
+                          listLoading && "animate-spin",
+                        )}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={t("inbox.searchPlaceholder")}
+                    aria-label={t("inbox.searchAria")}
+                    className="h-8 rounded-lg border-border bg-background/60 pr-7 pl-8 text-xs text-foreground placeholder:text-muted-foreground"
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      aria-label={t("common.close")}
+                      className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+                {listLoading && contacts.length === 0 ? (
+                  <div className="flex h-40 items-center justify-center">
+                    <LoaderCircle className="size-5 animate-spin text-primary" />
+                  </div>
+                ) : listError ? (
+                  <div className="p-4 text-center">
+                    <p className="text-xs text-destructive">{listError}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadList()}
+                      className="mt-3 h-7 text-xs"
+                    >
+                      {t("common.retry")}
+                    </Button>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="flex h-52 flex-col items-center justify-center px-6 text-center">
+                    <div className="mb-2 flex size-10 items-center justify-center rounded-xl border border-border bg-background/60 text-muted-foreground">
+                      <InboxIcon className="size-5" />
+                    </div>
+                    <p className="text-xs font-medium text-foreground">
+                      {query ? t("inbox.emptyQuery") : t("inbox.emptyTitle")}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                      {query ? t("inbox.emptyQueryHint") : t("inbox.emptyHint")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {filtered.map((contact) => {
+                      const selected = contact.id === selectedId;
+                      const meta = CONTACT_STATUS[contact.session_status];
+
+                      return (
+                        <button
+                          key={contact.id}
+                          type="button"
+                          onClick={() => openContact(contact.id)}
+                          aria-current={selected ? "true" : undefined}
+                          className={cn(
+                            "flex w-full items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none",
+                            selected
+                              ? "border-primary/30 bg-primary/[0.08]"
+                              : "border-transparent hover:bg-white/[0.03]",
+                          )}
+                        >
+                          <div className="relative shrink-0">
+                            <div className="flex size-10 items-center justify-center rounded-full border border-white/[0.08] bg-[#0c0d11] text-[12px] font-semibold text-zinc-200">
+                              {initials(contact.name)}
+                            </div>
+                            <span
+                              className={cn(
+                                "absolute -right-0.5 -bottom-0.5 size-3 rounded-full ring-2 ring-[#0e0f12]",
+                                meta.dot,
+                              )}
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="truncate text-[12.5px] font-semibold text-foreground">
+                                {contact.name}
+                              </span>
+                              <span className="shrink-0 text-[10px] text-muted-foreground">
+                                {listTime(contact.last_activity_at, locale)}
+                              </span>
+                            </div>
+
+                            <p className="mt-0.5 truncate text-[11.5px] leading-4 text-muted-foreground">
+                              {contact.last_message || t("inbox.noMessages")}
+                            </p>
+
+                            <div className="mt-1 flex min-w-0 items-center gap-2 text-[10.5px] text-muted-foreground">
+                              <span className="inline-flex shrink-0 items-center gap-1">
+                                <span
+                                  className={cn(
+                                    "size-1.5 rounded-full",
+                                    meta.dot,
+                                  )}
+                                />
+                                {t(meta.labelKey)}
+                              </span>
+                              {contact.workflow_name && (
+                                <span className="min-w-0 truncate text-muted-foreground/70">
+                                  {contact.workflow_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </aside>
+          </div>
+
+          {/* Conversation */}
+          <div
+            className={cn(
+              "flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card",
               selectedId !== null ? "flex" : "hidden lg:flex",
             )}
           >
             {selectedId === null ? (
               <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-                <div className="mb-3 flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-500">
-                  <InboxIcon className="size-6 text-primary/70" />
+                <div className="mb-3 flex size-14 items-center justify-center rounded-2xl border border-border bg-background/60 text-primary/70">
+                  <InboxIcon className="size-6" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-200">
+                <h3 className="text-sm font-semibold text-foreground">
                   {t("inbox.selectTitle")}
                 </h3>
-                <p className="mt-1 max-w-xs text-xs text-zinc-400 leading-relaxed">
+                <p className="mt-1.5 max-w-xs text-xs leading-5 text-muted-foreground">
                   {t("inbox.selectHint")}
                 </p>
               </div>
@@ -467,56 +478,67 @@ export default function Inbox() {
                   variant="outline"
                   size="sm"
                   onClick={() => setDetailReload((current) => current + 1)}
-                  className="mt-3 h-8 border-white/10 text-xs"
+                  className="mt-3 h-8 text-xs"
                 >
                   {t("common.retry")}
                 </Button>
               </div>
             ) : !detail ? (
-              <div className="flex flex-1 items-center justify-center text-xs text-zinc-500">
+              <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
                 {t("inbox.detailUnavailable")}
               </div>
             ) : (
               <>
-                {/* Chat Top Header */}
-                <header className="flex shrink-0 items-center justify-between border-b border-white/10 bg-[#0e0f12] px-4 py-2.5">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <button
-                      type="button"
-                      aria-label={t("inbox.back")}
-                      onClick={() => setSelectedId(null)}
-                      className="inline-flex size-7 items-center justify-center rounded-md border border-white/10 text-zinc-400 hover:text-zinc-100 lg:hidden"
-                    >
-                      <ArrowLeft className="size-3.5" />
-                    </button>
+                {/* Conversation header */}
+                <header className="flex shrink-0 items-center gap-3 border-b border-white/5 px-4 py-3 bg-[#0a0a0f]/40 backdrop-blur">
+                  <button
+                    type="button"
+                    aria-label={t("inbox.back")}
+                    onClick={() => setSelectedId(null)}
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-200 lg:hidden"
+                  >
+                    <ArrowLeft className="size-4" />
+                  </button>
 
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs font-semibold text-zinc-200">
+                  <div className="relative shrink-0">
+                    <div className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-[#0a0a0f]/60 text-[11px] font-semibold text-zinc-200">
                       {initials(detail.name)}
                     </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h2 className="truncate text-xs font-semibold text-zinc-100">
-                          {detail.name}
-                        </h2>
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full border px-2 py-0.2 text-[10px] font-medium",
-                            statusMeta.tone,
-                          )}
-                        >
-                          <span className={cn("size-1.5 rounded-full", statusMeta.dot)} />
-                          <span>{t(statusMeta.labelKey)}</span>
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-mono text-zinc-500 truncate">
-                        {detail.contact_id}
-                        {latestSession?.workflow_name && ` · ${latestSession.workflow_name}`}
-                      </p>
-                    </div>
+                    <span
+                      className={cn(
+                        "absolute -right-0.5 -bottom-0.5 size-3 rounded-full ring-2 ring-[#0a0a0f]",
+                        statusMeta.dot,
+                      )}
+                    />
                   </div>
 
-                  {/* Takeover Actions */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="truncate text-[13px] font-semibold text-zinc-200">
+                        {detail.name}
+                      </h2>
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-px text-[9px] font-medium",
+                          statusMeta.tone,
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            statusMeta.dot,
+                          )}
+                        />
+                        {t(statusMeta.labelKey)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate font-mono text-[10px] text-zinc-500">
+                      {detail.contact_id}
+                      {latestSession?.workflow_name &&
+                        ` · ${latestSession.workflow_name}`}
+                    </p>
+                  </div>
+
                   {latestSession && latestSession.status !== "ended" && (
                     <button
                       type="button"
@@ -527,10 +549,10 @@ export default function Inbox() {
                       }
                       disabled={action !== null}
                       className={cn(
-                        "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors disabled:opacity-50",
+                        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors disabled:opacity-50",
                         latestStatus === "human"
-                          ? "border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-zinc-100"
-                          : "bg-teal-500/15 border border-teal-500/30 text-teal-300 hover:bg-teal-500/25",
+                          ? "border border-white/10 bg-[#0a0a0f]/40 text-zinc-300 hover:bg-white/[0.05]"
+                          : "border border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20",
                       )}
                     >
                       {action ? (
@@ -538,113 +560,120 @@ export default function Inbox() {
                       ) : (
                         <ShieldCheck className="size-3.5" />
                       )}
-                      <span>
-                        {latestStatus === "human"
-                          ? t("inbox.release")
-                          : t("inbox.takeover")}
-                      </span>
+                      {latestStatus === "human"
+                        ? t("inbox.release")
+                        : t("inbox.takeover")}
                     </button>
                   )}
                 </header>
 
-                {/* Notice & Error Alerts */}
+                {/* Alerts */}
                 {detailError && (
-                  <div className="border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+                  <div
+                    role="alert"
+                    className="border-b border-destructive/20 bg-destructive/5 px-4 py-2 text-xs text-destructive/80"
+                  >
                     {detailError}
                   </div>
                 )}
                 {notice && (
-                  <div className="border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-300">
+                  <div
+                    role="status"
+                    className="border-b border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-xs text-emerald-300/80"
+                  >
                     {notice}
                   </div>
                 )}
 
-                {/* Messages Body */}
-                <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-6">
-                  {detail.sessions.length === 0 ? (
-                    <div className="flex h-full min-h-52 flex-col items-center justify-center text-center">
-                      <Bot className="size-8 text-zinc-600 mb-2" />
-                      <p className="text-xs text-zinc-400">
-                        {t("inbox.noSessions")}
-                      </p>
-                    </div>
-                  ) : (
-                    detail.sessions.map((session) => (
-                      <SessionHistory
-                        key={session.id}
-                        session={session}
-                        latest={session.id === latestSession?.id}
-                      />
-                    ))
-                  )}
+                {/* Messages */}
+                <div className="relative min-h-0 flex-1 overflow-y-auto bg-[#0a0a0f]">
+                  <div className="relative w-full space-y-3 p-3 pb-1">
+                    {detail.sessions.length === 0 ? (
+                      <div className="flex h-full min-h-52 flex-col items-center justify-center text-center">
+                        <Bot className="mb-2 size-8 text-zinc-600" />
+                        <p className="text-xs text-zinc-500">
+                          {t("inbox.noSessions")}
+                        </p>
+                      </div>
+                    ) : (
+                      detail.sessions.map((session) => (
+                        <SessionHistory
+                          key={session.id}
+                          session={session}
+                          latest={session.id === latestSession?.id}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
 
-                {/* Bottom Reply Area */}
-                <div className="shrink-0 border-t border-white/10 bg-[#0e0f12] p-3">
-                  {latestStatus === "human" && latestSession ? (
-                    <form onSubmit={(event) => void submitReply(event)}>
-                      <div className="flex items-end gap-2">
-                        <Textarea
-                          value={reply}
-                          onChange={(event) => setReply(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" && !event.shiftKey) {
-                              event.preventDefault();
-                              event.currentTarget.form?.requestSubmit();
-                            }
-                          }}
-                          rows={1}
-                          maxLength={4000}
-                          placeholder={t("inbox.replyPlaceholder")}
-                          className="max-h-32 min-h-9 resize-none rounded-lg border-white/10 bg-[#08090b] text-xs text-zinc-200 placeholder:text-zinc-500"
-                          disabled={sending}
-                        />
-                        <button
-                          type="submit"
-                          disabled={!reply.trim() || sending}
-                          aria-label={t("inbox.sendReply")}
-                          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-teal-950 font-medium hover:bg-teal-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          {sending ? (
-                            <LoaderCircle className="size-4 animate-spin" />
+                {/* Composer */}
+                <div className="shrink-0 border-t border-white/5 bg-[#0a0a0f]/60 backdrop-blur-md p-3">
+                  <div className="w-full max-w-none px-1">
+                    {latestStatus === "human" && latestSession ? (
+                      <form onSubmit={(event) => void submitReply(event)}>
+                        <div className="flex items-end gap-2">
+                          <Textarea
+                            value={reply}
+                            onChange={(event) => setReply(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.shiftKey) {
+                                event.preventDefault();
+                                event.currentTarget.form?.requestSubmit();
+                              }
+                            }}
+                            rows={1}
+                            maxLength={4000}
+                            placeholder={t("inbox.replyPlaceholder")}
+                            className="max-h-32 min-h-9 resize-none rounded-xl border border-white/5 bg-[#0a0a0f]/40 text-[13px] text-zinc-200 placeholder:text-zinc-500"
+                            disabled={sending}
+                          />
+                          <button
+                            type="submit"
+                            disabled={!reply.trim() || sending}
+                            aria-label={t("inbox.sendReply")}
+                            className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0f4c81] text-white transition-colors hover:bg-[#0e4272] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {sending ? (
+                              <LoaderCircle className="size-4 animate-spin text-white" />
+                            ) : (
+                              <Send className="size-4" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+                          <span>{t("inbox.enterToSend")}</span>
+                        </p>
+                      </form>
+                    ) : latestSession ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-[#0a0a0f]/40 px-3 py-2.5 text-[11px] text-zinc-500">
+                        <span className="inline-flex items-center gap-2">
+                          {latestStatus === "active" ? (
+                            <>
+                              <Bot className="size-4 text-zinc-400" />
+                              <span>{t("inbox.aiHandling")}</span>
+                            </>
                           ) : (
-                            <Send className="size-4" />
+                            <>
+                              <ShieldCheck className="size-4 text-zinc-400" />
+                              <span>{t("inbox.endedHint")}</span>
+                            </>
                           )}
-                        </button>
-                      </div>
-                      <p className="mt-1.5 flex items-center gap-1 text-[11px] text-teal-400">
-                        <ShieldCheck className="size-3" />
-                        <span>{t("inbox.replyHint")} · Tekan Enter untuk kirim</span>
-                      </p>
-                    </form>
-                  ) : latestSession ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400">
-                      <span className="inline-flex items-center gap-2">
-                        {latestStatus === "active" ? (
-                          <>
-                            <Bot className="size-4 text-primary" />
-                            <span>{t("inbox.aiHandling")}</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShieldCheck className="size-4 text-zinc-500" />
-                            <span>{t("inbox.endedHint")}</span>
-                          </>
+                        </span>
+                        {latestStatus === "active" && (
+                          <button
+                            type="button"
+                            onClick={() => void changeTakeover("takeover")}
+                            disabled={action !== null}
+                            className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-teal-500/30 bg-teal-500/10 px-2.5 text-xs font-medium text-teal-300 transition-colors hover:bg-teal-500/20 disabled:opacity-50"
+                          >
+                            <ShieldCheck className="size-3.5" />
+                            {t("inbox.takeover")}
+                          </button>
                         )}
-                      </span>
-                      {latestStatus === "active" && (
-                        <button
-                          type="button"
-                          onClick={() => void changeTakeover("takeover")}
-                          disabled={action !== null}
-                          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-teal-500/30 bg-teal-500/10 px-2.5 text-xs font-medium text-teal-300 hover:bg-teal-500/20 transition-colors"
-                        >
-                          <ShieldCheck className="size-3.5" />
-                          <span>{t("inbox.takeover")}</span>
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </>
             )}
@@ -662,32 +691,34 @@ function SessionHistory({
   session: InboxSession;
   latest: boolean;
 }) {
-  const { language, t } = useI18n();
-  const locale = formatLocale(language);
+  const { t } = useI18n();
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[11px] text-zinc-400">
-        <span className="font-medium text-zinc-200">
-          Sesi #{session.id}
-          {latest ? " (Terbaru)" : ""}
-        </span>
-        <span className="text-zinc-600">·</span>
-        <span className="truncate">{session.workflow_name || "Workflow"}</span>
-        <span className="text-zinc-600">·</span>
-        <span>
-          {session.started_at
-            ? dayLabel(session.started_at, locale, t("inbox.dayUnknown"))
-            : "—"}
-        </span>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[10px] font-medium text-zinc-500">
+            {t("inbox.sessionLabel", { id: session.id })}
+          </span>
+          {latest && (
+            <span className="shrink-0 rounded-full border border-primary/20 bg-primary/5 px-1.5 py-px text-[9px] font-medium text-primary/60">
+              {t("inbox.latest")}
+            </span>
+          )}
+        </div>
+        {session.workflow_name && (
+          <span className="shrink-0 rounded-full border border-white/5 bg-[#0a0a0f]/40 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+            {session.workflow_name}
+          </span>
+        )}
       </div>
 
       {session.messages.length === 0 ? (
-        <p className="px-3 text-xs text-zinc-500">
+        <p className="px-3 text-xs text-muted-foreground">
           {t("inbox.noSessionMessages")}
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {session.messages.map((message, index) => {
             const previous = session.messages[index - 1];
             const showDay =
@@ -699,7 +730,7 @@ function SessionHistory({
                 <div key={message.id}>
                   {showDay && <DayLabel value={message.created_at} />}
                   <div className="flex justify-center">
-                    <p className="max-w-[85%] rounded-full border border-teal-500/25 bg-teal-500/[0.05] px-3 py-1 text-center text-[11px] text-teal-300">
+                    <p className="max-w-[80%] rounded-full border border-white/5 bg-[#0a0a0f]/40 px-3 py-1 text-center text-[10px] text-zinc-500 uppercase tracking-tighter">
                       {message.content}
                     </p>
                   </div>
@@ -725,58 +756,36 @@ function DayLabel({ value }: { value: string | null }) {
   const locale = formatLocale(language);
 
   return (
-    <p className="my-2 text-center text-[10px] font-medium tracking-wide text-zinc-500 uppercase">
-      {dayLabel(value, locale, t("inbox.dayUnknown"))}
+    <p className="my-4 flex justify-center">
+      <span className="rounded-full border border-white/5 bg-[#0a0a0f]/50 px-2 py-0.5 text-[10px] font-medium text-zinc-500 uppercase tracking-tighter">
+        {dayLabel(value, locale, t("inbox.dayUnknown"))}
+      </span>
     </p>
   );
 }
 
 function MessageBubble({ message }: { message: InboxMessage }) {
-  const { language, t } = useI18n();
+  const { language } = useI18n();
   const locale = formatLocale(language);
   const isCustomer = message.role === "customer";
   const isAdmin = message.role === "admin";
-  const Icon = isAdmin ? ShieldCheck : isCustomer ? User : Bot;
 
   return (
-    <div
-      className={cn(
-        "flex items-end gap-2",
-        isCustomer ? "flex-row-reverse" : "",
-      )}
-    >
+    <div className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : ""}`}>
       <div
         className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-full border text-xs",
+          "max-w-[70%] rounded-xl px-3 py-2 text-[12.5px] leading-5 break-words whitespace-pre-wrap",
           isAdmin
-            ? "border-teal-500/30 bg-teal-500/10 text-teal-300"
+            ? "rounded-tl-none rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-white/5 bg-[#161b26] text-zinc-200"
             : isCustomer
-              ? "border-white/10 bg-white/5 text-zinc-400"
-              : "border-primary/30 bg-primary/10 text-primary",
+              ? "rounded-tr-none rounded-tl-2xl rounded-br-2xl rounded-bl-2xl border border-white/10 bg-[#0f4c81] text-white"
+              : "rounded-tl-none rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-white/5 bg-[#161b26] text-zinc-200",
         )}
       >
-        <Icon className="size-3.5" />
-      </div>
-
-      <div
-        className={cn(
-          "max-w-[78%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed",
-          isAdmin
-            ? "rounded-br-sm border border-teal-500/30 bg-teal-500/10 text-teal-100"
-            : isCustomer
-              ? "rounded-br-sm border border-white/10 bg-white/[0.06] text-zinc-100"
-              : "rounded-bl-sm border border-primary/25 bg-primary/[0.08] text-zinc-100",
-        )}
-      >
-        {isAdmin && (
-          <p className="mb-0.5 text-[10px] font-semibold text-teal-300">
-            {t("inbox.admin")}
-          </p>
-        )}
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        {message.content}
         <p
           className={cn(
-            "mt-1 text-[10px] text-zinc-500",
+            "mt-1 text-[10px] text-muted-foreground",
             isCustomer || isAdmin ? "text-right" : "",
           )}
         >

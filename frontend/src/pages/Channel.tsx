@@ -5,9 +5,9 @@ import {
   ChatCircleDots,
   Check,
   Copy,
-  Globe,
   InstagramLogo,
   MessengerLogo,
+  PaperPlaneRight,
   PencilSimple,
   TelegramLogo,
   WhatsappLogo,
@@ -24,7 +24,6 @@ import {
 
 import orqivaMark from "@/assets/orqiva-mark.png";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -32,8 +31,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/dialog";import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -414,41 +412,26 @@ export default function Channel() {
     );
   }
 
-  return (
-    <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="w-full space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-              <Globe className="size-4" weight="duotone" />
-              {t("channel.eyebrow")}
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Channel
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {t("channel.subtitle")}
-            </p>
-          </div>
+  const entryWorkflowName =
+    entryWorkflows.find((workflow) => String(workflow.id) === workflowId)
+      ?.name ?? t("channel.noneSelected");
 
-          <span
-            className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
-              isActive
-                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-                : "border-amber-400/30 bg-amber-400/10 text-amber-300"
-            }`}
-          >
-            <span
-              className={`size-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-amber-400"}`}
-            />
-            {isActive ? t("channel.widgetActive") : t("channel.widgetInactive")}
-          </span>
+  return (
+    <section className="min-h-[calc(100vh-3rem)] bg-background">
+      <div className="w-full px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+        <div className="mb-4">
+          <h1 className="text-[1.5rem] leading-tight font-semibold tracking-[-0.02em] text-foreground">
+            Channel Connector
+          </h1>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Add and set the channels you want to connect to
+          </p>
         </div>
 
         {error && (
           <div
             role="alert"
-            className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           >
             <span>{error}</span>
             <Button
@@ -465,7 +448,7 @@ export default function Channel() {
         {notice && (
           <div
             role="status"
-            className="flex items-center justify-between gap-4 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"
+            className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"
           >
             <span className="inline-flex items-center gap-2">
               <Check className="size-4" />
@@ -483,216 +466,399 @@ export default function Channel() {
           </div>
         )}
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                {t("channel.catalogTitle")}
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {t("channel.catalogDescription")}
-              </p>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {t("channel.catalogCount", {
-                active: 1 + (telegram ? 1 : 0),
-                soon: 3,
-              })}
-            </span>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {CHANNEL_CATALOG.map((item) => {
-              const Icon = item.icon;
-              const isTelegram = item.id === "telegram";
-              const available = item.active || isTelegram;
-              const connected = isTelegram ? telegram !== null : true;
-              const cardActive = isTelegram ? Boolean(telegram?.is_active) : isActive;
-              const badgeLabel = !available
-                ? t("channel.cardComingSoon")
-                : !connected
-                  ? t("channel.cardNotConnected")
-                  : cardActive
-                    ? t("channel.cardActive")
-                    : t("channel.cardInactive");
-
-              return (
-                <div
-                  key={item.id}
-                  className={`relative flex min-h-52 flex-col rounded-xl border p-4 transition ${
-                    available
-                      ? "border-primary/30 bg-[linear-gradient(145deg,rgba(59,130,246,0.10),rgba(15,23,42,0.18))] shadow-lg shadow-black/10"
-                      : "border-border bg-card/60"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span
-                      className={`flex size-11 items-center justify-center rounded-xl border ${item.tile}`}
-                    >
-                      <Icon size={24} weight="fill" />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,390px)] 2xl:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="min-w-0 space-y-4">
+            {/* Featured widget */}
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset]">
+              <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(300px,350px)] 2xl:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
+                <div className="flex flex-col p-5 sm:p-6">
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
+                      <ChatCircleDots size={22} weight="fill" />
                     </span>
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold text-foreground">
+                        {t("channel.widgetName")}
+                      </h2>
+                      <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                        {t("channel.widgetDescription")}
+                      </p>
+                    </div>
                     <span
-                      className={`rounded-full border px-2 py-1 text-[10px] font-medium ${
-                        !available
-                          ? "border-border bg-muted/40 text-muted-foreground"
-                          : cardActive
-                            ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
-                            : "border-amber-400/25 bg-amber-400/10 text-amber-300"
+                      className={`ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                        isActive
+                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                          : "border-amber-400/30 bg-amber-400/10 text-amber-300"
                       }`}
                     >
-                      {badgeLabel}
+                      <span
+                        className={`size-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-amber-400"}`}
+                      />
+                      {isActive
+                        ? t("channel.widgetActive")
+                        : t("channel.widgetInactive")}
                     </span>
                   </div>
 
-                  <div className="mt-4 min-h-0 flex-1">
-                    <h3 className="text-sm font-semibold text-foreground">
-                      {t(item.nameKey)}
-                    </h3>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {t(item.descriptionKey)}
-                    </p>
-                  </div>
-
-                  {isTelegram ? (
-                    <Button
-                      type="button"
-                      variant={telegram ? "outline" : "default"}
-                      size="sm"
-                      className="mt-4 w-full"
-                      onClick={openTelegram}
-                    >
-                      <TelegramLogo size={15} weight="bold" />
-                      {telegram
-                        ? t("channel.telegramManage")
-                        : t("channel.telegramConnect")}
-                    </Button>
-                  ) : item.active ? (
-                    <div className="mt-4 flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-sm"
-                        title={t("channel.editWidgetTitle")}
-                        aria-label={t("channel.editWidgetTitle")}
-                        onClick={openEditor}
+                  <dl className="mt-5 grid gap-2 sm:grid-cols-2">
+                    <div className="min-w-0 rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
+                      <dt className="text-[10.5px] tracking-[0.06em] text-muted-foreground">
+                        {t("channel.workflowLabel")}
+                      </dt>
+                      <dd
+                        className="mt-1 truncate text-[12.5px] font-medium text-foreground"
+                        title={entryWorkflowName}
                       >
-                        <PencilSimple size={15} weight="bold" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-sm"
-                        title={t("channel.openWidgetTitle")}
-                        aria-label={t("channel.openWidgetTitle")}
-                        onClick={() =>
-                          window.open(widgetUrl, "_blank", "noopener,noreferrer")
-                        }
-                        disabled={!widgetUrl}
-                      >
-                        <ArrowSquareOut size={15} weight="bold" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-sm"
-                        title={t("channel.regenerateTitle")}
-                        aria-label={t("channel.regenerateTitle")}
-                        onClick={() => void regenerate()}
-                        disabled={regenerating}
-                      >
-                        <ArrowsClockwise
-                          size={15}
-                          weight="bold"
-                          className={regenerating ? "animate-spin" : undefined}
-                        />
-                      </Button>
+                        {entryWorkflowName}
+                      </dd>
                     </div>
-                  ) : (
+                    <div className="min-w-0 rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
+                      <dt className="text-[10.5px] tracking-[0.06em] text-muted-foreground">
+                        {t("channel.openModeTitle")}
+                      </dt>
+                      <dd className="mt-1 truncate text-[12.5px] font-medium text-foreground">
+                        {openMode === "always"
+                          ? t("channel.openModeAlways")
+                          : t("channel.openModeManual")}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                    <Button type="button" size="sm" onClick={openEditor}>
+                      <PencilSimple size={15} weight="bold" />
+                      {t("channel.editWidgetTitle")}
+                    </Button>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      disabled
-                      className="mt-4 w-full"
+                      onClick={() =>
+                        window.open(widgetUrl, "_blank", "noopener,noreferrer")
+                      }
+                      disabled={!widgetUrl}
                     >
-                      {t("channel.cardComingSoon")}
+                      <ArrowSquareOut size={15} weight="bold" />
+                      {t("channel.openWidgetTitle")}
                     </Button>
-                  )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void regenerate()}
+                      disabled={regenerating}
+                    >
+                      <ArrowsClockwise
+                        size={15}
+                        weight="bold"
+                        className={regenerating ? "animate-spin" : undefined}
+                      />
+                      {t("channel.regenerateTitle")}
+                    </Button>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <Card className="gap-0 py-0">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">
-                {t("channel.linkTitle")}
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {t("channel.linkDescription")}
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3">
-                <p className="break-all font-mono text-xs leading-5 text-muted-foreground">
-                  {widgetUrl || t("channel.tokenUnavailable")}
-                </p>
+                {/* Live widget preview */}
+                <div className="relative overflow-hidden border-t border-border bg-[#0b0c11] md:border-t-0 md:border-l">
+                  <div className="tg-chat-wallpaper pointer-events-none absolute inset-0 opacity-70" />
+                  <div className="relative flex h-full min-h-[320px] flex-col items-center justify-center gap-3 p-5 2xl:min-h-[380px]">
+                    <div
+                      className="w-full max-w-[290px] overflow-hidden rounded-2xl border border-white/10 shadow-[0_24px_70px_-24px_rgba(0,0,0,0.9)] 2xl:max-w-[320px]"
+                      style={{ backgroundColor: appearance.background_color }}
+                    >
+                      <div
+                        className="flex items-center gap-2.5 px-3.5 py-3"
+                        style={{ backgroundColor: appearance.header_color }}
+                      >
+                        <img
+                          src={icons.chat || orqivaMark}
+                          alt=""
+                          className="size-8 rounded-full object-cover"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-[11.5px] font-semibold text-white">
+                            {name || t("channel.namePlaceholder")}
+                          </p>
+                          <p className="flex items-center gap-1 text-[9.5px] text-white/55">
+                            <span
+                              className="size-1.5 rounded-full"
+                              style={{
+                                backgroundColor: isActive
+                                  ? "#34d399"
+                                  : "#f59e0b",
+                              }}
+                            />
+                            {isActive
+                              ? t("public.online")
+                              : t("channel.widgetOffline")}
+                          </p>
+                        </div>
+                        <span
+                          className="ml-auto text-sm leading-none text-white/40"
+                          aria-hidden="true"
+                        >
+                          &#8943;
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 px-3 py-3">
+                        {welcome.trim() && (
+                          <div className="max-w-[82%] rounded-xl rounded-tl-sm bg-white/10 px-2.5 py-1.5 text-[10px] leading-4 text-white/85 backdrop-blur">
+                            {welcome.trim()}
+                          </div>
+                        )}
+                        <div
+                          className="max-w-[78%] rounded-xl rounded-tl-sm px-2.5 py-1.5 text-[10px] leading-4 text-white/85"
+                          style={{ backgroundColor: "#182533" }}
+                        >
+                          {t("channel.previewIncoming")}
+                        </div>
+                        <div
+                          className="ml-auto max-w-[78%] rounded-xl rounded-tr-sm px-2.5 py-1.5 text-[10px] leading-4 text-white/90"
+                          style={{ backgroundColor: appearance.outgoing_color }}
+                        >
+                          {t("channel.previewOutgoing")}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 px-3 pb-3">
+                        <div className="min-w-0 flex-1 truncate rounded-full bg-black/25 px-3 py-1.5 text-[10px] text-white/40">
+                          {placeholder.trim() ||
+                            t("channel.placeholderPlaceholder")}
+                        </div>
+                        <span
+                          className="flex size-7 shrink-0 items-center justify-center rounded-full text-white"
+                          style={{ backgroundColor: appearance.accent_color }}
+                        >
+                          <PaperPlaneRight size={13} weight="fill" />
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground/70">
+                      {t("channel.previewTitle")}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void copyWidgetUrl()}
-                disabled={!widgetUrl}
-                className="shrink-0"
-              >
-                {copied ? <Check /> : <Copy />}
-                {copied ? t("channel.copiedUrl") : t("channel.copyUrl")}
-              </Button>
             </div>
-          </Card>
 
-          <Card className="border-primary/20 bg-primary/[0.04] p-5">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <ShieldCheck className="size-4 text-primary" />
-              {t("channel.crossTitle")}
+            {/* Install */}
+            <h2 className="px-1 text-sm font-semibold text-foreground">
+              {t("channel.installTitle")}
+            </h2>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+                <h2 className="text-sm font-semibold text-foreground">
+                  {t("channel.linkTitle")}
+                </h2>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                  {t("channel.linkDescription")}
+                </p>
+                <div className="mt-3 rounded-lg border border-border bg-background/60 p-3">
+                  <p className="font-mono text-[11px] leading-5 break-all text-muted-foreground">
+                    {widgetUrl || t("channel.tokenUnavailable")}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 w-full"
+                  onClick={() => void copyWidgetUrl()}
+                  disabled={!widgetUrl}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied ? t("channel.copiedUrl") : t("channel.copyUrl")}
+                </Button>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+                <h2 className="text-sm font-semibold text-foreground">
+                  {t("channel.widgetSnippet")}
+                </h2>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                  {t("channel.widgetSnippetDescription")}
+                </p>
+                <pre className="mt-3 max-h-[92px] overflow-auto rounded-lg border border-border bg-background/60 p-3 font-mono text-[10.5px] leading-5 text-muted-foreground">
+                  <code>
+                    {widgetSnippet || t("channel.tokenUnavailable")}
+                  </code>
+                </pre>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 w-full"
+                  onClick={() => void copyWidgetSnippet()}
+                  disabled={!widgetSnippet}
+                >
+                  {snippetCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {snippetCopied
+                    ? t("channel.snippetCopied")
+                    : t("channel.copySnippet")}
+                </Button>
+              </div>
             </div>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              {t("channel.crossDescription")}
-            </p>
-          </Card>
-        </div>
+          </div>
 
-        <Card className="gap-0 py-0">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                {t("channel.widgetSnippet")}
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {t("channel.widgetSnippetDescription")}
+          {/* Channel catalog rail */}
+          <div className="min-w-0 space-y-4">
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-end justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-foreground">
+                    {t("channel.catalogTitle")}
+                  </h2>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                    {t("channel.catalogDescription")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {CHANNEL_CATALOG.map((item) => {
+                  const Icon = item.icon;
+                  const isTelegram = item.id === "telegram";
+                  const available = item.active || isTelegram;
+                  const connected = isTelegram ? telegram !== null : true;
+                  const cardActive = isTelegram
+                    ? Boolean(telegram?.is_active)
+                    : isActive;
+                  const badgeLabel = !available
+                    ? t("channel.cardComingSoon")
+                    : !connected
+                      ? t("channel.cardNotConnected")
+                      : cardActive
+                        ? t("channel.cardActive")
+                        : t("channel.cardInactive");
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-3 rounded-xl border p-3 transition ${
+                        available
+                          ? "border-border/80 bg-background/40 hover:border-primary/25"
+                          : "border-border/60 bg-card/30"
+                      }`}
+                    >
+                      <span
+                        className={`flex size-9 shrink-0 items-center justify-center rounded-lg border ${item.tile}`}
+                      >
+                        <Icon size={18} weight="fill" />
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p
+                            className={`truncate text-[12.5px] font-medium ${
+                              available
+                                ? "text-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {t(item.nameKey)}
+                          </p>
+                          <span
+                            className={`rounded-full border px-1.5 py-px text-[9.5px] font-medium ${
+                              !available
+                                ? "border-border bg-muted/30 text-muted-foreground"
+                                : cardActive
+                                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
+                                  : "border-amber-400/25 bg-amber-400/10 text-amber-300"
+                            }`}
+                          >
+                            {badgeLabel}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+                          {t(item.descriptionKey)}
+                        </p>
+
+                        <div className="mt-2">
+                          {isTelegram ? (
+                            <Button
+                              type="button"
+                              variant={telegram ? "outline" : "default"}
+                              size="sm"
+                              className="h-7 w-full text-[11px]"
+                              onClick={openTelegram}
+                            >
+                              <TelegramLogo size={13} weight="bold" />
+                              {telegram
+                                ? t("channel.telegramManage")
+                                : t("channel.telegramConnect")}
+                            </Button>
+                          ) : item.active ? (
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-[11px]"
+                                onClick={openEditor}
+                              >
+                                <PencilSimple size={12} weight="bold" />
+                                {t("channel.editWidgetTitle")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                title={t("channel.openWidgetTitle")}
+                                aria-label={t("channel.openWidgetTitle")}
+                                onClick={() =>
+                                  window.open(
+                                    widgetUrl,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  )
+                                }
+                                disabled={!widgetUrl}
+                              >
+                                <ArrowSquareOut size={13} weight="bold" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                title={t("channel.regenerateTitle")}
+                                aria-label={t("channel.regenerateTitle")}
+                                onClick={() => void regenerate()}
+                                disabled={regenerating}
+                              >
+                                <ArrowsClockwise
+                                  size={13}
+                                  weight="bold"
+                                  className={
+                                    regenerating ? "animate-spin" : undefined
+                                  }
+                                />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground/60">
+                              {t("channel.cardComingSoon")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-primary/20 bg-primary/[0.05] p-4">
+              <div className="flex items-center gap-2 text-[12.5px] font-medium text-foreground">
+                <ShieldCheck size={15} className="text-primary" />
+                {t("channel.crossTitle")}
+              </div>
+              <p className="mt-1.5 text-[11.5px] leading-5 text-muted-foreground">
+                {t("channel.crossDescription")}
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void copyWidgetSnippet()}
-              disabled={!widgetSnippet}
-            >
-              {snippetCopied ? <Check /> : <Copy />}
-              {snippetCopied
-                ? t("channel.snippetCopied")
-                : t("channel.copySnippet")}
-            </Button>
           </div>
-          <div className="p-5">
-            <pre className="overflow-x-auto rounded-lg border border-border bg-background p-4 font-mono text-xs leading-6 text-muted-foreground">
-              <code>{widgetSnippet || t("channel.tokenUnavailable")}</code>
-            </pre>
-          </div>
-        </Card>
+        </div>
       </div>
 
       <Dialog open={editing} onOpenChange={setEditing}>

@@ -19,7 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import PreferenceControls from "@/components/preferences/PreferenceControls";
 import OrqivaLogo from "@/components/brand/OrqivaLogo";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -48,6 +47,7 @@ interface HeaderProps {
   onLogout: () => void;
   onNavigate: (key: NavKey) => void;
   onToggleSidebar: () => void;
+  showSidebarToggle?: boolean;
   user: HeaderUser | null;
 }
 
@@ -84,6 +84,7 @@ export default function Header({
   onLogout,
   onNavigate,
   onToggleSidebar,
+  showSidebarToggle = true,
   user,
 }: HeaderProps) {
   const { t } = useI18n();
@@ -97,16 +98,18 @@ export default function Header({
 
   return (
     <header
-      className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-white/[0.06] bg-[#090a0c]/80 px-2.5 backdrop-blur-md sm:px-4"
+      className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-white/[0.10] bg-[#090a0c]/80 px-2.5 backdrop-blur-md sm:px-4"
     >
-      <button
-        type="button"
-        onClick={onToggleSidebar}
-        aria-label={t("side.openMenu")}
-        className="flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-200 lg:hidden"
-      >
-        <Menu size={18} strokeWidth={1.5} />
-      </button>
+      {showSidebarToggle && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label={t("side.openMenu")}
+          className="flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-200 lg:hidden"
+        >
+          <Menu size={18} strokeWidth={1.5} />
+        </button>
+      )}
 
       <a
         href="/"
@@ -146,8 +149,6 @@ export default function Header({
       </nav>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        <PreferenceControls className="hidden sm:flex" />
-
         <button
           type="button"
           onClick={() => onNavigate("inbox")}

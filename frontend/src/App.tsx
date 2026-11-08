@@ -235,6 +235,7 @@ export default function App() {
       health={health}
       user={user}
       loggingOut={loggingOut}
+      hideSidebar={activeNav === "channel" || activeNav === "inbox" || activeNav === "dashboard"}
       onLogout={() => void handleLogout()}
       onDashboardClick={() => navigate("/dashboard")}
       onWorkflowsClick={() => navigate("/workflows")}

@@ -17,6 +17,7 @@ interface DashboardLayoutProps {
   onAiProvidersClick: () => void;
   onHelpClick: () => void;
   onSettingsClick: () => void;
+  hideSidebar?: boolean;
   children: ReactNode;
 }
 
@@ -34,6 +35,7 @@ export default function DashboardLayout({
   onAiProvidersClick,
   onHelpClick,
   onSettingsClick,
+  hideSidebar = false,
   children,
 }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -63,18 +65,21 @@ export default function DashboardLayout({
         onLogout={onLogout}
         onNavigate={navigate}
         onToggleSidebar={() => setMobileOpen((open) => !open)}
+        showSidebarToggle={!hideSidebar}
       />
 
       <div className="flex min-h-[calc(100vh-3rem)]">
-        <div className="sticky top-12 hidden h-[calc(100vh-3rem)] w-[208px] shrink-0 border-r border-white/[0.06] lg:block">
-          <Sidebar
-            health={health}
-            activeNav={activeNav}
-            onNavigate={navigate}
-          />
-        </div>
+        {!hideSidebar && (
+          <div className="sticky top-12 hidden h-[calc(100vh-3rem)] w-[208px] shrink-0 border-r border-white/[0.06] lg:block">
+            <Sidebar
+              health={health}
+              activeNav={activeNav}
+              onNavigate={navigate}
+            />
+          </div>
+        )}
 
-        {mobileOpen && (
+        {!hideSidebar && mobileOpen && (
           <>
             <button
               type="button"

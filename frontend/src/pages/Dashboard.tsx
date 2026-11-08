@@ -154,15 +154,10 @@ const STATUS_META: Record<
 };
 
 const NUMBER_FORMATS: Record<Language, Intl.NumberFormat> = {
-  id: new Intl.NumberFormat("id-ID"),
   en: new Intl.NumberFormat("en-US"),
 };
 
 const COMPACT_FORMATS: Record<Language, Intl.NumberFormat> = {
-  id: new Intl.NumberFormat("id-ID", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }),
   en: new Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: 1,
@@ -170,10 +165,6 @@ const COMPACT_FORMATS: Record<Language, Intl.NumberFormat> = {
 };
 
 const DATE_FORMATS: Record<Language, Intl.DateTimeFormat> = {
-  id: new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }),
   en: new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -312,8 +303,8 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
       : 0;
 
   return (
-    <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="w-full space-y-6">
+    <section className="min-h-[calc(100vh-3rem)] bg-background">
+      <div className="w-full px-4 py-5 sm:px-6 lg:px-8 lg:py-6 space-y-6">
         {/* Heading */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>

@@ -37,16 +37,10 @@ const DEFAULT_APPEARANCE = {
 };
 
 const TIME_FORMATS: Record<Language, Intl.DateTimeFormat> = {
-  id: new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }),
   en: new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit" }),
 };
 
 const DATE_FORMATS: Record<Language, Intl.DateTimeFormat> = {
-  id: new Intl.DateTimeFormat("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }),
   en: new Intl.DateTimeFormat("en-US", {
     day: "numeric",
     month: "long",

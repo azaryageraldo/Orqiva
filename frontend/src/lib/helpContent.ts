@@ -1,6 +1,4 @@
-import type { Language } from "./i18n";
-
-export type Localized = Record<Language, string>;
+export type Localized = { id?: string; en: string };
 
 export type HelpBlock = {
   title?: Localized;

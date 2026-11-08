@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 
 import OrqivaLogo from "./components/brand/OrqivaLogo";
-import PreferenceControls from "./components/preferences/PreferenceControls";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
@@ -100,10 +99,6 @@ export default function Login({ onLogin }: Props) {
         aria-hidden="true"
         className="login-grid pointer-events-none absolute inset-0"
       />
-
-      <div className="absolute top-4 right-4 z-20">
-        <PreferenceControls />
-      </div>
 
       <div className="relative z-10 w-full max-w-[400px]">
         <div className="mb-8 flex flex-col items-center text-center">
