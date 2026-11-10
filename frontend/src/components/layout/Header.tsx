@@ -20,6 +20,7 @@ import {
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import OrqivaLogo from "@/components/brand/OrqivaLogo";
+import { formatAbsoluteTime, formatRelativeTime } from "@/lib/date";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { NavKey } from "./Sidebar";
@@ -101,14 +102,45 @@ function initialsOf(name: string): string {
   );
 }
 
-const NOTIFICATION_CONFIG: Record<string, { icon: React.ElementType; color: string }> = {
-  "workflow.created": { icon: Plus, color: "text-emerald-400" },
-  "workflow.error": { icon: ShieldAlert, color: "text-destructive" },
-  "api.key.added": { icon: KeyRound, color: "text-primary" },
-  "api.key.edited": { icon: KeyRound, color: "text-teal-400" },
-  "profile.updated": { icon: User, color: "text-violet-400" },
-  "login": { icon: User, color: "text-amber-400" },
-  "message.received": { icon: Bot, color: "text-blue-400" },
+const NOTIFICATION_CONFIG: Record<
+  string,
+  { icon: React.ElementType; chip: string; iconColor: string }
+> = {
+  "workflow.created": {
+    icon: Plus,
+    chip: "bg-emerald-500/10",
+    iconColor: "text-emerald-400",
+  },
+  "workflow.error": {
+    icon: ShieldAlert,
+    chip: "bg-red-500/10",
+    iconColor: "text-red-400",
+  },
+  "api.key.added": {
+    icon: KeyRound,
+    chip: "bg-primary/10",
+    iconColor: "text-primary",
+  },
+  "api.key.edited": {
+    icon: KeyRound,
+    chip: "bg-teal-500/10",
+    iconColor: "text-teal-400",
+  },
+  "profile.updated": {
+    icon: User,
+    chip: "bg-violet-500/10",
+    iconColor: "text-violet-400",
+  },
+  login: {
+    icon: User,
+    chip: "bg-amber-500/10",
+    iconColor: "text-amber-400",
+  },
+  "message.received": {
+    icon: Bot,
+    chip: "bg-blue-500/10",
+    iconColor: "text-blue-400",
+  },
 };
 
 export default function Header({
@@ -126,9 +158,50 @@ export default function Header({
   const { t } = useI18n();
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const notificationsRef = React.useRef<HTMLDivElement>(null);
+  const userMenuRef = React.useRef<HTMLDivElement>(null);
 
   const displayName = user?.name || t("header.workspaceAdmin");
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Close the open popovers when clicking outside or pressing Escape.
+  React.useEffect(() => {
+    if (!notificationsOpen && !userMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+
+      if (
+        notificationsOpen &&
+        notificationsRef.current &&
+        !notificationsRef.current.contains(target)
+      ) {
+        setNotificationsOpen(false);
+      }
+
+      if (
+        userMenuOpen &&
+        userMenuRef.current &&
+        !userMenuRef.current.contains(target)
+      ) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setNotificationsOpen(false);
+      setUserMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [notificationsOpen, userMenuOpen]);
 
   return (
     <header
@@ -214,7 +287,7 @@ export default function Header({
           </button>
 
           {notificationsOpen && (
-            <div className="absolute z-[60] top-12 right-0 w-[320px] mt-1">
+            <div ref={notificationsRef} className="absolute z-[60] top-12 right-0 w-[320px] mt-1">
               <div className="border border-white/[0.08] bg-[#0a0b0f]/90 backdrop-blur-md shadow-xl rounded-xl p-3">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -239,13 +312,14 @@ export default function Header({
                             setNotificationsOpen(false);
                           }}
                           className={cn(
-                            "flex items-start gap-2.5 p-2 rounded-lg transition-colors",
-                            !item.read
-                              ? "bg-white/5"
-                              : "hover:bg-white/5",
+                            "flex items-start gap-2 p-2 rounded-lg transition-colors",
+                            !item.read ? "bg-white/5" : "hover:bg-white/5",
                           )}
                         >
-                          <div className="flex size-6 shrink-0 items-center justify-center rounded-md">
+                          <div className={cn(
+                            "flex size-6 shrink-0 items-center justify-center rounded-md",
+                            Config.chip,
+                          )}>
                             <Icon size={14} strokeWidth={1.5} />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -257,12 +331,12 @@ export default function Header({
                                 {item.description}
                               </p>
                             )}
-                            <p className="mt-1 text-[9px] text-zinc-500">
-                              {item.timestamp}
+                            <p className="mt-1 text-[9px] text-zinc-500" title={formatAbsoluteTime(item.timestamp)}>
+                              {formatRelativeTime(item.timestamp)}
                             </p>
                           </div>
                           {!item.read && (
-                            <span className="size-[6px] rounded-full bg-primary shrink-0" />
+                            <span className="size-[5px] rounded-full bg-primary shrink-0" />
                           )}
                         </button>
                       );
@@ -299,7 +373,7 @@ export default function Header({
           </button>
 
           {userMenuOpen && (
-            <div className="absolute z-[60] top-12 right-0 w-[60px] mt-1">
+            <div ref={userMenuRef} className="absolute z-[60] top-12 right-0 w-[60px] mt-1">
               <div className="border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl rounded-xl p-1">
                 <button
                   type="button"
