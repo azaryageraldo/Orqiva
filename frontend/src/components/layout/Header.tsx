@@ -288,7 +288,7 @@ export default function Header({
 
           {notificationsOpen && (
             <div ref={notificationsRef} className="absolute z-[60] top-12 right-0 w-[320px] mt-1">
-              <div className="border border-white/[0.08] bg-[#0a0b0f]/90 backdrop-blur-md shadow-xl rounded-xl p-3">
+              <div className="border border-white/[0.08] bg-[#0a0b0f]/97 shadow-xl rounded-xl p-3">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 text-center">
                     <Bell size={28} className="text-zinc-600 mb-2" />
@@ -323,9 +323,14 @@ export default function Header({
                             <Icon size={14} strokeWidth={1.5} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[12px] font-medium text-zinc-100 leading-tight">
-                              {item.title}
-                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[12px] font-medium text-zinc-100 leading-tight">
+                                {item.title}
+                              </p>
+                              {!item.read && (
+                                <span className="size-4 rounded-full bg-primary shrink-0" />
+                              )}
+                            </div>
                             {item.description && (
                               <p className="mt-0.5 text-[10px] text-zinc-500 leading-tight">
                                 {item.description}
@@ -335,9 +340,6 @@ export default function Header({
                               {formatRelativeTime(item.timestamp)}
                             </p>
                           </div>
-                          {!item.read && (
-                            <span className="size-[5px] rounded-full bg-primary shrink-0" />
-                          )}
                         </button>
                       );
                     })}
