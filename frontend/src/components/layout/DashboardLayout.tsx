@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import Sidebar, { type Health, type NavKey } from "./Sidebar";
-import Header, { type HeaderUser } from "./Header";
+import Header, { type HeaderUser, type NotificationItem } from "./Header";
 
 interface DashboardLayoutProps {
   health: Health;
@@ -18,6 +18,10 @@ interface DashboardLayoutProps {
   onHelpClick: () => void;
   onSettingsClick: () => void;
   hideSidebar?: boolean;
+  notifications: NotificationItem[];
+  onMarkAsRead: (id: string) => void;
+  onMarkAllAsRead: () => void;
+  onNotificationClick: (item: NotificationItem) => void;
   children: ReactNode;
 }
 
@@ -36,6 +40,10 @@ export default function DashboardLayout({
   onHelpClick,
   onSettingsClick,
   hideSidebar = false,
+  notifications,
+  onMarkAsRead,
+  onMarkAllAsRead,
+  onNotificationClick,
   children,
 }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -66,6 +74,10 @@ export default function DashboardLayout({
         onNavigate={navigate}
         onToggleSidebar={() => setMobileOpen((open) => !open)}
         showSidebarToggle={!hideSidebar}
+        notifications={notifications}
+        onMarkAsRead={onMarkAsRead}
+        onMarkAllAsRead={onMarkAllAsRead}
+        onNotificationClick={onNotificationClick}
       />
 
       <div className="flex min-h-[calc(100vh-3rem)]">

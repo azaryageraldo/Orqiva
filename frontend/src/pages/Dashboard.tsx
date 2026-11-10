@@ -1,33 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity as ActivityIcon,
   ArrowUpRight,
-  Bot,
-  BookOpen,
   CheckCircle2,
   CircleAlert,
   CircleDashed,
   Clock,
   Coins,
+  Download,
   Layers,
   LoaderCircle,
   Percent,
-  RefreshCw,
-  Send,
-  Sparkles,
   TrendingUp,
   Workflow as WorkflowIcon,
   XCircle,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { getAiSettings } from "../services/aiSettings";
+import { cn } from "@/lib/utils";
 import { useI18n, type Language } from "@/lib/i18n";
 import { getWorkflows } from "../services/workflow";
 import {
   getActivity,
   getTokenUsage,
+  type ActivityExecution,
   type ActivityStats,
   type ExecutionStatus,
   type TokenUsageBucket,
@@ -70,56 +71,6 @@ const PERIODS: Array<{ key: TokenUsagePeriod; labelKey: string }> = [
   { key: "daily", labelKey: "dashboard.period.daily" },
   { key: "monthly", labelKey: "dashboard.period.monthly" },
   { key: "yearly", labelKey: "dashboard.period.yearly" },
-];
-
-const OPENROUTER_FREE_COLLECTION =
-  "https://openrouter.ai/collections/free-models";
-const OPENROUTER_DOCS = "https://openrouter.ai/docs/quickstart";
-
-const FREE_MODELS: Array<{
-  name: string;
-  author: string;
-  context: string;
-  tag: string;
-}> = [
-  {
-    name: "Nemotron 3 Ultra",
-    author: "NVIDIA",
-    context: "1M",
-    tag: "Reasoning",
-  },
-  {
-    name: "Nemotron 3.5 Lightning",
-    author: "NVIDIA",
-    context: "1M",
-    tag: "Fast",
-  },
-  { name: "Laguna S 2.1", author: "Poolside", context: "262K", tag: "Coding" },
-  {
-    name: "Dots3-Note Preview",
-    author: "Dots Studio",
-    context: "512K",
-    tag: "Multimodal",
-  },
-  {
-    name: "Nemotron 3 Super",
-    author: "NVIDIA",
-    context: "262K",
-    tag: "Agentic",
-  },
-  {
-    name: "Nemotron 3.5 Super VL",
-    author: "NVIDIA",
-    context: "1M",
-    tag: "Vision",
-  },
-  {
-    name: "Inkling",
-    author: "Thinking Machines",
-    context: "1.05M",
-    tag: "Multimodal",
-  },
-  { name: "North Mini Code", author: "Cohere", context: "256K", tag: "Coding" },
 ];
 
 const STATUS_META: Record<
@@ -171,6 +122,115 @@ const DATE_FORMATS: Record<Language, Intl.DateTimeFormat> = {
   }),
 };
 
+// Estimated cost per 1M token (USD), based on market pricing
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  "gemini-1.5-pro": { input: 3.50, output: 10.50 },
+  "gemini-1.5-flash": { input: 0.075, output: 0.30 },
+  "gemini-2.5-flash": { input: 0.15, output: 0.60 },
+  "gemini-2.5-flash-lite": { input: 0.03, output: 0.06 },
+  "gpt-4o": { input: 2.50, output: 10.00 },
+  "gpt-4o-mini": { input: 0.15, output: 0.60 },
+  "gpt-3.5-turbo": { input: 0.50, output: 1.50 },
+  "claude-3-5-sonnet": { input: 3.00, output: 15.00 },
+  "claude-3-haiku": { input: 0.25, output: 1.25 },
+  default: { input: 1.00, output: 3.00 },
+};
+
+function getModelPricing(model: string | null) {
+  const key = model?.toLowerCase() ?? "";
+  for (const [name, pricing] of Object.entries(MODEL_PRICING)) {
+    if (key.includes(name)) return pricing;
+  }
+  return MODEL_PRICING.default;
+}
+
+function estimateCost(
+  _totalTokens: number,
+  promptTokens: number,
+  completionTokens: number,
+  model: string | null,
+): number {
+  if (!model) return 0;
+  const pricing = getModelPricing(model);
+  const inputCost = (promptTokens / 1_000_000) * pricing.input;
+  const outputCost = (completionTokens / 1_000_000) * pricing.output;
+  return inputCost + outputCost;
+}
+
+type WorkflowUsage = {
+  name: string;
+  id: number | null;
+  tokens: number;
+  executions: number;
+  errors: number;
+  avgDuration: number;
+};
+
+function computeWorkflowUsage(
+  executions: ActivityExecution[],
+): WorkflowUsage[] {
+  const map = new Map<number | null, WorkflowUsage>();
+
+  for (const ex of executions) {
+    const key = ex.workflow_id;
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, {
+        name: ex.workflow_name ?? `Workflow #${key ?? "?"}`,
+        id: key,
+        tokens: ex.total_tokens,
+        executions: 1,
+        errors: ex.status === "failed" ? 1 : 0,
+        avgDuration:
+          ex.started_at && ex.finished_at
+            ? new Date(ex.finished_at).getTime() -
+              new Date(ex.started_at).getTime()
+            : 0,
+      });
+    } else {
+      existing.tokens += ex.total_tokens;
+      existing.executions += 1;
+      if (ex.status === "failed") existing.errors += 1;
+      if (ex.started_at && ex.finished_at) {
+        existing.avgDuration +=
+          new Date(ex.finished_at).getTime() -
+          new Date(ex.started_at).getTime();
+      }
+    }
+  }
+
+  return Array.from(map.values()).map((item) => ({
+    ...item,
+    avgDuration: item.executions > 0 ? item.avgDuration / item.executions : 0,
+  }));
+}
+
+function computeActiveConversationsToday(
+  executions: ActivityExecution[],
+): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const activeContacts = new Set<string>();
+
+  for (const ex of executions) {
+    if (
+      ex.session_status === "active" &&
+      ex.contact_id &&
+      ex.started_at
+    ) {
+      const started = new Date(ex.started_at);
+      started.setHours(0, 0, 0, 0);
+      if (started.getTime() === today.getTime()) {
+        activeContacts.add(ex.contact_id);
+      }
+    }
+  }
+
+  return activeContacts.size;
+}
+
 function compactNumber(value: number, language: Language): string {
   return COMPACT_FORMATS[language].format(value);
 }
@@ -187,6 +247,22 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
   const [activity, setActivity] = useState<ActivityStats | null>(null);
   const [usage, setUsage] = useState<TokenUsageStats | null>(null);
   const [period, setPeriod] = useState<TokenUsagePeriod>("daily");
+  const [dateRange, setDateRange] = useState<{
+    from: Date | null;
+    to: Date | null;
+  } | null>(null);
+
+  const [aiSettings, setAiSettings] = useState<{
+    provider: string | null;
+    model: string | null;
+  } | null>(null);
+
+  const [conversations, setConversations] = useState<{
+    activeToday: number;
+    total: number;
+  }>({ activeToday: 0, total: 0 });
+
+  const dashboardRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [usageLoading, setUsageLoading] = useState(true);
@@ -195,8 +271,8 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
   useEffect(() => {
     let active = true;
 
-    Promise.allSettled([getWorkflows(), getActivity(8)])
-      .then(([workflowsResult, activityResult]) => {
+    Promise.allSettled([getWorkflows(), getActivity(8), getAiSettings()])
+      .then(([workflowsResult, activityResult, aiSettingsResult]) => {
         if (!active) return;
 
         if (workflowsResult.status === "fulfilled") {
@@ -207,6 +283,27 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
 
         if (activityResult.status === "fulfilled") {
           setActivity(activityResult.value);
+          const executions = activityResult.value.executions;
+          setConversations({
+            activeToday: computeActiveConversationsToday(executions),
+            total: executions.length,
+          });
+        }
+
+        if (aiSettingsResult.status === "fulfilled") {
+          const settings = aiSettingsResult.value;
+          const defaultProvider = (settings.providers as Array<{ configured: boolean; default_model: string | null; provider: string }>).find(
+            (p) => p.configured,
+          );
+          const defaultModel = defaultProvider
+            ? (settings.models as Array<{ id: string }>).find(
+                (m) => m.id === defaultProvider.default_model,
+              )
+            : null;
+          setAiSettings({
+            provider: defaultProvider?.provider ?? null,
+            model: defaultModel?.id ?? null,
+          });
         }
       })
       .finally(() => {
@@ -266,6 +363,11 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
 
     if (activityResult.status === "fulfilled") {
       setActivity(activityResult.value);
+      const executions = activityResult.value.executions;
+      setConversations({
+        activeToday: computeActiveConversationsToday(executions),
+        total: executions.length,
+      });
     }
 
     if (usageResult.status === "fulfilled") {
@@ -276,12 +378,38 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
     setUsageLoading(false);
   }
 
+  async function handleExportPDF() {
+    if (!dashboardRef.current) return;
+
+    const canvas = await html2canvas(dashboardRef.current, {
+      backgroundColor: "#090a0c",
+      scale: 2,
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+    const imgX = (pageWidth - imgWidth * ratio) / 2;
+    const imgY = (pageHeight - imgHeight * ratio) / 2;
+
+    pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+    pdf.save(`orqiva-dashboard-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   const stats = useMemo(() => {
-    const active = workflows.filter((item) => item.status === "active").length;
+    const activeWorkflows = workflows.filter((item) => item.status === "active");
+    const inactiveWorkflows = workflows.filter(
+      (item) => item.status !== "active",
+    );
     return {
       total: workflows.length,
-      active,
-      draft: workflows.length - active,
+      active: activeWorkflows.length,
+      inactive: inactiveWorkflows.length,
     };
   }, [workflows]);
 
@@ -302,45 +430,61 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
       ? Math.round(usage.totals.total_tokens / usage.totals.executions)
       : 0;
 
+  const estimatedCost = usage
+    ? estimateCost(
+        usage.totals.total_tokens,
+        usage.totals.prompt_tokens,
+        usage.totals.completion_tokens,
+        aiSettings?.model ?? null,
+      )
+    : 0;
+
+  const costLabel =
+    aiSettings?.model && estimatedCost > 0
+      ? `Estimated cost (${aiSettings.model})`
+      : t("dashboard.estimatedCost");
+
+  // Workflow usage ranking
+  const workflowUsage = useMemo(() => {
+    if (!activity?.executions) return [];
+    return computeWorkflowUsage(activity.executions)
+      .sort((a, b) => b.tokens - a.tokens)
+      .slice(0, 5);
+  }, [activity]);
+
+  // Cost projection for current month
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dailyCost = estimatedCost; // cost for current period
+  const costProjection = dailyCost * daysInMonth;
+
   return (
-    <section className="min-h-[calc(100vh-3rem)] bg-background">
+    <section ref={dashboardRef} className="min-h-[calc(100vh-3rem)] bg-background">
       <div className="w-full px-4 py-5 sm:px-6 lg:px-8 lg:py-6 space-y-6">
         {/* Heading */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-              <ActivityIcon className="size-4" />
-              {t("dashboard.eyebrow")}
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Dashboard
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="mt-0 text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
+              {t("dashboard.title")}
             </h1>
-            <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-              {t("dashboard.subtitle")}
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              label="Rentang tanggal"
+              className="max-w-[220px]"
+            />
             <Button
               type="button"
               variant="outline"
-              onClick={() => void reload()}
-              disabled={loading || usageLoading}
-              className="h-10 px-4"
+              onClick={handleExportPDF}
+              className="h-9 px-3.5"
             >
-              <RefreshCw className={loading ? "animate-spin" : undefined} />
-              {t("dashboard.refresh")}
+              <Download className="size-4" />
+              {t("dashboard.exportPDF")}
             </Button>
-            {onViewActivity && (
-              <Button
-                type="button"
-                onClick={onViewActivity}
-                className="h-10 px-4"
-              >
-                <ActivityIcon />
-                {t("dashboard.viewAudit")}
-              </Button>
-            )}
           </div>
         </div>
 
@@ -365,9 +509,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           </div>
         )}
 
-        <AutomationPipeline />
-
-        {/* Stat cards (terpisah) */}
+        {/* Stat cards */}
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard
             icon={WorkflowIcon}
@@ -394,7 +536,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           <StatCard
             icon={CircleDashed}
             label={t("dashboard.draft")}
-            value={stats.draft}
+            value={stats.inactive}
             caption={t("dashboard.reviewBeforeActive")}
             tone="amber"
             loading={loading}
@@ -402,7 +544,7 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
         </div>
 
         {/* KPI strip */}
-        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-px overflow-hidden rounded-xl border border-white/5 bg-border sm:grid-cols-2 lg:grid-cols-4">
           <MetricTile
             icon={Coins}
             label={t("dashboard.totalTokens")}
@@ -439,17 +581,137 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             })}
             loading={loading}
           />
+          <MetricTile
+            icon={Coins}
+            label={costLabel}
+            value={estimatedCost > 0 ? `$${estimatedCost.toFixed(4)}` : "—"}
+            hint={t("dashboard.costHint")}
+            loading={usageLoading}
+          />
+          <MetricTile
+            icon={ActivityIcon}
+            label={t("dashboard.activeConversations")}
+            value={String(conversations.activeToday)}
+            hint={t("dashboard.activeConversationsHint")}
+            loading={loading}
+          />
+          <MetricTile
+            icon={TrendingUp}
+            label={t("dashboard.costProjection")}
+            value={`$${costProjection.toFixed(2)}`}
+            hint={t("dashboard.costProjectionHint")}
+            loading={loading}
+          />
+        </div>
+
+        {/* Top Workflows */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-xl border border-white/5 bg-card lg:col-span-2">
+            <div className="border-b border-white/5 p-5">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
+                  {t("dashboard.topWorkflows")}
+                </h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {t("dashboard.topWorkflowsHint")}
+                </p>
+              </div>
+            </div>
+            <div className="overflow-x-auto p-5">
+              <div className="space-y-3">
+                {workflowUsage.map((item) => {
+                  const maxTokens = Math.max(1, ...workflowUsage.map((w) => w.tokens));
+                  const barWidth = (item.tokens / maxTokens) * 100;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 px-2"
+                    >
+                      <div className="w-[100px] shrink-0">
+                        <p className="text-[11px] font-medium text-foreground truncate">
+                          {item.name}
+                        </p>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary"
+                              style={{ width: `${barWidth}%` }}
+                            />
+                          </div>
+                          <span className="w-[40px] shrink-0 text-[10px] font-medium text-right text-foreground">
+                            {compactNumber(item.tokens, language)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {workflowUsage.length === 0 && (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    {t("dashboard.noWorkflows")}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Model Distribution */}
+          <div className="rounded-xl border border-white/5 bg-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
+                {t("dashboard.modelDistribution")}
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                {aiSettings?.provider ?? t("dashboard.noModel")}
+              </p>
+            </div>
+            <div className="flex items-center justify-center">
+              <div className="relative size-48">
+                <svg viewBox="0 0 88 88" className="size-full">
+                  <circle
+                    cx="44"
+                    cy="44"
+                    r="36"
+                    fill="none"
+                    stroke="var(--border)"
+                    strokeWidth="8"
+                  />
+                  <circle
+                    cx="44"
+                    cy="44"
+                    r="36"
+                    fill="none"
+                    stroke="var(--primary)"
+                    strokeWidth="8"
+                    strokeDasharray="75"
+                    strokeDashoffset="25"
+                    className="text-primary"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xs font-semibold text-foreground">
+                    {aiSettings?.model ?? "—"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {aiSettings?.provider ?? "Tidak terhubung"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Charts */}
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-xl border border-border bg-card lg:col-span-2">
-            <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 border-b border-white/5 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-base font-semibold text-foreground">
+                <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                   {t("dashboard.tokenUsage")}
                 </h2>
-                <p className="mt-0.5 text-sm text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   {t("dashboard.tokenUsageDescription")}
                 </p>
               </div>
@@ -476,7 +738,9 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             <div className="p-5">
               <div className="mb-5 flex flex-wrap items-end gap-x-8 gap-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">{t("dashboard.totalTokens")}</p>
+                  <p className="text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                    {t("dashboard.totalTokens")}
+                  </p>
                   <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
                     {usageLoading
                       ? "—"
@@ -518,11 +782,11 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           </div>
 
           <div className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border p-5">
-              <h2 className="text-base font-semibold text-foreground">
+            <div className="border-b border-white/5 p-5">
+              <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                 {t("dashboard.executionResults")}
               </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {t("dashboard.executionResultsDescription")}
               </p>
             </div>
@@ -581,56 +845,60 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                 </p>
               </div>
             ) : (
-              <ul className="divide-y divide-border">
-                {activity.executions.map((execution) => {
-                  const meta = STATUS_META[execution.status];
-                  return (
-                    <li
-                      key={execution.id}
-                      className="flex items-center gap-4 px-5 py-3"
-                    >
-                      <span
-                        className={`size-2 shrink-0 rounded-full ${meta.dot}`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {execution.workflow_name ||
-                            t("dashboard.workflowFallback", {
-                              id: execution.workflow_id,
-                            })}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {t("dashboard.executionHash", {
-                            id: execution.id,
-                          })}{" "}
-                          · {formatDate(execution.started_at, language)}
-                        </p>
-                      </div>
-                      <span
-                        className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${meta.badge}`}
-                      >
-                        {t(meta.labelKey)}
-                      </span>
-                      <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground md:block">
-                        {execution.total_tokens > 0
-                          ? `${NUMBER_FORMATS[language].format(
-                              execution.total_tokens,
-                            )} token`
-                          : "—"}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="space-y-4">
+                {/* Daily executions bar chart */}
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase mb-3">
+                    {t("dashboard.dailyExecutions")}
+                  </p>
+                  <DailyExecutionsChart executions={activity.executions} />
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  <ul className="divide-y divide-border">
+                    {activity.executions.map((execution) => {
+                      const meta = STATUS_META[execution.status];
+                      return (
+                        <li
+                          key={execution.id}
+                          className="flex items-center gap-3 px-3 py-2"
+                        >
+                          <span
+                            className={`size-2 shrink-0 rounded-full ${meta.dot}`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11px] font-medium text-foreground">
+                              {execution.workflow_name ||
+                                t("dashboard.workflowFallback", {
+                                  id: execution.workflow_id,
+                                })}
+                            </p>
+                            <p className="truncate text-[10px] text-muted-foreground">
+                              {t("dashboard.executionHash", {
+                                id: execution.id,
+                              })}{" "}
+                              · {formatDate(execution.started_at, language)}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium ${meta.badge.replace("bg-", "bg-white/10")}`}
+                          >
+                            {t(meta.labelKey)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
             )}
           </div>
 
-          <div className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border p-5">
-              <h2 className="text-base font-semibold text-foreground">
+          <div className="rounded-xl border border-white/5 bg-card">
+            <div className="border-b border-white/5 p-5">
+              <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                 {t("dashboard.needsAttention")}
               </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {t("dashboard.attentionDescription")}
               </p>
             </div>
@@ -652,8 +920,8 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
               <AttentionRow
                 icon={CircleDashed}
                 tone="muted"
-                label={t("dashboard.draftWorkflows")}
-                value={stats.draft}
+                label={t("dashboard.inactiveWorkflows")}
+                value={stats.inactive}
                 hint={t("dashboard.notActivated")}
               />
               <AttentionRow
@@ -716,81 +984,6 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
           </div>
         </div>
 
-        {/* OpenRouter free models */}
-        <div className="rounded-xl border border-border bg-card">
-          <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                {t("dashboard.freeModels")}
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {t("dashboard.freeModelsDescription")}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                nativeButton={false}
-                render={
-                  <a
-                    href={OPENROUTER_DOCS}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
-                }
-              >
-                <BookOpen />
-                {t("dashboard.docs")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                nativeButton={false}
-                render={
-                  <a
-                    href={OPENROUTER_FREE_COLLECTION}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
-                }
-              >
-                {t("dashboard.freeCollection")}
-                <ArrowUpRight />
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
-            {FREE_MODELS.map((model) => (
-              <div key={model.name} className="bg-card p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {model.name}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {model.author}
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {model.context}
-                  </span>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                    {model.tag}
-                  </span>
-                  <span className="text-[11px] font-medium text-emerald-400">
-                    $0 / M
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   );
@@ -823,11 +1016,13 @@ function StatCard({
   const styles = TONE_STYLES[tone];
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5">
+    <div className="relative overflow-hidden rounded-xl border border-white/5 bg-card p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+          <p className="text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+            {label}
+          </p>
+          <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">
             {loading ? (
               <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
             ) : (
@@ -836,12 +1031,12 @@ function StatCard({
           </p>
         </div>
         <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${styles.icon}`}
+          className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${styles.icon}`}
         >
-          <Icon className="size-5" />
+          <Icon className="size-4.5" />
         </span>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">{caption}</p>
+      <p className="mt-3 text-[10px] text-muted-foreground">{caption}</p>
       <span className={`absolute inset-x-0 bottom-0 h-0.5 ${styles.bar}`} />
     </div>
   );
@@ -863,17 +1058,17 @@ function MetricTile({
   return (
     <div className="bg-card p-5">
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="size-4" />
-        <span className="text-sm">{label}</span>
+        <Icon className="size-3.5" />
+        <span className="text-[11px] font-medium">{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+      <p className="mt-2 text-xl font-semibold tracking-tight text-foreground">
         {loading ? (
           <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
         ) : (
           value
         )}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+      <p className="mt-1 text-[10px] text-muted-foreground">{hint}</p>
     </div>
   );
 }
@@ -899,15 +1094,15 @@ function AttentionRow({
   }[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-background/40 p-3">
+    <div className="flex items-center gap-2.5 rounded-lg border border-white/5 bg-background/40 p-3">
       <span
-        className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
+        className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
       >
-        <Icon className="size-4" />
+        <Icon className="size-3.5" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        <p className="truncate text-xs text-muted-foreground">{hint}</p>
+        <p className="text-[12px] font-medium text-foreground">{label}</p>
+        <p className="truncate text-[10px] text-muted-foreground">{hint}</p>
       </div>
       <span className="text-lg font-semibold text-foreground">{value}</span>
     </div>
@@ -926,100 +1121,65 @@ function SystemRow({
   text: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5">
-      <span className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className={`size-2 shrink-0 rounded-full ${dot}`} />
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/5 bg-background/40 px-3 py-2.5">
+      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span className={`size-1.5 shrink-0 rounded-full ${dot}`} />
         {label}
       </span>
-      <span className={`truncate text-sm font-medium ${text}`}>{value}</span>
+      <span className={`truncate text-[11px] font-medium ${text}`}>{value}</span>
     </div>
   );
 }
 
-function AutomationPipeline() {
-  const { t } = useI18n();
+function DailyExecutionsChart({ executions }: { executions: ActivityExecution[] }) {
+
+  // Compute daily counts for last 7 days
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const dailyCounts: { date: Date; count: number }[] = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const count = executions.filter((ex) => {
+      if (!ex.started_at) return false;
+      const exDate = new Date(ex.started_at);
+      exDate.setHours(0, 0, 0, 0);
+      return exDate.getTime() === d.getTime();
+    }).length;
+    dailyCounts.push({ date: d, count });
+  }
+
+  const maxCount = Math.max(1, ...dailyCounts.map((d) => d.count));
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8">
-      <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-[30rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
-
-      <div className="relative">
-        <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-          <Sparkles className="size-4 text-primary" />
-          {t("dashboard.pipelineTitle")}
-        </div>
-
-        <div className="mt-6 overflow-x-auto pb-1">
-          <div className="flex min-w-[520px] items-center gap-4">
-            <PipelineNode
-              icon={Zap}
-              label={t("dashboard.pipelineTrigger")}
-              hint={t("dashboard.pipelineIncoming")}
+    <div className="h-48 flex items-end gap-1">
+      {dailyCounts.map((day) => {
+        const barHeight = (day.count / maxCount) * 100;
+        const isToday = day.date.getTime() === now.getTime();
+        return (
+          <div
+            key={day.date.getTime()}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div
+              className={cn(
+                "w-full rounded-t-md transition-all duration-300",
+                isToday ? "bg-primary" : "bg-white/5",
+              )}
+              style={{ height: `${barHeight}%` }}
             />
-            <PipelineConnector />
-            <PipelineNode
-              icon={Bot}
-              label={t("dashboard.pipelineAI")}
-              hint={t("dashboard.pipelineAIHint")}
-              active
-            />
-            <PipelineConnector />
-            <PipelineNode
-              icon={Send}
-              label={t("dashboard.pipelineSend")}
-              hint={t("dashboard.pipelineReply")}
-            />
+            <span className="text-[9px] text-muted-foreground">
+              {day.date.getDate()}
+            </span>
+            <span className="text-[10px] font-medium text-foreground">
+              {day.count}
+            </span>
           </div>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
-}
-
-function PipelineNode({
-  icon: Icon,
-  label,
-  hint,
-  active,
-}: {
-  icon: LucideIcon;
-  label: string;
-  hint: string;
-  active?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-        active
-          ? "border-primary/40 bg-primary/[0.06] shadow-[0_0_35px_-12px_var(--primary)]"
-          : "border-border bg-background/60"
-      }`}
-    >
-      <span className="relative flex size-10 shrink-0 items-center justify-center">
-        <span
-          className={`relative flex size-10 items-center justify-center rounded-lg ${
-            active
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          <Icon className="size-[18px]" />
-        </span>
-      </span>
-      <span className="pr-1">
-        <span className="block text-sm font-semibold text-foreground">
-          {label}
-        </span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">
-          {hint}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function PipelineConnector() {
-  return <div className="h-0.5 min-w-10 flex-1 rounded-full bg-border" />;
 }
 
 function Legend({
@@ -1037,11 +1197,11 @@ function Legend({
 
   return (
     <div>
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className={`size-2 rounded-full ${color}`} />
+      <p className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <span className={`size-1.5 rounded-full ${color}`} />
         {label}
       </p>
-      <p className="mt-1 text-lg font-semibold text-foreground">
+      <p className="mt-0.5 text-xs font-semibold text-foreground">
         {raw
           ? NUMBER_FORMATS[language].format(value)
           : compactNumber(value, language)}
@@ -1054,7 +1214,7 @@ function EmptyChart() {
   const { t } = useI18n();
 
   return (
-    <div className="flex h-52 flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
+    <div className="flex h-52 flex-col items-center justify-center rounded-lg border border-white/5 bg-background/50 text-center">
       <p className="text-sm font-medium text-foreground">
         {t("dashboard.emptyTokens")}
       </p>
@@ -1256,25 +1416,27 @@ function StatusDonut({
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-semibold tracking-tight text-foreground">
+          <span className="text-2xl font-semibold tracking-tight text-foreground">
             {rate}%
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground">
             {t("dashboard.successShort")}
           </span>
         </div>
       </div>
 
-      <ul className="w-full space-y-2">
+      <ul className="w-full space-y-1.5">
         {(
           ["success", "failed", "waiting", "running", "escalated"] as const
         ).map((key) => {
           const meta = STATUS_META[key];
           return (
-            <li key={key} className="flex items-center gap-3 text-sm">
-              <span className={`size-2.5 rounded-full ${meta.dot}`} />
-              <span className="flex-1 text-muted-foreground">{t(meta.labelKey)}</span>
-              <span className="font-medium text-foreground">
+            <li key={key} className="flex items-center gap-2 text-xs">
+              <span className={`size-1.5 rounded-full ${meta.dot}`} />
+              <span className="flex-1 text-[11px] text-muted-foreground">
+                {t(meta.labelKey)}
+              </span>
+              <span className="font-medium text-[11px] text-foreground">
                 {summary[key]}
               </span>
             </li>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Navigate,
   Route,
@@ -40,6 +40,23 @@ function PageLoader() {
 
 type Health = "checking" | "online" | "offline";
 type CurrentUser = { name: string; email?: string };
+
+type NotificationItem = {
+  id: string;
+  type:
+    | "workflow.created"
+    | "workflow.error"
+    | "api.key.added"
+    | "api.key.edited"
+    | "profile.updated"
+    | "login"
+    | "message.received";
+  title: string;
+  description?: string;
+  timestamp: string;
+  read: boolean;
+  url?: string;
+};
 
 function ErrorBanner({
   message,
@@ -112,6 +129,26 @@ export default function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  const markAsRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    );
+  }, []);
+
+  const markAllAsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const onNotificationClick = useCallback(
+    (item: NotificationItem) => {
+      if (item.url) {
+        navigate(item.url);
+      }
+    },
+    [navigate],
+  );
 
   const activeNav: NavKey = useMemo(() => {
     const path = location.pathname;
@@ -133,6 +170,37 @@ export default function App() {
         if (!active) return;
         setUser(currentUser);
         setAuthenticated(true);
+
+        // Add sample notifications for demonstration
+        setNotifications([
+          {
+            id: "notif-1",
+            type: "workflow.created",
+            title: "New workflow created",
+            description: "Customer Support Bot was added",
+            timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+            read: false,
+            url: "/workflows",
+          },
+          {
+            id: "notif-2",
+            type: "workflow.error",
+            title: "Workflow error",
+            description: "Lead Generation failed to execute",
+            timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+            read: false,
+            url: "/activity",
+          },
+          {
+            id: "notif-3",
+            type: "api.key.added",
+            title: "API key added",
+            description: "Gemini API key was connected",
+            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+            read: true,
+            url: "/ai-providers",
+          },
+        ]);
       })
       .catch(() => {
         if (!active) return;
@@ -245,6 +313,10 @@ export default function App() {
       onAiProvidersClick={() => navigate("/ai-providers")}
       onHelpClick={() => navigate("/help")}
       onSettingsClick={() => navigate("/settings")}
+      notifications={notifications}
+      onMarkAsRead={markAsRead}
+      onMarkAllAsRead={markAllAsRead}
+      onNotificationClick={onNotificationClick}
     >
       {error && <ErrorBanner message={error} onClose={() => setError("")} />}
 

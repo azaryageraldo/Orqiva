@@ -1,3 +1,6 @@
+"use client";
+
+import * as React from "react";
 import {
   Bell,
   ChevronDown,
@@ -5,7 +8,14 @@ import {
   LifeBuoy,
   LogOut,
   Menu,
-  Settings,
+  Layout,
+  Bot,
+  Globe,
+  Settings as SettingsIcon,
+  ShieldAlert,
+  User,
+  Plus,
+  Activity,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -29,7 +39,6 @@ export type HeaderIcon =
   | "workflows"
   | "editor"
   | "chat"
-  | "inbox"
   | "channel"
   | "activity"
   | "keys"
@@ -41,6 +50,23 @@ export interface HeaderUser {
   email?: string;
 }
 
+interface NotificationItem {
+  id: string;
+  type:
+    | "workflow.created"
+    | "workflow.error"
+    | "api.key.added"
+    | "api.key.edited"
+    | "profile.updated"
+    | "login"
+    | "message.received";
+  title: string;
+  description?: string;
+  timestamp: string;
+  read: boolean;
+  url?: string;
+}
+
 interface HeaderProps {
   activeNav: NavKey;
   loggingOut: boolean;
@@ -49,20 +75,28 @@ interface HeaderProps {
   onToggleSidebar: () => void;
   showSidebarToggle?: boolean;
   user: HeaderUser | null;
+  notifications: NotificationItem[];
+  onMarkAsRead: (id: string) => void;
+  onMarkAllAsRead: () => void;
+  onNotificationClick: (item: NotificationItem) => void;
 }
 
-const TOP_NAV: Array<{
+export type { NotificationItem };
+
+const NAV_ITEMS: Array<{
   key: NavKey;
-  labelKey: string;
+  label: string;
+  icon: React.ElementType;
   matches: NavKey[];
 }> = [
-  { key: "dashboard", labelKey: "topnav.data", matches: ["dashboard"] },
-  { key: "inbox", labelKey: "topnav.inbox", matches: ["inbox"] },
-  { key: "channel", labelKey: "topnav.channel", matches: ["channel"] },
-  { key: "workflows", labelKey: "topnav.agent", matches: ["workflows"] },
+  { key: "dashboard", label: "Dashboard", icon: Layout, matches: ["dashboard"] },
+  { key: "inbox", label: "Inbox", icon: Activity, matches: ["inbox"] },
+  { key: "channel", label: "Channel", icon: Globe, matches: ["channel"] },
+  { key: "workflows", label: "Agent", icon: Bot, matches: ["workflows"] },
   {
     key: "settings",
-    labelKey: "topnav.settings",
+    label: "Settings",
+    icon: SettingsIcon,
     matches: ["settings"],
   },
 ];
@@ -78,6 +112,16 @@ function initialsOf(name: string): string {
   );
 }
 
+const NOTIFICATION_CONFIG: Record<string, { icon: React.ElementType; color: string }> = {
+  "workflow.created": { icon: Plus, color: "text-emerald-400" },
+  "workflow.error": { icon: ShieldAlert, color: "text-destructive" },
+  "api.key.added": { icon: KeyRound, color: "text-primary" },
+  "api.key.edited": { icon: KeyRound, color: "text-teal-400" },
+  "profile.updated": { icon: User, color: "text-violet-400" },
+  "login": { icon: User, color: "text-amber-400" },
+  "message.received": { icon: Bot, color: "text-blue-400" },
+};
+
 export default function Header({
   activeNav,
   loggingOut,
@@ -86,26 +130,35 @@ export default function Header({
   onToggleSidebar,
   showSidebarToggle = true,
   user,
+  notifications,
+  onMarkAsRead,
+  onMarkAllAsRead,
+  onNotificationClick,
 }: HeaderProps) {
   const { t } = useI18n();
+  const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+
   const displayName = user?.name || t("header.workspaceAdmin");
   const email = user?.email ?? "";
-  const account = {
-    name: displayName,
-    role: t("header.workspaceAdmin"),
-    initials: initialsOf(displayName),
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleNotificationClick = (item: NotificationItem) => {
+    onMarkAsRead(item.id);
+    onNotificationClick(item);
+    setNotificationsOpen(false);
   };
 
   return (
     <header
-      className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-white/[0.10] bg-[#090a0c]/80 px-2.5 backdrop-blur-md sm:px-4"
+      className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#090a0c]/80 backdrop-blur-md px-2.5 sm:px-4"
     >
       {showSidebarToggle && (
         <button
           type="button"
           onClick={onToggleSidebar}
           aria-label={t("side.openMenu")}
-          className="flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-200 lg:hidden"
+          className="flex size-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200 lg:hidden"
         >
           <Menu size={18} strokeWidth={1.5} />
         </button>
@@ -124,45 +177,151 @@ export default function Header({
 
       <nav
         aria-label={t("topnav.label")}
-        className="ml-2 flex min-w-0 items-center gap-0.5 overflow-x-auto"
+        className="ml-2.5 flex min-w-0 items-center gap-0.5 overflow-x-auto no-scrollbar"
       >
-        {TOP_NAV.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const active = item.matches.includes(activeNav);
+          const Icon = item.icon;
 
           return (
             <button
               key={item.key}
               type="button"
-              onClick={() => onNavigate(item.key)}
+              onClick={() => {
+                onNavigate(item.key);
+                setNotificationsOpen(false);
+              }}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex h-8 shrink-0 items-center rounded-md px-2.5 text-[12.5px] font-medium transition-colors",
+                "inline-flex h-9 shrink-0 items-center justify-center rounded-md px-2.5 text-[12px] font-medium transition-colors whitespace-nowrap",
                 active
-                  ? "bg-white/[0.06] text-zinc-100"
+                  ? "bg-primary/10 border border-primary/20 text-primary"
                   : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300",
               )}
             >
-              {t(item.labelKey)}
+              <Icon size={14} strokeWidth={1.5} />
+              <span className="ml-1.5">{item.label}</span>
             </button>
           );
         })}
       </nav>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onNavigate("inbox")}
-          aria-label={t("topnav.notifications")}
-          title={t("topnav.notifications")}
-          className="relative flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-200"
-        >
-          <Bell size={17} strokeWidth={1.5} />
-          <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary" />
-        </button>
+      <div className="ml-auto flex shrink-0 items-center gap-1">
+        {/* Notifications Bell */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setNotificationsOpen(!notificationsOpen);
+              setUserMenuOpen(false);
+            }}
+            aria-label={t("notifications.title")}
+            className={cn(
+              "relative flex size-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200",
+              unreadCount > 0 && "text-primary",
+            )}
+          >
+            <Bell size={17} strokeWidth={1.5} />
+            {unreadCount > 0 && (
+              <span
+                className={`absolute top-1 right-1 size-[10px] rounded-full border border-[#090a0c] bg-primary text-[8px] font-bold text-white flex items-center justify-center px-0.5`}
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notifications Dropdown */}
+          <DropdownMenu
+            open={notificationsOpen}
+            onOpenChange={setNotificationsOpen}
+            modal={false}
+          >
+            <DropdownMenuContent
+              className="w-[360px] p-0 border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl"
+              align="end"
+            >
+              <DropdownMenuContent
+                className="p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <DropdownMenuLabel className="text-sm font-semibold text-zinc-100">
+                    {t("notifications.title")}
+                  </DropdownMenuLabel>
+                  {unreadCount > 0 && (
+                    <DropdownMenuItem
+                      onClick={onMarkAllAsRead}
+                      className="text-[11px] text-primary hover:bg-white/5"
+                    >
+                      {t("notifications.markAllRead")}
+                    </DropdownMenuItem>
+                  )}
+                </div>
+
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Bell size={32} className="text-zinc-600 mb-2" />
+                    <p className="text-[11px] text-zinc-500">
+                      {t("notifications.empty")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
+                    {notifications.map((item) => {
+                      const Config = NOTIFICATION_CONFIG[item.type];
+                      const Icon = Config.icon;
+
+                      return (
+                        <DropdownMenuItem
+                          key={item.id}
+                          onClick={() => handleNotificationClick(item)}
+                          className={cn(
+                            "flex items-start gap-3 p-2.5 text-[12px] transition-colors",
+                            !item.read
+                              ? "bg-white/5 border-l-2 border-l-primary"
+                              : "hover:bg-white/5",
+                          )}
+                        >
+                          <div className={cn(
+                            "flex size-6 items-center justify-center rounded-md",
+                            Config.color,
+                          )}>
+                            <Icon size={14} strokeWidth={1.5} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-zinc-100 leading-tight">
+                              {item.title}
+                            </p>
+                            {item.description && (
+                              <p className="mt-0.5 text-[10px] text-zinc-500 leading-tight">
+                                {item.description}
+                              </p>
+                            )}
+                            <p className="mt-1 text-[9px] text-zinc-600">
+                              {item.timestamp}
+                            </p>
+                          </div>
+                          {!item.read && (
+                            <span className="size-[6px] rounded-full bg-primary" />
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         <span className="mx-0.5 hidden h-4 w-[1px] bg-white/[0.05] sm:block" />
 
-        <DropdownMenu>
+        {/* User Profile Dropdown */}
+        <DropdownMenu
+          open={userMenuOpen}
+          onOpenChange={setUserMenuOpen}
+          modal={false}
+        >
           <DropdownMenuTrigger
             render={
               <Button
@@ -178,7 +337,7 @@ export default function Header({
                 </span>
               )}
               <span className="block max-w-36 truncate text-[12.5px] font-medium text-zinc-200">
-                {account.name}
+                {displayName}
               </span>
             </span>
 
@@ -187,7 +346,7 @@ export default function Header({
               className="size-7 ring-1 ring-primary/30 ring-offset-1 ring-offset-[#090a0c]"
             >
               <AvatarFallback className="bg-gradient-to-br from-primary/40 to-primary/10 text-[10px] font-bold text-primary">
-                {account.initials}
+                {initialsOf(displayName)}
               </AvatarFallback>
             </Avatar>
 
@@ -198,7 +357,7 @@ export default function Header({
             <DropdownMenuGroup>
               <DropdownMenuLabel className="px-3 py-2">
                 <span className="block truncate text-sm font-medium text-zinc-100">
-                  {account.name}
+                  {displayName}
                 </span>
                 {email && (
                   <span className="mt-0.5 block truncate text-[11px] font-normal text-zinc-500">
@@ -211,7 +370,7 @@ export default function Header({
             <DropdownMenuSeparator className="border-white/[0.06]" />
 
             <DropdownMenuItem onClick={() => onNavigate("settings")} className="text-[13px]">
-              <Settings size={15} strokeWidth={1.5} />
+              <SettingsIcon size={15} strokeWidth={1.5} />
               {t("nav.settings")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onNavigate("ai-providers")} className="text-[13px]">

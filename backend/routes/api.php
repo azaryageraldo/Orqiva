@@ -27,7 +27,12 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:setup');
 
     Route::post('/login', [AuthController::class, 'login'])
-        ->middleware('throttle:login');
+        ->middleware([
+            'throttle:login',
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        ]);
 
     Route::prefix('public')->group(function () {
         Route::get('/channels/{token}', [PublicChatController::class, 'showChannel']);
