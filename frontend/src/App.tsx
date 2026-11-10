@@ -137,10 +137,6 @@ export default function App() {
     );
   }, []);
 
-  const markAllAsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
-
   const onNotificationClick = useCallback(
     (item: NotificationItem) => {
       if (item.url) {
@@ -315,7 +311,6 @@ export default function App() {
       onSettingsClick={() => navigate("/settings")}
       notifications={notifications}
       onMarkAsRead={markAsRead}
-      onMarkAllAsRead={markAllAsRead}
       onNotificationClick={onNotificationClick}
     >
       {error && <ErrorBanner message={error} onClose={() => setError("")} />}

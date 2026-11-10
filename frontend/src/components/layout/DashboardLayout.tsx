@@ -20,7 +20,6 @@ interface DashboardLayoutProps {
   hideSidebar?: boolean;
   notifications: NotificationItem[];
   onMarkAsRead: (id: string) => void;
-  onMarkAllAsRead: () => void;
   onNotificationClick: (item: NotificationItem) => void;
   children: ReactNode;
 }
@@ -42,7 +41,6 @@ export default function DashboardLayout({
   hideSidebar = false,
   notifications,
   onMarkAsRead,
-  onMarkAllAsRead,
   onNotificationClick,
   children,
 }: DashboardLayoutProps) {
@@ -76,7 +74,6 @@ export default function DashboardLayout({
         showSidebarToggle={!hideSidebar}
         notifications={notifications}
         onMarkAsRead={onMarkAsRead}
-        onMarkAllAsRead={onMarkAllAsRead}
         onNotificationClick={onNotificationClick}
       />
 
