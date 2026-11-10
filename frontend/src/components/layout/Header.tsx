@@ -287,7 +287,10 @@ export default function Header({
           </button>
 
           {notificationsOpen && (
-            <div ref={notificationsRef} className="absolute z-[60] top-12 right-0 w-[320px] mt-1">
+            <div
+              ref={notificationsRef}
+              className="absolute z-[60] top-12 right-0 w-[280px] mt-1 max-w-[calc(100vw-4rem)]"
+            >
               <div className="border border-white/[0.08] bg-[#0a0b0f]/97 shadow-xl rounded-xl p-3">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 text-center">
