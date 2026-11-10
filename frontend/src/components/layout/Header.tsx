@@ -19,16 +19,6 @@ import {
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import OrqivaLogo from "@/components/brand/OrqivaLogo";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -140,14 +130,7 @@ export default function Header({
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
   const displayName = user?.name || t("header.workspaceAdmin");
-  const email = user?.email ?? "";
   const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const handleNotificationClick = (item: NotificationItem) => {
-    onMarkAsRead(item.id);
-    onNotificationClick(item);
-    setNotificationsOpen(false);
-  };
 
   return (
     <header
@@ -190,6 +173,7 @@ export default function Header({
               onClick={() => {
                 onNavigate(item.key);
                 setNotificationsOpen(false);
+                setUserMenuOpen(false);
               }}
               aria-current={active ? "page" : undefined}
               className={cn(
@@ -231,173 +215,172 @@ export default function Header({
             )}
           </button>
 
-          {/* Notifications Dropdown */}
-          <DropdownMenu
-            open={notificationsOpen}
-            onOpenChange={setNotificationsOpen}
-            modal={false}
-          >
-            <DropdownMenuContent
-              className="w-[360px] p-4 border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl"
-              align="end"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <DropdownMenuLabel className="text-sm font-semibold text-zinc-100">
-                  {t("notifications.title")}
-                </DropdownMenuLabel>
-                {unreadCount > 0 && (
-                  <DropdownMenuItem
-                    onClick={onMarkAllAsRead}
-                    className="text-[11px] text-primary hover:bg-white/5"
-                  >
-                    {t("notifications.markAllRead")}
-                  </DropdownMenuItem>
+          {notificationsOpen && (
+            <div className="absolute z-[60] top-12 right-0 w-[360px] mt-1">
+              <div className="border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-zinc-100">
+                    {t("notifications.title")}
+                  </span>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={onMarkAllAsRead}
+                      className="text-[11px] text-primary hover:bg-white/5 hover:text-primary/80 transition-colors px-2 py-1 rounded"
+                    >
+                      {t("notifications.markAllRead")}
+                    </button>
+                  )}
+                </div>
+
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Bell size={32} className="text-zinc-600 mb-2" />
+                    <p className="text-[11px] text-zinc-500">
+                      {t("notifications.empty")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
+                    {notifications.map((item) => {
+                      const Config = NOTIFICATION_CONFIG[item.type];
+                      const Icon = Config.icon;
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            onMarkAsRead(item.id);
+                            onNotificationClick(item);
+                            setNotificationsOpen(false);
+                          }}
+                          className={cn(
+                            "flex items-start gap-3 p-2.5 text-[12px] transition-colors",
+                            !item.read
+                              ? "bg-white/5 border-l-2 border-l-primary"
+                              : "hover:bg-white/5",
+                          )}
+                        >
+                          <div className={cn(
+                            "flex size-6 items-center justify-center rounded-md shrink-0",
+                            Config.color,
+                          )}>
+                            <Icon size={14} strokeWidth={1.5} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-zinc-100 leading-tight">
+                              {item.title}
+                            </p>
+                            {item.description && (
+                              <p className="mt-0.5 text-[10px] text-zinc-500 leading-tight">
+                                {item.description}
+                              </p>
+                            )}
+                            <p className="mt-1 text-[9px] text-zinc-600">
+                              {item.timestamp}
+                            </p>
+                          </div>
+                          {!item.read && (
+                            <span className="size-[6px] rounded-full bg-primary shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-
-              {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <Bell size={32} className="text-zinc-600 mb-2" />
-                  <p className="text-[11px] text-zinc-500">
-                    {t("notifications.empty")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
-                  {notifications.map((item) => {
-                    const Config = NOTIFICATION_CONFIG[item.type];
-                    const Icon = Config.icon;
-
-                    return (
-                      <DropdownMenuItem
-                        key={item.id}
-                        onClick={() => handleNotificationClick(item)}
-                        className={cn(
-                          "flex items-start gap-3 p-2.5 text-[12px] transition-colors",
-                          !item.read
-                            ? "bg-white/5 border-l-2 border-l-primary"
-                            : "hover:bg-white/5",
-                        )}
-                      >
-                        <div className={cn(
-                          "flex size-6 items-center justify-center rounded-md",
-                          Config.color,
-                        )}>
-                          <Icon size={14} strokeWidth={1.5} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-zinc-100 leading-tight">
-                            {item.title}
-                          </p>
-                          {item.description && (
-                            <p className="mt-0.5 text-[10px] text-zinc-500 leading-tight">
-                              {item.description}
-                            </p>
-                          )}
-                          <p className="mt-1 text-[9px] text-zinc-600">
-                            {item.timestamp}
-                          </p>
-                        </div>
-                        {!item.read && (
-                          <span className="size-[6px] rounded-full bg-primary" />
-                        )}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </div>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
+          )}
         </div>
 
         <span className="mx-0.5 hidden h-4 w-[1px] bg-white/[0.05] sm:block" />
 
         {/* User Profile Dropdown */}
-        <DropdownMenu
-          open={userMenuOpen}
-          onOpenChange={setUserMenuOpen}
-          modal={false}
-        >
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                className="h-8 gap-2 rounded-md border-transparent px-1 transition-colors hover:bg-white/[0.04]"
-              />
-            }
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setUserMenuOpen(!userMenuOpen);
+              setNotificationsOpen(false);
+            }}
+            aria-label="User menu"
+            className="relative flex size-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
           >
-            <span className="hidden min-w-0 text-right leading-tight md:block">
-              {email && (
-                <span className="block max-w-44 truncate text-[10px] font-normal text-zinc-500">
-                  {email}
-                </span>
-              )}
-              <span className="block max-w-36 truncate text-[12.5px] font-medium text-zinc-200">
-                {displayName}
-              </span>
-            </span>
-
             <Avatar
               size="sm"
-              className="size-7 ring-1 ring-primary/30 ring-offset-1 ring-offset-[#090a0c]"
+              className="ring-1 ring-primary/30 ring-offset-1 ring-offset-[#090a0c]"
             >
               <AvatarFallback className="bg-gradient-to-br from-primary/40 to-primary/10 text-[10px] font-bold text-primary">
                 {initialsOf(displayName)}
               </AvatarFallback>
             </Avatar>
-
             <ChevronDown className="hidden size-3.5 text-zinc-500 sm:block" />
-          </DropdownMenuTrigger>
+          </button>
 
-          <DropdownMenuContent align="end" className="w-60 border border-white/[0.08] bg-[#0a0b0f]/90 backdrop-blur-md">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="px-3 py-2">
-                <span className="block truncate text-sm font-medium text-zinc-100">
-                  {displayName}
-                </span>
-                {email && (
-                  <span className="mt-0.5 block truncate text-[11px] font-normal text-zinc-500">
-                    {email}
-                  </span>
-                )}
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
+          {userMenuOpen && (
+            <div className="absolute z-[60] top-12 right-0 w-[60px] mt-1">
+              <div className="border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl rounded-xl p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onNavigate("settings");
+                  }}
+                  className="flex items-center gap-2 p-2 text-[13px] text-zinc-100 hover:bg-white/5"
+                >
+                  <SettingsIcon size={15} strokeWidth={1.5} />
+                  {t("nav.settings")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onNavigate("ai-providers");
+                  }}
+                  className="flex items-center gap-2 p-2 text-[13px] text-zinc-100 hover:bg-white/5"
+                >
+                  <KeyRound size={15} strokeWidth={1.5} />
+                  {t("nav.apiKeys")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onNavigate("help");
+                  }}
+                  className="flex items-center gap-2 p-2 text-[13px] text-zinc-100 hover:bg-white/5"
+                >
+                  <LifeBuoy size={15} strokeWidth={1.5} />
+                  {t("nav.help")}
+                </button>
 
-            <DropdownMenuSeparator className="border-white/[0.06]" />
+                <div className="border-t border-white/[0.06] my-1" />
 
-            <DropdownMenuItem onClick={() => onNavigate("settings")} className="text-[13px]">
-              <SettingsIcon size={15} strokeWidth={1.5} />
-              {t("nav.settings")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onNavigate("ai-providers")} className="text-[13px]">
-              <KeyRound size={15} strokeWidth={1.5} />
-              {t("nav.apiKeys")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onNavigate("help")} className="text-[13px]">
-              <LifeBuoy size={15} strokeWidth={1.5} />
-              {t("nav.help")}
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator className="border-white/[0.06]" />
-
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={loggingOut}
-              onClick={onLogout}
-              className="text-[13px]"
-            >
-              {loggingOut ? (
-                <span className="flex items-center gap-2">
-                  <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  {t("header.loggingOut")}
-                </span>
-              ) : (
-                <LogOut size={15} strokeWidth={1.5} />
-              )}
-              {loggingOut ? t("header.loggingOut") : t("header.logout")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <button
+                  type="button"
+                  disabled={loggingOut}
+                  onClick={onLogout}
+                  className={cn(
+                    "flex items-center gap-2 p-2 text-[13px] transition-colors",
+                    loggingOut && "text-zinc-500 pointer-events-none",
+                    !loggingOut ? "text-zinc-100 hover:bg-white/5" : "text-destructive/30",
+                  )}
+                >
+                  {loggingOut ? (
+                    <span className="flex items-center gap-2">
+                      <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      {t("header.loggingOut")}
+                    </span>
+                  ) : (
+                    <LogOut size={15} strokeWidth={1.5} />
+                  )}
+                  {loggingOut ? t("header.loggingOut") : t("header.logout")}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
