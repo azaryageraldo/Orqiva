@@ -238,78 +238,74 @@ export default function Header({
             modal={false}
           >
             <DropdownMenuContent
-              className="w-[360px] p-0 border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl"
+              className="w-[360px] p-4 border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl"
               align="end"
             >
-              <DropdownMenuContent
-                className="p-4"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <DropdownMenuLabel className="text-sm font-semibold text-zinc-100">
-                    {t("notifications.title")}
-                  </DropdownMenuLabel>
-                  {unreadCount > 0 && (
-                    <DropdownMenuItem
-                      onClick={onMarkAllAsRead}
-                      className="text-[11px] text-primary hover:bg-white/5"
-                    >
-                      {t("notifications.markAllRead")}
-                    </DropdownMenuItem>
-                  )}
-                </div>
-
-                {notifications.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Bell size={32} className="text-zinc-600 mb-2" />
-                    <p className="text-[11px] text-zinc-500">
-                      {t("notifications.empty")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
-                    {notifications.map((item) => {
-                      const Config = NOTIFICATION_CONFIG[item.type];
-                      const Icon = Config.icon;
-
-                      return (
-                        <DropdownMenuItem
-                          key={item.id}
-                          onClick={() => handleNotificationClick(item)}
-                          className={cn(
-                            "flex items-start gap-3 p-2.5 text-[12px] transition-colors",
-                            !item.read
-                              ? "bg-white/5 border-l-2 border-l-primary"
-                              : "hover:bg-white/5",
-                          )}
-                        >
-                          <div className={cn(
-                            "flex size-6 items-center justify-center rounded-md",
-                            Config.color,
-                          )}>
-                            <Icon size={14} strokeWidth={1.5} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-zinc-100 leading-tight">
-                              {item.title}
-                            </p>
-                            {item.description && (
-                              <p className="mt-0.5 text-[10px] text-zinc-500 leading-tight">
-                                {item.description}
-                              </p>
-                            )}
-                            <p className="mt-1 text-[9px] text-zinc-600">
-                              {item.timestamp}
-                            </p>
-                          </div>
-                          {!item.read && (
-                            <span className="size-[6px] rounded-full bg-primary" />
-                          )}
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </div>
+              <div className="flex items-center justify-between mb-3">
+                <DropdownMenuLabel className="text-sm font-semibold text-zinc-100">
+                  {t("notifications.title")}
+                </DropdownMenuLabel>
+                {unreadCount > 0 && (
+                  <DropdownMenuItem
+                    onClick={onMarkAllAsRead}
+                    className="text-[11px] text-primary hover:bg-white/5"
+                  >
+                    {t("notifications.markAllRead")}
+                  </DropdownMenuItem>
                 )}
-              </DropdownMenuContent>
+              </div>
+
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Bell size={32} className="text-zinc-600 mb-2" />
+                  <p className="text-[11px] text-zinc-500">
+                    {t("notifications.empty")}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
+                  {notifications.map((item) => {
+                    const Config = NOTIFICATION_CONFIG[item.type];
+                    const Icon = Config.icon;
+
+                    return (
+                      <DropdownMenuItem
+                        key={item.id}
+                        onClick={() => handleNotificationClick(item)}
+                        className={cn(
+                          "flex items-start gap-3 p-2.5 text-[12px] transition-colors",
+                          !item.read
+                            ? "bg-white/5 border-l-2 border-l-primary"
+                            : "hover:bg-white/5",
+                        )}
+                      >
+                        <div className={cn(
+                          "flex size-6 items-center justify-center rounded-md",
+                          Config.color,
+                        )}>
+                          <Icon size={14} strokeWidth={1.5} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-zinc-100 leading-tight">
+                            {item.title}
+                          </p>
+                          {item.description && (
+                            <p className="mt-0.5 text-[10px] text-zinc-500 leading-tight">
+                              {item.description}
+                            </p>
+                          )}
+                          <p className="mt-1 text-[9px] text-zinc-600">
+                            {item.timestamp}
+                          </p>
+                        </div>
+                        {!item.read && (
+                          <span className="size-[6px] rounded-full bg-primary" />
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
