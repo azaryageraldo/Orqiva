@@ -21,7 +21,7 @@ export function TableContainer({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-md border border-border bg-card",
+        "overflow-hidden rounded-xl border border-border bg-card/90 shadow-sm backdrop-blur-sm",
         className,
       )}
     >
@@ -58,7 +58,7 @@ interface TheadProps {
 }
 
 export function Thead({ children }: TheadProps) {
-  return <thead>{children}</thead>;
+  return <thead className="border-b border-border bg-muted/30 sticky top-0 z-10">{children}</thead>;
 }
 
 interface TrProps {
@@ -69,7 +69,14 @@ interface TrProps {
 
 export function Tr({ children, className, onClick }: TrProps) {
   return (
-    <tr className={className} onClick={onClick}>
+    <tr
+      className={cn(
+        "border-b border-border/60 transition-colors last:border-b-0",
+        onClick && "cursor-pointer hover:bg-muted/35",
+        className,
+      )}
+      onClick={onClick}
+    >
       {children}
     </tr>
   );
@@ -82,7 +89,12 @@ interface ThProps {
 
 export function Th({ children, className }: ThProps) {
   return (
-    <th className={cn("px-3 py-2.5 text-[11px] font-medium whitespace-nowrap text-zinc-500 last:border-r-0", className)}>
+    <th
+      className={cn(
+        "px-3.5 py-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase whitespace-nowrap",
+        className,
+      )}
+    >
       {children}
     </th>
   );
@@ -106,7 +118,10 @@ export function Td({ children, className, colSpan }: TdProps) {
   return (
     <td
       colSpan={colSpan}
-      className={cn("px-3 py-2.5 align-middle text-[11px] text-zinc-400 last:border-r-0", className)}
+      className={cn(
+        "px-3.5 py-3 align-middle text-[13px] text-foreground font-normal",
+        className,
+      )}
     >
       {children}
     </td>

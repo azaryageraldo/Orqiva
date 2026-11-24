@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowsSplit,
   GoogleLogo,
   OpenAiLogo,
 } from "@phosphor-icons/react";
 import {
   ArrowUpRight,
   Check,
+  GitFork,
   KeyRound,
   LoaderCircle,
   Save,
@@ -60,7 +60,7 @@ const PROVIDERS = [
     provider: "openrouter",
     name: "OpenRouter",
     descriptionKey: "ai.provider.openrouter",
-    icon: ArrowsSplit,
+    icon: GitFork,
     tile: "border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-300",
     docs: "https://openrouter.ai/keys",
   },

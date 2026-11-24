@@ -7,7 +7,7 @@ import {
   useNavigate,
   useParams,
 } from "react-router-dom";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, LucideProvider } from "lucide-react";
 
 import Login from "./Login";
 import { getCurrentUser, logout } from "./services/auth";
@@ -297,36 +297,43 @@ export default function App() {
   // Standalone public chat widget route
   if (location.pathname.startsWith("/widget/")) {
     return (
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/widget/:token" element={<PublicWidgetWrapper />} />
-        </Routes>
-      </Suspense>
+      <LucideProvider strokeWidth={1.5}>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/widget/:token" element={<PublicWidgetWrapper />} />
+          </Routes>
+        </Suspense>
+      </LucideProvider>
     );
   }
 
   if (authChecking) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-sm text-muted-foreground">
-        <LoaderCircle className="size-7 animate-spin text-primary" />
-        <p>{t("auth.checking")}</p>
-      </div>
+      <LucideProvider strokeWidth={1.5}>
+        <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-sm text-muted-foreground">
+          <LoaderCircle className="size-7 animate-spin text-primary" />
+          <p>{t("auth.checking")}</p>
+        </div>
+      </LucideProvider>
     );
   }
 
   if (!authenticated) {
     return (
-      <Login
-        onLogin={(currentUser) => {
-          setUser(currentUser);
-          setAuthenticated(true);
-        }}
-      />
+      <LucideProvider strokeWidth={1.5}>
+        <Login
+          onLogin={(currentUser) => {
+            setUser(currentUser);
+            setAuthenticated(true);
+          }}
+        />
+      </LucideProvider>
     );
   }
 
   return (
-    <DashboardLayout
+    <LucideProvider strokeWidth={1.5}>
+      <DashboardLayout
       activeNav={activeNav}
       health={health}
       user={user}
@@ -413,6 +420,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
-    </DashboardLayout>
+      </DashboardLayout>
+    </LucideProvider>
   );
 }

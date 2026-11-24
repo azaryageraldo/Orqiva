@@ -1,28 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowSquareOut,
-  ArrowsClockwise,
-  ChatCircleDots,
-  Check,
-  Copy,
   InstagramLogo,
   MessengerLogo,
-  PaperPlaneRight,
-  PencilSimple,
   TelegramLogo,
   WhatsappLogo,
 } from "@phosphor-icons/react";
 import {
+  Check,
+  Copy,
+  ExternalLink,
   ImagePlus,
   LoaderCircle,
+  MessageSquare,
+  Pencil,
   RotateCcw,
+  RotateCw,
   Save,
+  Send,
   ShieldCheck,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
 
 import orqivaMark from "@/assets/orqiva-mark.png";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -68,7 +69,7 @@ const CHANNEL_CATALOG = [
     id: "widget",
     nameKey: "channel.widgetName",
     descriptionKey: "channel.widgetDescription",
-    icon: ChatCircleDots,
+    icon: MessageSquare,
     tile: "border-primary/25 bg-primary/10 text-primary",
     active: true,
   },
@@ -525,7 +526,7 @@ export default function Channel() {
                 <div className="flex flex-col p-5 sm:p-6">
                   <div className="flex items-start gap-3">
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-                      <ChatCircleDots size={22} weight="fill" />
+                      <MessageSquare className="size-5" />
                     </span>
                     <div className="min-w-0">
                       <h2 className="text-base font-semibold text-foreground">
@@ -577,7 +578,7 @@ export default function Channel() {
 
                   <div className="mt-auto flex flex-wrap gap-2 pt-5">
                     <Button type="button" size="sm" onClick={openEditor}>
-                      <PencilSimple size={15} weight="bold" />
+                      <Pencil className="size-3.5" />
                       {t("channel.editWidgetTitle")}
                     </Button>
                     <Button
@@ -589,7 +590,7 @@ export default function Channel() {
                       }
                       disabled={!widgetUrl}
                     >
-                      <ArrowSquareOut size={15} weight="bold" />
+                      <ExternalLink className="size-3.5" />
                       {t("channel.openWidgetTitle")}
                     </Button>
                     <Button
@@ -599,10 +600,8 @@ export default function Channel() {
                       onClick={() => void regenerate()}
                       disabled={regenerating}
                     >
-                      <ArrowsClockwise
-                        size={15}
-                        weight="bold"
-                        className={regenerating ? "animate-spin" : undefined}
+                      <RotateCw
+                        className={cn("size-3.5", regenerating && "animate-spin")}
                       />
                       {t("channel.regenerateTitle")}
                     </Button>
@@ -681,7 +680,7 @@ export default function Channel() {
                           className="flex size-7 shrink-0 items-center justify-center rounded-full text-white"
                           style={{ backgroundColor: appearance.accent_color }}
                         >
-                          <PaperPlaneRight size={13} weight="fill" />
+                          <Send className="size-3 text-white" />
                         </span>
                       </div>
                     </div>
@@ -848,7 +847,7 @@ export default function Channel() {
                                 className="h-7 px-2 text-[11px]"
                                 onClick={openEditor}
                               >
-                                <PencilSimple size={12} weight="bold" />
+                                <Pencil className="size-3" />
                                 {t("channel.editWidgetTitle")}
                               </Button>
                               <Button
@@ -866,7 +865,7 @@ export default function Channel() {
                                 }
                                 disabled={!widgetUrl}
                               >
-                                <ArrowSquareOut size={13} weight="bold" />
+                                <ExternalLink className="size-3" />
                               </Button>
                               <Button
                                 type="button"
@@ -877,12 +876,11 @@ export default function Channel() {
                                 onClick={() => void regenerate()}
                                 disabled={regenerating}
                               >
-                                <ArrowsClockwise
-                                  size={13}
-                                  weight="bold"
-                                  className={
-                                    regenerating ? "animate-spin" : undefined
-                                  }
+                                <RotateCw
+                                  className={cn(
+                                    "size-3",
+                                    regenerating && "animate-spin",
+                                  )}
                                 />
                               </Button>
                             </div>
