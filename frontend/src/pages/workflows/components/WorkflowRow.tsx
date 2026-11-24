@@ -37,7 +37,7 @@ export default function WorkflowRow({
   return (
     <tr
       onClick={() => onOpen(String(item.id))}
-      className="group cursor-pointer border-t border-white/[0.06] transition-colors hover:bg-white/[0.025]"
+      className="group cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
     >
       <td
         className="w-10 px-4 py-3.5"
@@ -48,27 +48,27 @@ export default function WorkflowRow({
           checked={isSelected}
           onChange={() => onSelect(item.id)}
           aria-label={t("wf.selectOne", { name: item.name })}
-          className="size-3.5 cursor-pointer rounded-[4px] border-white/20 bg-transparent accent-[var(--primary)]"
+          className="size-3.5 cursor-pointer rounded-[4px] border-border bg-transparent accent-[var(--primary)]"
         />
       </td>
 
       <td className="px-4 py-3.5 align-middle">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 group-hover:border-primary/30 group-hover:bg-primary/[0.06] group-hover:text-primary transition-colors">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/30 text-muted-foreground group-hover:border-primary/30 group-hover:bg-primary/[0.06] group-hover:text-primary transition-colors">
             <GitFork className="size-4 rotate-90" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium text-zinc-100 group-hover:text-primary transition-colors">
+              <span className="truncate text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                 {item.name}
               </span>
             </div>
             {item.description ? (
-              <p className="mt-0.5 truncate text-xs text-zinc-400">
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {item.description}
               </p>
             ) : (
-              <p className="mt-0.5 text-xs text-zinc-600 italic">
+              <p className="mt-0.5 text-xs text-muted-foreground/60 italic">
                 No description
               </p>
             )}

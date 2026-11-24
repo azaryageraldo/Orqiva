@@ -578,7 +578,7 @@ export default function Dashboard({
         </div>
 
         {/* KPI strip */}
-        <div className="grid gap-px overflow-hidden rounded-xl border border-white/5 bg-border sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
           <MetricTile
             icon={Coins}
             label={t("dashboard.totalTokens")}
@@ -640,8 +640,8 @@ export default function Dashboard({
 
         {/* Top Workflows */}
         <div className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-white/5 bg-card lg:col-span-2">
-            <div className="border-b border-white/5 p-5">
+          <div className="rounded-xl border border-border bg-card lg:col-span-2">
+            <div className="border-b border-border p-5">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                   {t("dashboard.topWorkflows")}
@@ -692,7 +692,7 @@ export default function Dashboard({
           </div>
 
           {/* Model Distribution */}
-          <div className="rounded-xl border border-white/5 bg-card p-5">
+          <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                 {t("dashboard.modelDistribution")}
@@ -729,7 +729,7 @@ export default function Dashboard({
                     {aiSettings?.model ?? "—"}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {aiSettings?.provider ?? "Tidak terhubung"}
+                    {aiSettings?.provider ?? "Not connected"}
                   </span>
                 </div>
               </div>
@@ -740,7 +740,7 @@ export default function Dashboard({
         {/* Charts */}
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-xl border border-border bg-card lg:col-span-2">
-            <div className="flex flex-col gap-4 border-b border-white/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                   {t("dashboard.tokenUsage")}
@@ -816,7 +816,7 @@ export default function Dashboard({
           </div>
 
           <div className="rounded-xl border border-border bg-card">
-            <div className="border-b border-white/5 p-5">
+            <div className="border-b border-border p-5">
               <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                 {t("dashboard.executionResults")}
               </h2>
@@ -914,7 +914,7 @@ export default function Dashboard({
                             </p>
                           </div>
                           <span
-                            className={`shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium ${meta.badge.replace("bg-", "bg-white/10")}`}
+                            className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium font-mono", meta.badge)}
                           >
                             {t(meta.labelKey)}
                           </span>
@@ -927,8 +927,8 @@ export default function Dashboard({
             )}
           </div>
 
-          <div className="rounded-xl border border-white/5 bg-card">
-            <div className="border-b border-white/5 p-5">
+          <div className="rounded-xl border border-border bg-card">
+            <div className="border-b border-border p-5">
               <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                 {t("dashboard.needsAttention")}
               </h2>
@@ -1076,13 +1076,13 @@ function StatCard({
   const styles = TONE_STYLES[tone];
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/5 bg-card p-5">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-zinc-700/80">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+          <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
             {label}
           </p>
-          <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">
+          <p className="mt-1.5 text-2xl font-bold tracking-tight text-foreground">
             {loading ? (
               <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
             ) : (
@@ -1091,7 +1091,7 @@ function StatCard({
           </p>
         </div>
         <span
-          className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${styles.icon}`}
+          className={`flex size-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-white/10 ${styles.icon}`}
         >
           <Icon className="size-4.5" />
         </span>
@@ -1154,7 +1154,7 @@ function AttentionRow({
   }[tone];
 
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-white/5 bg-background/40 p-3">
+    <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/20 p-3">
       <span
         className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
       >
@@ -1181,7 +1181,7 @@ function SystemRow({
   text: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-white/5 bg-background/40 px-3 py-2.5">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
       <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <span className={`size-1.5 shrink-0 rounded-full ${dot}`} />
         {label}
@@ -1274,7 +1274,7 @@ function EmptyChart() {
   const { t } = useI18n();
 
   return (
-    <div className="flex h-52 flex-col items-center justify-center rounded-lg border border-white/5 bg-background/50 text-center">
+    <div className="flex h-52 flex-col items-center justify-center rounded-lg border border-border bg-muted/20 text-center">
       <p className="text-sm font-medium text-foreground">
         {t("dashboard.emptyTokens")}
       </p>

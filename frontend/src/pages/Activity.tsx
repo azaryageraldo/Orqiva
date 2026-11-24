@@ -183,7 +183,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-zinc-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
             <span>{status}</span>
           </span>
         );
@@ -196,18 +196,18 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
               {t("activity.title")}
             </h1>
-            <p className="mt-0.5 text-xs text-zinc-400">
-              Pantau riwayat sesi percakapan, eksekusi alur AI, dan eskalasi ke admin.
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Monitor conversation history, AI workflow executions, and escalations.
             </p>
           </div>
           <button
             type="button"
             onClick={() => void loadData(page, statusFilter, true)}
             disabled={loading || refreshing}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/10 bg-[#0d0e11] px-3 text-xs font-medium text-zinc-300 transition hover:bg-white/5 hover:text-zinc-100 disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground transition hover:bg-muted/40 disabled:opacity-50"
           >
             <RefreshCw
               className={cn("size-3.5", refreshing && "animate-spin text-primary")}
@@ -219,7 +219,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         {/* Toolbar & Filter Tabs */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Status Tabs */}
-          <div className="flex flex-wrap items-center gap-1 rounded-md border border-white/10 bg-[#0d0e11] p-1">
+          <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-card p-1">
             {filterTabs.map((tab) => {
               const isActive = statusFilter === tab.id;
               return (
@@ -233,8 +233,8 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
                     isActive
-                      ? "bg-white/10 text-zinc-100"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5",
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
                   )}
                 >
                   <span>{tab.label}</span>
@@ -242,8 +242,8 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                     className={cn(
                       "rounded px-1.5 text-[10px] font-mono",
                       isActive
-                        ? "bg-white/10 text-zinc-200"
-                        : "bg-white/5 text-zinc-500",
+                        ? "bg-primary/20 text-primary font-bold"
+                        : "bg-muted/40 text-muted-foreground",
                     )}
                   >
                     {tab.count}
@@ -255,21 +255,21 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
 
           {/* Search Box */}
           <div className="relative min-w-[220px] sm:max-w-[280px]">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-zinc-500" />
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder={t("activity.detail.searchPlaceholder")}
               aria-label={t("activity.detail.searchAria")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 rounded-md border-white/10 bg-[#0d0e11] pr-7 pl-8 text-xs text-zinc-200 placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:hidden"
+              className="h-8 rounded-md border-border bg-card pr-7 pl-8 text-xs text-foreground placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
                 aria-label="Clear search"
-                className="absolute top-1/2 right-2 -translate-y-1/2 text-zinc-500 transition hover:text-zinc-200"
+                className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
               >
                 <X className="size-3.5" />
               </button>
@@ -295,28 +295,28 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         )}
 
         {/* Table Container */}
-        <TableContainer className="rounded-md border border-border bg-card">
+        <TableContainer className="rounded-xl border border-border bg-card/80 backdrop-blur-sm shadow-xl shadow-black/40">
           <TableWrapper>
             <Table>
               <Thead>
-                <Tr className="border-b border-white/10 bg-white/[0.02]">
-                  <Th className="w-12 px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
+                <Tr className="border-b border-border bg-muted/20">
+                  <Th className="w-12 px-4 py-2.5 text-left font-medium text-xs text-muted-foreground">
                     #
                   </Th>
-                  <Th className="px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
+                  <Th className="px-4 py-2.5 text-left font-medium text-xs text-muted-foreground">
                     Customer & Session
                   </Th>
-                  <Th className="min-w-[180px] px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
+                  <Th className="min-w-[180px] px-4 py-2.5 text-left font-medium text-xs text-muted-foreground">
                     Workflow
                   </Th>
-                  <Th className="w-32 px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
+                  <Th className="w-32 px-4 py-2.5 text-left font-medium text-xs text-muted-foreground">
                     {t("activity.col.logStatus")}
                   </Th>
-                  <Th className="w-48 px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
-                    Waktu Sesi
+                  <Th className="w-48 px-4 py-2.5 text-left font-medium text-xs text-muted-foreground">
+                    Session Time
                   </Th>
-                  <Th className="w-20 px-4 py-2.5 text-right font-medium text-xs text-zinc-400">
-                    Aksi
+                  <Th className="w-20 px-4 py-2.5 text-right font-medium text-xs text-muted-foreground">
+                    Action
                   </Th>
                 </Tr>
               </Thead>
@@ -325,16 +325,16 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                   Array.from({ length: 5 }).map((_, index) => (
                     <Tr
                       key={`skeleton-${index}`}
-                      className="border-t border-white/[0.06]"
+                      className="border-t border-border"
                     >
                       <Td colSpan={6} className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="size-7 animate-pulse rounded-full bg-white/[0.06]" />
+                          <div className="size-7 animate-pulse rounded-full bg-muted/40" />
                           <div className="space-y-1.5 flex-1">
-                            <div className="h-3 w-40 animate-pulse rounded bg-white/[0.06]" />
-                            <div className="h-2 w-24 animate-pulse rounded bg-white/[0.04]" />
+                            <div className="h-3 w-40 animate-pulse rounded bg-muted/40" />
+                            <div className="h-2 w-24 animate-pulse rounded bg-muted/20" />
                           </div>
-                          <div className="h-4 w-16 animate-pulse rounded-full bg-white/[0.04]" />
+                          <div className="h-4 w-16 animate-pulse rounded-full bg-muted/20" />
                         </div>
                       </Td>
                     </Tr>
@@ -343,20 +343,20 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                   <Tr>
                     <Td colSpan={6}>
                       <div className="flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center">
-                        <span className="mb-2.5 flex size-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-500">
+                        <span className="mb-2.5 flex size-10 items-center justify-center rounded-lg border border-border bg-muted/30 text-muted-foreground">
                           {search ? (
-                            <AlertCircle className="size-5 text-zinc-400" />
+                            <AlertCircle className="size-5 text-muted-foreground" />
                           ) : (
-                            <ActivityIcon className="size-5 text-zinc-400" />
+                            <ActivityIcon className="size-5 text-muted-foreground" />
                           )}
                         </span>
-                        <h3 className="text-sm font-medium text-zinc-200">
+                        <h3 className="text-sm font-medium text-foreground">
                           {search ? t("activity.noMatch") : t("activity.empty")}
                         </h3>
-                        <p className="mt-1 max-w-sm text-xs text-zinc-500">
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
                           {search
                             ? t("activity.noMatchHint")
-                            : "Belum ada sesi percakapan atau alur kerja yang dijalankan."}
+                            : "No conversations or workflow executions yet."}
                         </p>
                       </div>
                     </Td>
@@ -377,28 +377,28 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                             String(execution.workflow_id),
                           )
                         }
-                        className="group cursor-pointer border-t border-white/[0.06] transition-colors hover:bg-white/[0.02]"
+                        className="group cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
                       >
                         {/* No */}
-                        <Td className="w-12 px-4 py-2.5 font-mono text-xs text-zinc-500">
+                        <Td className="w-12 px-4 py-2.5 font-mono text-xs text-muted-foreground">
                           {rowNumber}
                         </Td>
 
                         {/* Customer & Contact Info */}
                         <Td className="px-4 py-2.5 align-middle">
                           <div className="flex items-center gap-2.5">
-                            <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] font-medium text-zinc-300">
+                            <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 text-[10px] font-medium text-foreground">
                               {execution.contact_name ? (
                                 initials
                               ) : (
-                                <User className="size-3 text-zinc-500" />
+                                <User className="size-3 text-muted-foreground" />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="truncate text-xs font-medium text-zinc-200 group-hover:text-primary transition-colors">
+                              <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors">
                                 {contactName}
                               </p>
-                              <p className="text-[11px] font-mono text-zinc-500">
+                              <p className="text-[11px] font-mono text-muted-foreground">
                                 #{execution.session_id ?? execution.id}
                                 {execution.contact_id && ` · ${execution.contact_id}`}
                               </p>
@@ -409,8 +409,8 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                         {/* Workflow */}
                         <Td className="min-w-[180px] px-4 py-2.5 align-middle">
                           <div className="flex items-center gap-1.5">
-                            <GitFork className="size-3 rotate-90 text-zinc-500 shrink-0" />
-                            <span className="truncate text-xs text-zinc-300">
+                            <GitFork className="size-3 rotate-90 text-muted-foreground shrink-0" />
+                            <span className="truncate text-xs text-foreground/90">
                               {execution.workflow_name ||
                                 `Workflow #${execution.workflow_id}`}
                             </span>
@@ -423,14 +423,14 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                         </Td>
 
                         {/* Started At */}
-                        <Td className="w-48 px-4 py-2.5 align-middle text-xs text-zinc-400 whitespace-nowrap">
+                        <Td className="w-48 px-4 py-2.5 align-middle text-xs text-muted-foreground whitespace-nowrap">
                           {formatDate(execution.started_at, locale)}
                         </Td>
 
                         {/* Actions */}
                         <Td className="w-20 px-4 py-2.5 align-middle text-right">
-                          <span className="text-xs text-zinc-500 group-hover:text-zinc-200 transition-colors">
-                            Buka →
+                          <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                            Open →
                           </span>
                         </Td>
                       </Tr>
@@ -443,27 +443,27 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         </TableContainer>
 
         {/* Pagination Bar */}
-        <div className="flex items-center justify-between px-1 text-xs text-zinc-400">
+        <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
           <div>
-            Halaman <span className="font-mono text-zinc-200">{page}</span>
+            Page <span className="font-mono text-foreground font-medium">{page}</span>
           </div>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => void loadData(page - 1, statusFilter)}
               disabled={loading || page <= 1}
-              className="inline-flex h-7 items-center gap-1 rounded border border-white/10 bg-[#0d0e11] px-2 text-xs text-zinc-300 transition hover:bg-white/5 hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex h-7 items-center gap-1 rounded border border-border bg-card px-2 text-xs text-foreground transition hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="size-3" />
-              <span>Sebelumnya</span>
+              <span>Previous</span>
             </button>
             <button
               type="button"
               onClick={() => void loadData(page + 1, statusFilter)}
               disabled={loading || !hasMore}
-              className="inline-flex h-7 items-center gap-1 rounded border border-white/10 bg-[#0d0e11] px-2 text-xs text-zinc-300 transition hover:bg-white/5 hover:text-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex h-7 items-center gap-1 rounded border border-border bg-card px-2 text-xs text-foreground transition hover:bg-muted/40 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <span>Berikutnya</span>
+              <span>Next</span>
               <ChevronRight className="size-3" />
             </button>
           </div>

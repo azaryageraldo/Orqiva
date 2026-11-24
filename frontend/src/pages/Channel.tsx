@@ -614,7 +614,7 @@ export default function Channel() {
                   <div className="tg-chat-wallpaper pointer-events-none absolute inset-0 opacity-70" />
                   <div className="relative flex h-full min-h-[320px] flex-col items-center justify-center gap-3 p-5 2xl:min-h-[380px]">
                     <div
-                      className="w-full max-w-[290px] overflow-hidden rounded-2xl border border-white/10 shadow-[0_24px_70px_-24px_rgba(0,0,0,0.9)] 2xl:max-w-[320px]"
+                      className="w-full max-w-[290px] overflow-hidden rounded-2xl border border-border shadow-[0_24px_70px_-24px_rgba(0,0,0,0.9)] 2xl:max-w-[320px]"
                       style={{ backgroundColor: appearance.background_color }}
                     >
                       <div
@@ -1138,7 +1138,7 @@ export default function Channel() {
               </div>
 
               <div
-                className="overflow-hidden rounded-lg border border-white/10"
+                className="overflow-hidden rounded-lg border border-border"
                 style={{ backgroundColor: appearance.background_color }}
               >
                 <div
@@ -1476,7 +1476,7 @@ export default function Channel() {
                     <input
                       readOnly
                       value={`${window.location.origin}/api/v1/public/telegram/${telegram.public_token}/webhook`}
-                      className="h-8 flex-1 rounded-md border border-white/[0.08] bg-black/40 px-2.5 font-mono text-[11px] text-zinc-300 select-all"
+                      className="h-8 flex-1 rounded-md border border-border bg-muted/30 px-2.5 font-mono text-[11px] text-foreground select-all"
                     />
                     <Button
                       type="button"
@@ -1489,7 +1489,7 @@ export default function Channel() {
                         setWebhookCopied(true);
                         setTimeout(() => setWebhookCopied(false), 2000);
                       }}
-                      className="h-8 px-2.5 text-xs border-white/[0.08] hover:bg-white/[0.04]"
+                      className="h-8 px-2.5 text-xs border-border hover:bg-muted/40"
                     >
                       {webhookCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
                     </Button>

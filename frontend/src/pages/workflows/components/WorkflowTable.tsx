@@ -58,26 +58,26 @@ export default function WorkflowTable({
       <TableWrapper>
         <Table>
           <Thead>
-            <Tr className="border-b border-white/[0.08] bg-white/[0.02]">
+            <Tr className="border-b border-border bg-muted/20">
               <Th className="w-10 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={allSelected}
                   onChange={() => onSelectAll(!allSelected)}
                   aria-label={t("wf.selectAll")}
-                  className="size-3.5 cursor-pointer rounded-[4px] border-white/20 bg-transparent accent-[var(--primary)]"
+                  className="size-3.5 cursor-pointer rounded-[4px] border-border bg-transparent accent-[var(--primary)]"
                 />
               </Th>
-              <Th className="px-4 py-3 text-left font-medium text-xs text-zinc-400">
+              <Th className="px-4 py-3 text-left font-medium text-xs text-muted-foreground">
                 Workflow
               </Th>
-              <Th className="w-36 px-4 py-3 text-left font-medium text-xs text-zinc-400">
+              <Th className="w-36 px-4 py-3 text-left font-medium text-xs text-muted-foreground">
                 {t("wf.col.status")}
               </Th>
-              <Th className="w-48 px-4 py-3 text-left font-medium text-xs text-zinc-400">
+              <Th className="w-48 px-4 py-3 text-left font-medium text-xs text-muted-foreground">
                 Last Updated
               </Th>
-              <Th className="w-36 px-4 py-3 text-right font-medium text-xs text-zinc-400">
+              <Th className="w-36 px-4 py-3 text-right font-medium text-xs text-muted-foreground">
                 {t("wf.col.actions")}
               </Th>
             </Tr>
@@ -85,16 +85,16 @@ export default function WorkflowTable({
           <Tbody>
             {loading ? (
               Array.from({ length: 4 }).map((_, index) => (
-                <Tr key={`skeleton-${index}`} className="border-t border-white/[0.06]">
+                <Tr key={`skeleton-${index}`} className="border-t border-border">
                   <Td colSpan={5} className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="size-3.5 animate-pulse rounded bg-white/[0.06]" />
-                      <div className="size-9 animate-pulse rounded-lg bg-white/[0.06]" />
+                      <div className="size-3.5 animate-pulse rounded bg-muted/40" />
+                      <div className="size-9 animate-pulse rounded-lg bg-muted/40" />
                       <div className="space-y-1.5">
-                        <div className="h-3.5 w-48 animate-pulse rounded bg-white/[0.06]" />
-                        <div className="h-2.5 w-72 animate-pulse rounded bg-white/[0.04]" />
+                        <div className="h-3.5 w-48 animate-pulse rounded bg-muted/40" />
+                        <div className="h-2.5 w-72 animate-pulse rounded bg-muted/20" />
                       </div>
-                      <div className="ml-auto h-6 w-20 animate-pulse rounded-full bg-white/[0.04]" />
+                      <div className="ml-auto h-6 w-20 animate-pulse rounded-full bg-muted/20" />
                     </div>
                   </Td>
                 </Tr>
@@ -103,13 +103,13 @@ export default function WorkflowTable({
               <Tr>
                 <Td colSpan={5}>
                   <div className="flex min-h-72 flex-col items-center justify-center px-6 py-14 text-center">
-                    <div className="relative mb-4 flex size-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-zinc-400 shadow-inner">
+                    <div className="relative mb-4 flex size-14 items-center justify-center rounded-2xl border border-border bg-muted/30 text-muted-foreground shadow-inner">
                       <GitFork className="size-7 rotate-90 text-primary/70" />
                     </div>
-                    <h3 className="text-sm font-semibold text-zinc-200">
+                    <h3 className="text-sm font-semibold text-foreground">
                       {searchQuery ? t("wf.noMatch") : "No workflows yet"}
                     </h3>
-                    <p className="mt-1.5 max-w-sm text-xs text-zinc-400 leading-relaxed">
+                    <p className="mt-1.5 max-w-sm text-xs text-muted-foreground leading-relaxed">
                       {searchQuery
                         ? "Try another search keyword or clear the search input."
                         : "Design your automated conversation flows to handle customer inquiries intelligently."}

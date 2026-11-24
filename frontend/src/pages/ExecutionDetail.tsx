@@ -293,20 +293,20 @@ export default function ExecutionDetail({
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-primary">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/30 text-primary">
                 <GitFork className="size-5 rotate-90" />
               </div>
               <div>
-                <h1 className="text-base font-semibold text-zinc-100">
+                <h1 className="text-base font-semibold text-foreground">
                   {detail.workflow_name || `Workflow #${detail.workflow_id}`}
                 </h1>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-muted-foreground">
                   Contact:{" "}
-                  <span className="font-medium text-zinc-200">
+                  <span className="font-medium text-foreground">
                     {detail.contact_name || "New Customer"}
                   </span>
                   {detail.contact_public_id && (
-                    <span className="font-mono text-zinc-500">
+                    <span className="font-mono text-muted-foreground">
                       {" "}
                       ({detail.contact_public_id})
                     </span>
@@ -365,28 +365,28 @@ export default function ExecutionDetail({
                   <button
                     type="button"
                     onClick={() => setShowHistory(!showHistory)}
-                    className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                    className="inline-flex items-center gap-1 rounded border border-border bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <History className="size-3 text-zinc-400" />
+                    <History className="size-3 text-muted-foreground" />
                     <span>
                       {showHistory
-                        ? "Sembunyikan Riwayat"
-                        : `Riwayat (${conversationHistory.length})`}
+                        ? "Hide History"
+                        : `History (${conversationHistory.length})`}
                     </span>
                   </button>
                 )}
-                <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] font-mono text-zinc-400">
-                  {(customerInputText ? 1 : 0) + allMessages.length} pesan
+                <span className="rounded bg-muted/40 px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
+                  {(customerInputText ? 1 : 0) + allMessages.length} messages
                 </span>
               </div>
             </div>
 
             <div className="flex-1 min-h-[380px] max-h-[560px] overflow-y-auto p-4 space-y-3.5">
-              {/* Riwayat percakapan sebelumnya jika dibuka */}
+              {/* Previous conversation history if opened */}
               {showHistory && conversationHistory.length > 0 && (
-                <div className="space-y-3 pb-2 border-b border-white/10">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Riwayat Sesi Sebelumnya ({conversationHistory.length})
+                <div className="space-y-3 pb-2 border-b border-border">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Previous Session History ({conversationHistory.length})
                   </p>
                   {conversationHistory.map((item, index) => {
                     const isCustomer = item.role === "customer";
@@ -399,7 +399,7 @@ export default function ExecutionDetail({
                           key={`hist-${index}`}
                           className="flex justify-center my-1"
                         >
-                          <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[10px] text-zinc-500 italic">
+                          <span className="rounded-full bg-muted/40 px-2.5 py-0.5 text-[10px] text-muted-foreground italic">
                             {item.content}
                           </span>
                         </div>
@@ -414,7 +414,7 @@ export default function ExecutionDetail({
                           isCustomer ? "items-end" : "items-start"
                         )}
                       >
-                        <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                           {isCustomer ? (
                             <span>{detail.contact_name || "Customer"}</span>
                           ) : isAdmin ? (
@@ -427,8 +427,8 @@ export default function ExecutionDetail({
                           className={cn(
                             "rounded-xl p-2.5 text-xs max-w-[85%] whitespace-pre-wrap",
                             isCustomer
-                              ? "bg-white/5 text-zinc-300 border border-white/5"
-                              : "bg-primary/[0.04] text-zinc-300 border border-primary/10"
+                              ? "bg-muted/40 text-foreground border border-border"
+                              : "bg-primary/[0.04] text-foreground border border-primary/20"
                           )}
                         >
                           {item.content}
@@ -436,20 +436,20 @@ export default function ExecutionDetail({
                       </div>
                     );
                   })}
-                  <div className="my-3 flex items-center gap-2 text-[10px] text-zinc-500 font-medium tracking-wider uppercase">
-                    <div className="h-px flex-1 bg-white/10" />
+                  <div className="my-3 flex items-center gap-2 text-[10px] text-muted-foreground font-medium tracking-wider uppercase">
+                    <div className="h-px flex-1 bg-border" />
                     <span>This Execution Started</span>
-                    <div className="h-px flex-1 bg-white/10" />
+                    <div className="h-px flex-1 bg-border" />
                   </div>
                 </div>
               )}
 
               {!customerInputText && allMessages.length === 0 ? (
                 <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center">
-                  <div className="mb-2 flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-500">
+                  <div className="mb-2 flex size-10 items-center justify-center rounded-full border border-border bg-muted/30 text-muted-foreground">
                     <MessageSquare className="size-5" />
                   </div>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-muted-foreground">
                     No conversation responses were generated in this session.
                   </p>
                 </div>
@@ -458,16 +458,16 @@ export default function ExecutionDetail({
                   {/* Incoming Customer Message (Turn Trigger) */}
                   {customerInputText && (
                     <div className="flex flex-col items-end space-y-1">
-                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
-                        <span className="font-medium text-zinc-200">
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <span className="font-medium text-foreground">
                           {detail.contact_name || "Customer"}
                         </span>
-                        <span className="inline-flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.2 text-[9px] font-medium text-zinc-300">
-                          <User className="size-2.5 text-zinc-400" />
+                        <span className="inline-flex items-center gap-1 rounded bg-muted/40 px-1.5 py-0.2 text-[9px] font-medium text-foreground">
+                          <User className="size-2.5 text-muted-foreground" />
                           Incoming Trigger
                         </span>
                       </div>
-                      <div className="rounded-2xl rounded-tr-sm border border-white/15 bg-white/10 p-3 text-xs leading-relaxed text-zinc-100 max-w-[85%] whitespace-pre-wrap shadow-sm">
+                      <div className="rounded-2xl rounded-tr-sm border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground max-w-[85%] whitespace-pre-wrap shadow-sm">
                         {customerInputText}
                       </div>
                     </div>
@@ -571,21 +571,21 @@ export default function ExecutionDetail({
           </button>
 
           {showRawPayload && (
-            <div className="grid gap-4 border-t border-white/10 p-4 lg:grid-cols-2">
+            <div className="grid gap-4 border-t border-border p-4 lg:grid-cols-2">
               <div>
-                <p className="text-xs font-medium text-zinc-400 mb-2">
+                <p className="text-xs font-medium text-muted-foreground mb-2">
                   Input Payload:
                 </p>
-                <pre className="max-h-60 overflow-auto rounded-lg border border-white/10 bg-[#08090b] p-3 text-[11px] font-mono text-zinc-300">
+                <pre className="max-h-60 overflow-auto rounded-lg border border-border bg-card p-3 text-[11px] font-mono text-foreground">
                   {JSON.stringify(detail.input, null, 2)}
                 </pre>
               </div>
 
               <div>
-                <p className="text-xs font-medium text-zinc-400 mb-2">
+                <p className="text-xs font-medium text-muted-foreground mb-2">
                   Final Output:
                 </p>
-                <pre className="max-h-60 overflow-auto rounded-lg border border-white/10 bg-[#08090b] p-3 text-[11px] font-mono text-zinc-300">
+                <pre className="max-h-60 overflow-auto rounded-lg border border-border bg-card p-3 text-[11px] font-mono text-foreground">
                   {JSON.stringify(detail.output ?? {}, null, 2)}
                 </pre>
               </div>
