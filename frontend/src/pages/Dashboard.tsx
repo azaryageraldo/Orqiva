@@ -39,8 +39,16 @@ import type { Workflow as WorkflowItem } from "../types/workflow";
 
 type Health = "checking" | "online" | "offline";
 
+export type QueueHealth = {
+  driver: string;
+  pending_jobs: number;
+  stalled_jobs: number;
+  worker_status: "idle" | "stalled";
+};
+
 interface DashboardProps {
   health: Health;
+  queueHealth?: QueueHealth | null;
   onViewActivity?: () => void;
 }
 
@@ -241,7 +249,11 @@ function formatDate(value: string | null, language: Language): string {
   return Number.isNaN(date.getTime()) ? "—" : DATE_FORMATS[language].format(date);
 }
 
-export default function Dashboard({ health, onViewActivity }: DashboardProps) {
+export default function Dashboard({
+  health,
+  queueHealth,
+  onViewActivity,
+}: DashboardProps) {
   const { language, t } = useI18n();
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [activity, setActivity] = useState<ActivityStats | null>(null);
@@ -506,6 +518,24 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
             >
               {t("dashboard.retry")}
             </Button>
+          </div>
+        )}
+
+        {queueHealth && queueHealth.stalled_jobs > 0 && (
+          <div
+            role="alert"
+            className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200"
+          >
+            <CircleAlert className="size-4 shrink-0 text-amber-400 mt-0.5" />
+            <div className="flex-1 leading-relaxed">
+              <span className="font-semibold text-amber-300">Peringatan Antrean Latar:</span>{" "}
+              Terdapat {queueHealth.stalled_jobs} pesan yang menunggu lebih dari 2 menit di antrean.
+              Pastikan worker{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-amber-100">
+                php artisan queue:work
+              </code>{" "}
+              sedang berjalan di server agar pesan pelanggan diproses normal oleh AI.
+            </div>
           </div>
         )}
 
@@ -954,6 +984,32 @@ export default function Dashboard({ health, onViewActivity }: DashboardProps) {
                   value={t(HEALTH_STYLES[health].labelKey)}
                   dot={HEALTH_STYLES[health].dot}
                   text={HEALTH_STYLES[health].text}
+                />
+                <SystemRow
+                  label="Antrean Latar (Queue)"
+                  value={
+                    !queueHealth
+                      ? "Memeriksa..."
+                      : queueHealth.driver === "sync"
+                        ? "Sinkron (sync)"
+                        : queueHealth.stalled_jobs > 0
+                          ? `Tertahan (${queueHealth.stalled_jobs})`
+                          : `Siap (${queueHealth.pending_jobs} antre)`
+                  }
+                  dot={
+                    !queueHealth
+                      ? "bg-amber-400 animate-pulse"
+                      : queueHealth.stalled_jobs > 0
+                        ? "bg-amber-400"
+                        : "bg-emerald-400"
+                  }
+                  text={
+                    !queueHealth
+                      ? "text-amber-400"
+                      : queueHealth.stalled_jobs > 0
+                        ? "text-amber-300 font-medium"
+                        : "text-emerald-400"
+                  }
                 />
                 <SystemRow
                   label={t("dashboard.tokenTracking")}

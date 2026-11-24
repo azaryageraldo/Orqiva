@@ -13,12 +13,31 @@ use App\Http\Controllers\Api\WorkflowExecutionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-    Route::get('/health', static fn () => response()->json([
-        'data' => [
-            'status' => 'ok',
-            'service' => 'orqiva-api',
-        ],
-    ]));
+    Route::get('/health', static function () {
+        $queueDriver = config('queue.default');
+        $pendingJobs = 0;
+        $stalledJobs = 0;
+
+        if ($queueDriver === 'database' && \Illuminate\Support\Facades\Schema::hasTable('jobs')) {
+            $pendingJobs = \Illuminate\Support\Facades\DB::table('jobs')->count();
+            $stalledJobs = \Illuminate\Support\Facades\DB::table('jobs')
+                ->where('created_at', '<', now()->subMinutes(2)->timestamp)
+                ->count();
+        }
+
+        return response()->json([
+            'data' => [
+                'status' => 'ok',
+                'service' => 'orqiva-api',
+                'queue' => [
+                    'driver' => $queueDriver,
+                    'pending_jobs' => $pendingJobs,
+                    'stalled_jobs' => $stalledJobs,
+                    'worker_status' => $stalledJobs > 0 ? 'stalled' : 'idle',
+                ],
+            ],
+        ]);
+    });
 
     Route::get('/setup/status', [SetupController::class, 'status'])
         ->middleware('throttle:setup');

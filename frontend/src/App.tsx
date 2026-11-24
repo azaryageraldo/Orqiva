@@ -12,6 +12,7 @@ import { LoaderCircle } from "lucide-react";
 import Login from "./Login";
 import { getCurrentUser, logout } from "./services/auth";
 import { UNAUTHORIZED_EVENT } from "./services/api";
+import { getActivity } from "./services/stats";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import type { NavKey } from "./components/layout/Sidebar";
 import { Button } from "./components/ui/button";
@@ -130,8 +131,22 @@ export default function App() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [queueHealth, setQueueHealth] = useState<{
+    driver: string;
+    pending_jobs: number;
+    stalled_jobs: number;
+    worker_status: "idle" | "stalled";
+  } | null>(null);
 
   const markAsRead = useCallback((id: string) => {
+    try {
+      const stored = localStorage.getItem("orqiva_read_notifs");
+      const list = stored ? JSON.parse(stored) : [];
+      if (!list.includes(id)) {
+        localStorage.setItem("orqiva_read_notifs", JSON.stringify([...list, id]));
+      }
+    } catch {}
+
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
     );
@@ -139,11 +154,12 @@ export default function App() {
 
   const onNotificationClick = useCallback(
     (item: NotificationItem) => {
+      markAsRead(item.id);
       if (item.url) {
         navigate(item.url);
       }
     },
-    [navigate],
+    [navigate, markAsRead],
   );
 
   const activeNav: NavKey = useMemo(() => {
@@ -167,36 +183,47 @@ export default function App() {
         setUser(currentUser);
         setAuthenticated(true);
 
-        // Add sample notifications for demonstration
-        setNotifications([
-          {
-            id: "notif-1",
-            type: "workflow.created",
-            title: "New workflow created",
-            description: "Customer Support Bot was added",
-            timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-            read: false,
-            url: "/workflows",
-          },
-          {
-            id: "notif-2",
-            type: "workflow.error",
-            title: "Workflow error",
-            description: "Lead Generation failed to execute",
-            timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-            read: false,
-            url: "/activity",
-          },
-          {
-            id: "notif-3",
-            type: "api.key.added",
-            title: "API key added",
-            description: "Gemini API key was connected",
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            read: true,
-            url: "/ai-providers",
-          },
-        ]);
+        // Load real notifications from recent executions
+        getActivity(15)
+          .then((stats) => {
+            if (!active) return;
+            let readList: string[] = [];
+            try {
+              const stored = localStorage.getItem("orqiva_read_notifs");
+              if (stored) readList = JSON.parse(stored);
+            } catch {}
+
+            const realNotifs: NotificationItem[] = [];
+
+            for (const exec of stats.executions) {
+              if (exec.status === "failed") {
+                const id = `exec-fail-${exec.id}`;
+                realNotifs.push({
+                  id,
+                  type: "workflow.error",
+                  title: "Workflow gagal",
+                  description: `${exec.workflow_name || "Workflow"} #${exec.workflow_id}: ${exec.error || "Gagal dieksekusi"}`,
+                  timestamp: exec.started_at || new Date().toISOString(),
+                  read: readList.includes(id),
+                  url: `/activity/${exec.workflow_id}/${exec.id}`,
+                });
+              } else if (exec.session_status === "human" || exec.status === "escalated") {
+                const id = `exec-esc-${exec.id}`;
+                realNotifs.push({
+                  id,
+                  type: "message.received",
+                  title: "Eskalasi ke Admin",
+                  description: `Sesi ${exec.contact_name || "Pelanggan"} membutuhkan respons CS`,
+                  timestamp: exec.started_at || new Date().toISOString(),
+                  read: readList.includes(id),
+                  url: "/inbox",
+                });
+              }
+            }
+
+            setNotifications(realNotifs.slice(0, 8));
+          })
+          .catch(() => {});
       })
       .catch(() => {
         if (!active) return;
@@ -234,8 +261,13 @@ export default function App() {
         if (!response.ok) {
           throw new Error("API unavailable");
         }
-
+        return response.json();
+      })
+      .then((json) => {
         setHealth("online");
+        if (json?.data?.queue) {
+          setQueueHealth(json.data.queue);
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -323,6 +355,7 @@ export default function App() {
             element={
               <Dashboard
                 health={health}
+                queueHealth={queueHealth}
                 onViewActivity={() => navigate("/activity")}
               />
             }
