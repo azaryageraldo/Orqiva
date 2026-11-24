@@ -1,4 +1,5 @@
-import { Plus, Search, Trash2, X } from "lucide-react";
+import { useRef } from "react";
+import { Plus, Search, Trash2, Upload, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ interface WorkflowToolbarProps {
   activeCount: number;
   inactiveCount: number;
   onCreate: () => void;
+  onImport?: (file: File) => void;
+  importing?: boolean;
   onDeleteSelected: () => void;
   selectedCount: number;
   t: (key: string, params?: Record<string, string | number>) => string;
@@ -33,12 +36,15 @@ export default function WorkflowToolbar({
   activeCount,
   inactiveCount,
   onCreate,
+  onImport,
+  importing,
   onDeleteSelected,
   selectedCount,
   t,
   className,
   deletingSelected,
 }: WorkflowToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const filterTabs: Array<{ id: WorkflowFilterStatus; label: string; count: number }> = [
     { id: "all", label: "Semua", count: totalCount },
     { id: "active", label: t("wf.on"), count: activeCount },
@@ -124,6 +130,30 @@ export default function WorkflowToolbar({
             <span>{t("wf.deleteSelected", { count: selectedCount })}</span>
           </Button>
         )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && onImport) {
+              onImport(file);
+              e.target.value = "";
+            }
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={importing}
+          onClick={() => fileInputRef.current?.click()}
+          className="h-8 gap-1.5 rounded-lg border-white/[0.08] bg-[#0c0d11] px-3 text-xs font-medium text-zinc-300 hover:bg-white/[0.05] hover:text-white"
+        >
+          <Upload className="size-3.5" />
+          <span>{importing ? "Mengimpor..." : "Impor"}</span>
+        </Button>
         <Button
           type="button"
           size="sm"

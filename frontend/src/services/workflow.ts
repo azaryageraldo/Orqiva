@@ -70,6 +70,29 @@ export async function deleteWorkflow(id: string): Promise<void> {
   await api.delete(`/workflows/${id}`);
 }
 
+export type WorkflowTemplate = {
+  schema_version: number;
+  type: string;
+  exported_at: string;
+  workflow: {
+    name: string;
+    description: string | null;
+    definition: Workflow["definition"];
+  };
+};
+
+export async function exportWorkflow(id: string): Promise<WorkflowTemplate> {
+  const response = await api.get<{ data: WorkflowTemplate }>(`/workflows/${id}/export`);
+  return response.data.data;
+}
+
+export async function importWorkflow(
+  payload: Record<string, unknown>,
+): Promise<Workflow> {
+  const response = await api.post<{ data: Workflow }>("/workflows/import", payload);
+  return response.data.data;
+}
+
 export type WorkflowExecutionResult = {
   message: string;
   data: {

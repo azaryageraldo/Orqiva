@@ -1,4 +1,4 @@
-import { ArrowUpRight, GitFork, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, Download, GitFork, Pencil, Trash2 } from "lucide-react";
 
 import type { Workflow as WorkflowItem } from "@/types/workflow";
 import WorkflowStatusToggle from "./WorkflowStatusToggle";
@@ -14,6 +14,7 @@ interface WorkflowRowProps {
   onEdit: (item: WorkflowItem) => void;
   onDelete: (item: WorkflowItem) => void;
   onToggleStatus: (item: WorkflowItem) => void;
+  onExport?: (item: WorkflowItem) => void;
 }
 
 export default function WorkflowRow({
@@ -27,6 +28,7 @@ export default function WorkflowRow({
   onEdit,
   onDelete,
   onToggleStatus,
+  onExport,
 }: WorkflowRowProps) {
   const isActive = item.status === "active";
 
@@ -103,6 +105,15 @@ export default function WorkflowRow({
             className="flex size-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-primary/[0.1] hover:text-primary focus-visible:outline-none"
           >
             <ArrowUpRight className="size-4" />
+          </button>
+          <button
+            type="button"
+            title="Ekspor Template JSON"
+            aria-label="Ekspor Template JSON"
+            onClick={() => onExport?.(item)}
+            className="flex size-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:outline-none"
+          >
+            <Download className="size-3.5" />
           </button>
           <button
             type="button"

@@ -297,4 +297,72 @@ class WorkflowApiTest extends TestCase
             array_column($response->json('data.data'), 'name')
         );
     }
+
+    public function test_export_returns_workflow_template(): void
+    {
+        $owner = $this->user();
+        $workflow = Workflow::create([
+            'user_id' => $owner->id,
+            'name' => 'Template Flow',
+            'description' => 'Contoh template',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->getJson("/api/v1/workflows/{$workflow->id}/export");
+
+        $response->assertOk();
+        $this->assertSame('orqiva-workflow-template', $response->json('data.type'));
+        $this->assertSame('Template Flow', $response->json('data.workflow.name'));
+        $this->assertSame('Contoh template', $response->json('data.workflow.description'));
+    }
+
+    public function test_export_denies_other_user(): void
+    {
+        $owner = $this->user();
+        $other = $this->user('other-user@example.com');
+        $workflow = Workflow::create([
+            'user_id' => $owner->id,
+            'name' => 'Secret Flow',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $this->actingAs($other)
+            ->getJson("/api/v1/workflows/{$workflow->id}/export")
+            ->assertNotFound();
+    }
+
+    public function test_import_creates_new_workflow(): void
+    {
+        $owner = $this->user();
+
+        $response = $this->actingAs($owner)->postJson('/api/v1/workflows/import', [
+            'workflow' => [
+                'name' => 'Imported CS Flow',
+                'description' => 'Imported via JSON',
+                'definition' => $this->singleAgentDefinition(),
+            ],
+        ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('workflows', [
+            'user_id' => $owner->id,
+            'name' => 'Imported CS Flow',
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_import_rejects_invalid_definition(): void
+    {
+        $owner = $this->user();
+
+        $response = $this->actingAs($owner)->postJson('/api/v1/workflows/import', [
+            'workflow' => [
+                'name' => 'Broken Flow',
+                'definition' => 'not an array',
+            ],
+        ]);
+
+        $response->assertStatus(422);
+    }
 }

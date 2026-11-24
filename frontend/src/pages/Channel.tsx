@@ -47,8 +47,10 @@ import {
   createChannel,
   deleteChannelIcon,
   getChannel,
+  getTelegramWebhook,
   getWorkflowOptions,
   listChannels,
+  manageTelegramWebhook,
   regenerateChannelToken,
   updateChannel,
   updateChannelById,
@@ -56,6 +58,7 @@ import {
   type ChannelAppearance,
   type ChannelIconKind,
   type ChannelOpenMode,
+  type TelegramWebhookInfo,
   type WidgetChannel,
   type WorkflowOption,
 } from "../services/channel";
@@ -146,6 +149,9 @@ export default function Channel() {
   const [telegramActive, setTelegramActive] = useState(false);
   const [botToken, setBotToken] = useState("");
   const [telegramSaving, setTelegramSaving] = useState(false);
+  const [webhookInfo, setWebhookInfo] = useState<TelegramWebhookInfo | null>(null);
+  const [webhookCopied, setWebhookCopied] = useState(false);
+  const [webhookBusy, setWebhookBusy] = useState(false);
 
   function applyChannel(value: WidgetChannel) {
     setChannel(value);
@@ -313,9 +319,54 @@ export default function Channel() {
         telegram.workflow_id ? String(telegram.workflow_id) : "",
       );
       setTelegramActive(telegram.is_active);
+
+      getTelegramWebhook(telegram.id)
+        .then((info) => setWebhookInfo(info))
+        .catch(() => setWebhookInfo(null));
+    } else {
+      setWebhookInfo(null);
     }
 
     setTelegramOpen(true);
+  }
+
+  async function handleSetWebhook() {
+    if (!telegram) return;
+    setWebhookBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const hookUrl = `${window.location.origin}/api/v1/public/telegram/${telegram.public_token}/webhook`;
+      await manageTelegramWebhook(telegram.id, "set", hookUrl);
+      const info = await getTelegramWebhook(telegram.id);
+      setWebhookInfo(info);
+      setNotice("Webhook berhasil didaftarkan ke Telegram.");
+    } catch (caught) {
+      setError(
+        getErrorMessage(
+          caught,
+          "Gagal mendaftarkan webhook. Pastikan server dapat diakses dengan domain / HTTPS publik.",
+        ),
+      );
+    } finally {
+      setWebhookBusy(false);
+    }
+  }
+
+  async function handleDeleteWebhook() {
+    if (!telegram) return;
+    setWebhookBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await manageTelegramWebhook(telegram.id, "delete");
+      setWebhookInfo({ url: "" });
+      setNotice("Webhook dinonaktifkan. Anda dapat menggunakan polling (php artisan channels:telegram-poll).");
+    } catch (caught) {
+      setError(getErrorMessage(caught, "Gagal menghapus webhook."));
+    } finally {
+      setWebhookBusy(false);
+    }
   }
 
   async function saveTelegram() {
@@ -1384,6 +1435,88 @@ export default function Channel() {
                 </span>
               </span>
             </label>
+
+            {telegram && (
+              <div className="space-y-3 rounded-xl border border-white/[0.08] bg-[#0c0d11]/60 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-zinc-200">
+                      Webhook Telegram
+                    </span>
+                    <span className="rounded bg-sky-400/10 px-2 py-0.5 text-[10px] font-medium text-sky-400">
+                      Opsional
+                    </span>
+                  </div>
+                  {webhookInfo?.url ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400">
+                      <span className="size-1.5 rounded-full bg-emerald-400" />
+                      Aktif (Webhook)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
+                      <span className="size-1.5 rounded-full bg-zinc-500" />
+                      Polling Mode
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Jika Orqiva dipasang di server publik dengan domain HTTPS, Anda dapat mendaftarkan Webhook agar Telegram mengirim pesan instan tanpa perlu menjalankan antrean polling di terminal.
+                </p>
+
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-medium text-zinc-300">URL Webhook:</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={`${window.location.origin}/api/v1/public/telegram/${telegram.public_token}/webhook`}
+                      className="h-8 flex-1 rounded-md border border-white/[0.08] bg-black/40 px-2.5 font-mono text-[11px] text-zinc-300 select-all"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(
+                          `${window.location.origin}/api/v1/public/telegram/${telegram.public_token}/webhook`,
+                        );
+                        setWebhookCopied(true);
+                        setTimeout(() => setWebhookCopied(false), 2000);
+                      }}
+                      className="h-8 px-2.5 text-xs border-white/[0.08] hover:bg-white/[0.04]"
+                    >
+                      {webhookCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={webhookBusy}
+                    onClick={() => void handleSetWebhook()}
+                    className="h-7 text-xs border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
+                  >
+                    {webhookBusy ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : null}
+                    Daftarkan Webhook
+                  </Button>
+                  {webhookInfo?.url && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={webhookBusy}
+                      onClick={() => void handleDeleteWebhook()}
+                      className="h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                    >
+                      Hapus (Gunakan Polling)
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-2">

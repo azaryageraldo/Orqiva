@@ -6,7 +6,9 @@ import { useI18n } from "@/lib/i18n";
 import {
   createWorkflow,
   deleteWorkflow,
+  exportWorkflow,
   getWorkflows,
+  importWorkflow,
   updateWorkflow,
 } from "@/services/workflow";
 import { getErrorMessage } from "@/services/api";
@@ -63,6 +65,7 @@ export default function Workflows({
   const [savingEdit, setSavingEdit] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [importing, setImporting] = useState(false);
   const requestRef = useRef(0);
 
   const dateFormatter = useMemo(
@@ -151,6 +154,52 @@ export default function Workflows({
       window.clearTimeout(loadingTimer);
     };
   }, [searchQuery, t]);
+
+  async function handleExport(item: WorkflowItem) {
+    setError("");
+    setSuccess("");
+    try {
+      const template = await exportWorkflow(String(item.id));
+      const blob = new Blob([JSON.stringify(template, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const slug = item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      a.download = `${slug || "workflow"}-template.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSuccess(`Template alur kerja "${item.name}" berhasil diunduh.`);
+    } catch (caught) {
+      setError(getErrorMessage(caught, "Gagal mengekspor alur kerja."));
+    }
+  }
+
+  async function handleImport(file: File) {
+    if (importing) return;
+    setImporting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const created = await importWorkflow(parsed);
+      setSuccess(`Alur kerja "${created.name}" berhasil diimpor.`);
+      await loadWorkflows(1, "");
+    } catch (caught) {
+      setError(
+        getErrorMessage(
+          caught,
+          "Gagal mengimpor alur kerja. Pastikan berkas adalah JSON template yang valid.",
+        ),
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -382,6 +431,8 @@ export default function Workflows({
               activeCount={activeCount}
               inactiveCount={inactiveCount}
               onCreate={() => setShowCreate(true)}
+              onImport={handleImport}
+              importing={importing}
               onDeleteSelected={handleDeleteSelected}
               selectedCount={selectedIds.size}
               t={t}
@@ -435,6 +486,7 @@ export default function Workflows({
               onEdit={beginEdit}
               onDelete={setWorkflowToDelete}
               onToggleStatus={toggleStatus}
+              onExport={handleExport}
               onCreateNew={() => setShowCreate(true)}
               allSelected={allSelected}
               searchQuery={searchQuery}

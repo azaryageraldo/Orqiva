@@ -136,6 +136,56 @@ class WorkflowService
     }
 
     /**
+     * Ekspor workflow sebagai template terstruktur.
+     */
+    public function exportWorkflow(User $user, int $id): array
+    {
+        $workflow = $this->getWorkflow($user, $id);
+
+        return [
+            'schema_version' => 1,
+            'type' => 'orqiva-workflow-template',
+            'exported_at' => now()->toIso8601String(),
+            'workflow' => [
+                'name' => $workflow->name,
+                'description' => $workflow->description,
+                'definition' => $workflow->definition,
+            ],
+        ];
+    }
+
+    /**
+     * Impor template workflow menjadi workflow baru milik user.
+     */
+    public function importWorkflow(User $user, array $payload): Workflow
+    {
+        $rawWorkflow = $payload['workflow'] ?? $payload;
+
+        $name = trim((string) ($rawWorkflow['name'] ?? 'Alur Kerja Impor'));
+        if ($name === '') {
+            $name = 'Alur Kerja Impor';
+        }
+
+        $description = isset($rawWorkflow['description']) ? (string) $rawWorkflow['description'] : null;
+        $definition = $rawWorkflow['definition'] ?? null;
+
+        if (! is_array($definition)) {
+            throw ValidationException::withMessages([
+                'definition' => 'Format template tidak valid: definition harus berupa objek.',
+            ]);
+        }
+
+        $this->assertDefinitionIsValid($definition, $user);
+
+        return $user->workflows()->create([
+            'name' => $name,
+            'description' => $description,
+            'status' => 'draft',
+            'definition' => $definition,
+        ]);
+    }
+
+    /**
      * Validasi payload create.
      */
     private function validateStore(array $data): array

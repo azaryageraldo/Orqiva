@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\InboxController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PublicChatController;
 use App\Http\Controllers\Api\SetupController;
+use App\Http\Controllers\Api\TelegramWebhookController;
 use App\Http\Controllers\Api\UsageStatsController;
 use App\Http\Controllers\Api\WorkflowController;
 use App\Http\Controllers\Api\WorkflowExecutionController;
@@ -65,6 +66,8 @@ Route::prefix('v1')->group(function () {
             ->middleware('throttle:public-poll');
         Route::post('/sessions/{token}/messages', [PublicChatController::class, 'send'])
             ->middleware('throttle:public-send');
+        Route::post('/telegram/{token}/webhook', [TelegramWebhookController::class, 'handle'])
+            ->middleware('throttle:public-send');
     });
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -79,6 +82,9 @@ Route::prefix('v1')->group(function () {
         Route::delete('/ai-settings/providers/{provider}', [AiSettingsController::class, 'destroy']);
 
         Route::get('/workflow-options', [WorkflowController::class, 'options']);
+
+        Route::get('/workflows/{workflow}/export', [WorkflowController::class, 'export']);
+        Route::post('/workflows/import', [WorkflowController::class, 'import']);
 
         Route::apiResource('workflows', WorkflowController::class);
 
@@ -114,6 +120,8 @@ Route::prefix('v1')->group(function () {
         Route::put('/channels/{channel}', [ChannelController::class, 'update']);
         Route::delete('/channels/{channel}', [ChannelController::class, 'destroy']);
         Route::post('/channels/{channel}/regenerate', [ChannelController::class, 'regenerate']);
+        Route::get('/channels/{channel}/telegram/webhook', [ChannelController::class, 'getTelegramWebhook']);
+        Route::post('/channels/{channel}/telegram/webhook', [ChannelController::class, 'manageTelegramWebhook']);
 
         Route::get(
             '/stats/token-usage',

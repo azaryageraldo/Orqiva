@@ -111,4 +111,28 @@ class ChannelController extends Controller
 
         return response()->json(['data' => $data]);
     }
+
+    public function getTelegramWebhook(Request $request, Channel $channel): JsonResponse
+    {
+        $data = $this->channelService->getTelegramWebhook($request->user(), $channel);
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function manageTelegramWebhook(Request $request, Channel $channel): JsonResponse
+    {
+        $action = $request->input('action', 'set');
+
+        if ($action === 'delete') {
+            $data = $this->channelService->deleteTelegramWebhook($request->user(), $channel);
+        } else {
+            $data = $this->channelService->setTelegramWebhook(
+                $request->user(),
+                $channel,
+                $request->input('url')
+            );
+        }
+
+        return response()->json(['data' => $data]);
+    }
 }

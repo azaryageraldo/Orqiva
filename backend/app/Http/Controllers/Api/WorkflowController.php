@@ -73,4 +73,38 @@ class WorkflowController extends Controller
             'message' => 'Workflow deleted successfully.',
         ]);
     }
+
+    public function export(Request $request, Workflow $workflow): JsonResponse
+    {
+        $template = $this->workflowService->exportWorkflow(
+            $request->user(),
+            (int) $workflow->id
+        );
+
+        return response()->json(['data' => $template]);
+    }
+
+    public function import(Request $request): JsonResponse
+    {
+        $payload = $request->all();
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $contents = file_get_contents($file->getRealPath());
+            $decoded = json_decode($contents, true);
+            if (! is_array($decoded)) {
+                return response()->json([
+                    'message' => 'File template bukan format JSON yang valid.',
+                ], 422);
+            }
+            $payload = $decoded;
+        }
+
+        $workflow = $this->workflowService->importWorkflow(
+            $request->user(),
+            $payload
+        );
+
+        return response()->json(['data' => $workflow], 201);
+    }
 }

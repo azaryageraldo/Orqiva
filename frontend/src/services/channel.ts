@@ -135,3 +135,31 @@ export async function getWorkflowOptions(): Promise<WorkflowOption[]> {
   );
   return response.data.data;
 }
+
+export type TelegramWebhookInfo = {
+  url?: string;
+  has_custom_certificate?: boolean;
+  pending_update_count?: number;
+  last_error_date?: number;
+  last_error_message?: string;
+};
+
+export async function getTelegramWebhook(
+  channelId: number,
+): Promise<TelegramWebhookInfo> {
+  const response = await api.get<{ data: TelegramWebhookInfo }>(
+    `/channels/${channelId}/telegram/webhook`,
+  );
+  return response.data.data;
+}
+
+export async function manageTelegramWebhook(
+  channelId: number,
+  action: "set" | "delete",
+  url?: string,
+): Promise<{ success: boolean; url?: string; message?: string }> {
+  const response = await api.post<{
+    data: { success: boolean; url?: string; message?: string };
+  }>(`/channels/${channelId}/telegram/webhook`, { action, url });
+  return response.data.data;
+}

@@ -26,6 +26,25 @@ class TelegramClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function setWebhook(string $token, string $url): array
+    {
+        return $this->call($token, 'setWebhook', [
+            'url' => $url,
+            'allowed_updates' => ['message'],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getWebhookInfo(string $token): array
+    {
+        return $this->call($token, 'getWebhookInfo');
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function getUpdates(string $token, ?int $offset, int $timeout): array

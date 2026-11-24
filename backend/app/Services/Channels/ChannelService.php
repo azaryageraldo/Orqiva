@@ -503,5 +503,89 @@ class ChannelService
             .'?v='
             .($channel->updated_at?->timestamp ?? time());
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTelegramWebhook(User $user, Channel $channel): array
+    {
+        $this->authorizeChannel($user, $channel);
+
+        if ($channel->type !== Channel::TYPE_TELEGRAM) {
+            throw ValidationException::withMessages([
+                'channel' => 'Hanya channel Telegram yang mendukung webhook.',
+            ]);
+        }
+
+        $botToken = data_get($channel->credentials, 'bot_token');
+        if (! is_string($botToken) || trim($botToken) === '') {
+            return ['url' => '', 'has_custom_certificate' => false, 'pending_update_count' => 0];
+        }
+
+        try {
+            return $this->telegram->getWebhookInfo($botToken);
+        } catch (Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function setTelegramWebhook(User $user, Channel $channel, ?string $webhookUrl = null): array
+    {
+        $this->authorizeChannel($user, $channel);
+
+        if ($channel->type !== Channel::TYPE_TELEGRAM) {
+            throw ValidationException::withMessages([
+                'channel' => 'Hanya channel Telegram yang mendukung webhook.',
+            ]);
+        }
+
+        $botToken = data_get($channel->credentials, 'bot_token');
+        if (! is_string($botToken) || trim($botToken) === '') {
+            throw ValidationException::withMessages([
+                'bot_token' => 'Token bot Telegram belum diatur.',
+            ]);
+        }
+
+        $url = trim((string) $webhookUrl);
+        if ($url === '') {
+            $url = url('/api/v1/public/telegram/'.$channel->public_token.'/webhook');
+        }
+
+        try {
+            $result = $this->telegram->setWebhook($botToken, $url);
+            $channel->forceFill(['last_error' => null])->save();
+            return ['success' => true, 'url' => $url, 'result' => $result];
+        } catch (Throwable $e) {
+            throw ValidationException::withMessages([
+                'webhook' => 'Gagal mendaftarkan webhook ke Telegram: '.$e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deleteTelegramWebhook(User $user, Channel $channel): array
+    {
+        $this->authorizeChannel($user, $channel);
+
+        if ($channel->type !== Channel::TYPE_TELEGRAM) {
+            throw ValidationException::withMessages([
+                'channel' => 'Hanya channel Telegram yang mendukung webhook.',
+            ]);
+        }
+
+        $botToken = data_get($channel->credentials, 'bot_token');
+        if (is_string($botToken) && trim($botToken) !== '') {
+            try {
+                $this->telegram->deleteWebhook($botToken);
+            } catch (Throwable) {}
+        }
+
+        return ['success' => true, 'message' => 'Webhook berhasil dihapus.'];
+    }
 }
 
