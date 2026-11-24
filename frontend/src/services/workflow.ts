@@ -93,6 +93,11 @@ export async function importWorkflow(
   return response.data.data;
 }
 
+export async function duplicateWorkflow(id: string): Promise<Workflow> {
+  const response = await api.post<{ data: Workflow }>(`/workflows/${id}/duplicate`);
+  return response.data.data;
+}
+
 export type WorkflowExecutionResult = {
   message: string;
   data: {

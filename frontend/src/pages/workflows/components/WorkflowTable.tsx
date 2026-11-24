@@ -28,6 +28,7 @@ interface WorkflowTableProps {
   onDelete: (item: WorkflowItem) => void;
   onToggleStatus: (item: WorkflowItem) => void;
   onExport?: (item: WorkflowItem) => void;
+  onDuplicate?: (item: WorkflowItem) => void;
   onCreateNew?: () => void;
   allSelected: boolean;
   searchQuery?: string;
@@ -47,6 +48,7 @@ export default function WorkflowTable({
   onDelete,
   onToggleStatus,
   onExport,
+  onDuplicate,
   onCreateNew,
   allSelected,
   searchQuery,
@@ -141,6 +143,7 @@ export default function WorkflowTable({
                   onDelete={onDelete}
                   onToggleStatus={onToggleStatus}
                   onExport={onExport}
+                  onDuplicate={onDuplicate}
                 />
               ))
             )}

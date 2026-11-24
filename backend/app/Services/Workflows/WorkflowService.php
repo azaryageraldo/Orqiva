@@ -136,6 +136,21 @@ class WorkflowService
     }
 
     /**
+     * Duplikasi alur kerja yang sudah ada sebagai draf baru milik user.
+     */
+    public function duplicateWorkflow(User $user, int $id): Workflow
+    {
+        $source = $this->getWorkflow($user, $id);
+
+        return $user->workflows()->create([
+            'name' => $source->name.' (Salinan)',
+            'description' => $source->description,
+            'status' => 'draft',
+            'definition' => $source->definition,
+        ]);
+    }
+
+    /**
      * Ekspor workflow sebagai template terstruktur.
      */
     public function exportWorkflow(User $user, int $id): array

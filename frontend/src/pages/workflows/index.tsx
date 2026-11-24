@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import {
   createWorkflow,
   deleteWorkflow,
+  duplicateWorkflow,
   exportWorkflow,
   getWorkflows,
   importWorkflow,
@@ -175,6 +176,18 @@ export default function Workflows({
       setSuccess(`Template alur kerja "${item.name}" berhasil diunduh.`);
     } catch (caught) {
       setError(getErrorMessage(caught, "Gagal mengekspor alur kerja."));
+    }
+  }
+
+  async function handleDuplicate(item: WorkflowItem) {
+    setError("");
+    setSuccess("");
+    try {
+      const cloned = await duplicateWorkflow(String(item.id));
+      setSuccess(`Alur kerja "${item.name}" berhasil diduplikasi sebagai "${cloned.name}".`);
+      await loadWorkflows(1, "");
+    } catch (caught) {
+      setError(getErrorMessage(caught, "Gagal menduplikasi alur kerja."));
     }
   }
 
@@ -487,6 +500,7 @@ export default function Workflows({
               onDelete={setWorkflowToDelete}
               onToggleStatus={toggleStatus}
               onExport={handleExport}
+              onDuplicate={handleDuplicate}
               onCreateNew={() => setShowCreate(true)}
               allSelected={allSelected}
               searchQuery={searchQuery}

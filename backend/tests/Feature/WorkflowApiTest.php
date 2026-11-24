@@ -365,4 +365,43 @@ class WorkflowApiTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function test_duplicate_creates_draft_copy(): void
+    {
+        $owner = $this->user();
+        $source = Workflow::create([
+            'user_id' => $owner->id,
+            'name' => 'Original Flow',
+            'description' => 'Original desc',
+            'status' => 'active',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->postJson("/api/v1/workflows/{$source->id}/duplicate");
+
+        $response->assertCreated();
+        $this->assertSame('Original Flow (Salinan)', $response->json('data.name'));
+        $this->assertSame('draft', $response->json('data.status'));
+        $this->assertDatabaseHas('workflows', [
+            'user_id' => $owner->id,
+            'name' => 'Original Flow (Salinan)',
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_duplicate_denies_other_user(): void
+    {
+        $owner = $this->user();
+        $other = $this->user('other-dup@example.com');
+        $source = Workflow::create([
+            'user_id' => $owner->id,
+            'name' => 'Secret Flow',
+            'definition' => $this->singleAgentDefinition(),
+        ]);
+
+        $this->actingAs($other)
+            ->postJson("/api/v1/workflows/{$source->id}/duplicate")
+            ->assertNotFound();
+    }
 }

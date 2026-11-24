@@ -167,3 +167,4 @@ class TelegramWebhookTest extends TestCase
         $this->assertTrue($deleteResponse->json('data.success'));
     }
 }
+

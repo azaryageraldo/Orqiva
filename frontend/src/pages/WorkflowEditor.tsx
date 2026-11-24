@@ -205,6 +205,11 @@ export default function WorkflowEditor({
   const [agentTab, setAgentTab] = useState<"node" | "prompt" | "variables">("node");
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmDeleteNode, setConfirmDeleteNode] = useState<{
+    count: number;
+    isTrigger: boolean;
+    isConnected: boolean;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(workflowId));
   const [isSaving, setIsSaving] = useState(false);
   const [workflowName, setWorkflowName] = useState("");
@@ -693,7 +698,30 @@ export default function WorkflowEditor({
     setPendingFit(true);
   }
 
-  function deleteSelectedNodes() {
+  function requestDeleteSelectedNodes() {
+    if (selectedNodeIds.size === 0) return;
+
+    const selectedList = nodes.filter((n) => selectedNodeIds.has(n.id));
+    const isTrigger = selectedList.some(
+      (n) => n.type === "trigger" || n.data?.label === "Trigger",
+    );
+    const isConnected = edges.some(
+      (e) => selectedNodeIds.has(e.source) || selectedNodeIds.has(e.target),
+    );
+
+    if (isTrigger || isConnected) {
+      setConfirmDeleteNode({
+        count: selectedNodeIds.size,
+        isTrigger,
+        isConnected,
+      });
+      return;
+    }
+
+    performDeleteNodes();
+  }
+
+  function performDeleteNodes() {
     setNodes((current) =>
       current.filter((node) => !selectedNodeIds.has(node.id)),
     );
@@ -707,6 +735,7 @@ export default function WorkflowEditor({
     setSelectedNodeIds(new Set());
     setDraftData(null);
     changeSelection(null);
+    setConfirmDeleteNode(null);
   }
 
   function updateNode(patch: Partial<AutomationNodeData>) {
@@ -1192,7 +1221,7 @@ export default function WorkflowEditor({
             isDisabled={nodes.length === 0}
             onTidy={tidyCanvas}
             onToggleBlockMode={() => setBlockMode((prev) => !prev)}
-            onDeleteSelected={deleteSelectedNodes}
+            onDeleteSelected={requestDeleteSelectedNodes}
             onOpenLibrary={() => {
               if (selectedNode) saveNodeChanges();
               setPendingParentId(null);
@@ -1250,6 +1279,26 @@ export default function WorkflowEditor({
             onSelectionChange={onSelectionChange}
             onInit={(instance) => {
               flowRef.current = instance;
+            }}
+            onBeforeDelete={async ({ nodes: nodesToDelete }) => {
+              const idsToDelete = new Set(nodesToDelete.map((n) => n.id));
+              const isTrigger = nodesToDelete.some(
+                (n) => n.type === "trigger" || (n.data as AutomationNodeData)?.label === "Trigger",
+              );
+              const isConnected = edges.some(
+                (e) => idsToDelete.has(e.source) || idsToDelete.has(e.target),
+              );
+
+              if (isTrigger || isConnected) {
+                setSelectedNodeIds(idsToDelete);
+                setConfirmDeleteNode({
+                  count: nodesToDelete.length,
+                  isTrigger,
+                  isConnected,
+                });
+                return false;
+              }
+              return true;
             }}
             onNodeClick={(_, node) => selectNode(node as FlowNode)}
             onPaneClick={() => {
@@ -1411,6 +1460,38 @@ export default function WorkflowEditor({
           },
           variant: "destructive",
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmDeleteNode)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteNode(null);
+        }}
+        tone="danger"
+        title={
+          confirmDeleteNode?.isTrigger
+            ? "Hapus Node Pemicu (Trigger)?"
+            : confirmDeleteNode?.count === 1
+              ? "Hapus Node Terhubung?"
+              : `Hapus ${confirmDeleteNode?.count} Node Terhubung?`
+        }
+        description={
+          <div className="space-y-3 pt-0.5">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              {confirmDeleteNode?.isTrigger
+                ? "Node Trigger adalah titik awal pesan masuk. Menghapus node ini akan menyebabkan alur kerja tidak dapat dipicu oleh pesan baru sampai node Trigger baru dibuat."
+                : "Node yang dipilih memiliki koneksi aktif dalam alur kerja. Menghapusnya akan memutus jalur alur percakapan."}
+            </p>
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-300 leading-relaxed">
+              <span className="mt-1 size-1.5 shrink-0 rounded-full bg-red-400" />
+              <span>Semua garis koneksi yang terhubung ke node ini akan ikut dihapus. Lanjutkan?</span>
+            </div>
+          </div>
+        }
+        cancelLabel="Batal"
+        confirmLabel="Tetap Hapus"
+        confirmVariant="destructive"
+        onConfirm={performDeleteNodes}
       />
     </section>
   );

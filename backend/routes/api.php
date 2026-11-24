@@ -67,7 +67,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/sessions/{token}/messages', [PublicChatController::class, 'send'])
             ->middleware('throttle:public-send');
         Route::post('/telegram/{token}/webhook', [TelegramWebhookController::class, 'handle'])
-            ->middleware('throttle:public-send');
+            ->middleware('throttle:telegram-webhook');
     });
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -85,6 +85,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/workflows/{workflow}/export', [WorkflowController::class, 'export']);
         Route::post('/workflows/import', [WorkflowController::class, 'import']);
+        Route::post('/workflows/{workflow}/duplicate', [WorkflowController::class, 'duplicate']);
 
         Route::apiResource('workflows', WorkflowController::class);
 

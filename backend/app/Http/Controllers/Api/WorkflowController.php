@@ -107,4 +107,14 @@ class WorkflowController extends Controller
 
         return response()->json(['data' => $workflow], 201);
     }
+
+    public function duplicate(Request $request, Workflow $workflow): JsonResponse
+    {
+        $clone = $this->workflowService->duplicateWorkflow(
+            $request->user(),
+            (int) $workflow->id
+        );
+
+        return response()->json(['data' => $clone], 201);
+    }
 }

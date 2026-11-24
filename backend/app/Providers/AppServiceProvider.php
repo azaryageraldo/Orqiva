@@ -62,6 +62,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('public-send', fn (Request $request) => Limit::perMinute(30)
             ->by('public-send|'.$request->ip().'|'.$request->route('token')));
 
+        RateLimiter::for('telegram-webhook', fn (Request $request) => Limit::perMinute(300)
+            ->by('telegram-webhook|'.$request->route('token')));
+
         RateLimiter::for('workflow-execute', fn (Request $request) => Limit::perMinute(30)
             ->by('workflow-execute|'.($request->user()?->id ?? $request->ip())));
     }
