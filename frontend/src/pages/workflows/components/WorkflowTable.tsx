@@ -54,7 +54,7 @@ export default function WorkflowTable({
   searchQuery,
 }: WorkflowTableProps) {
   return (
-    <TableContainer className="rounded-xl border border-white/[0.08] bg-[#0c0d11]/80 backdrop-blur-sm shadow-xl shadow-black/40">
+    <TableContainer className="rounded-xl border border-border bg-card/80 backdrop-blur-sm shadow-xl shadow-black/40">
       <TableWrapper>
         <Table>
           <Thead>

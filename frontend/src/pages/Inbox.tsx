@@ -442,12 +442,12 @@ export default function Inbox() {
                           )}
                         >
                           <div className="relative shrink-0">
-                            <div className="flex size-10 items-center justify-center rounded-full border border-white/[0.08] bg-[#0c0d11] text-[12px] font-semibold text-zinc-200">
+                            <div className="flex size-10 items-center justify-center rounded-full border border-border bg-card text-[12px] font-semibold text-foreground">
                               {initials(contact.name)}
                             </div>
                             <span
                               className={cn(
-                                "absolute -right-0.5 -bottom-0.5 size-3 rounded-full ring-2 ring-[#0e0f12]",
+                                "absolute -right-0.5 -bottom-0.5 size-3 rounded-full ring-2 ring-background",
                                 meta.dot,
                               )}
                             />
@@ -536,23 +536,23 @@ export default function Inbox() {
             ) : (
               <>
                 {/* Conversation header */}
-                <header className="flex shrink-0 items-center gap-3 border-b border-white/5 px-4 py-3 bg-[#0a0a0f]/40 backdrop-blur">
+                <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 bg-card/40 backdrop-blur">
                   <button
                     type="button"
                     aria-label={t("inbox.back")}
                     onClick={() => setSelectedId(null)}
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-200 lg:hidden"
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
                   >
                     <ArrowLeft className="size-4" />
                   </button>
 
                   <div className="relative shrink-0">
-                    <div className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-[#0a0a0f]/60 text-[11px] font-semibold text-zinc-200">
+                    <div className="flex size-10 items-center justify-center rounded-full border border-border bg-card text-[11px] font-semibold text-foreground">
                       {initials(detail.name)}
                     </div>
                     <span
                       className={cn(
-                        "absolute -right-0.5 -bottom-0.5 size-3 rounded-full ring-2 ring-[#0a0a0f]",
+                        "absolute -right-0.5 -bottom-0.5 size-3 rounded-full ring-2 ring-background",
                         statusMeta.dot,
                       )}
                     />
@@ -597,8 +597,8 @@ export default function Inbox() {
                       className={cn(
                         "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors disabled:opacity-50",
                         latestStatus === "human"
-                          ? "border border-white/10 bg-[#0a0a0f]/40 text-zinc-300 hover:bg-white/[0.05]"
-                          : "border border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20",
+                          ? "border border-border bg-card/60 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          : "border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20",
                       )}
                     >
                       {action ? (
@@ -632,12 +632,12 @@ export default function Inbox() {
                 )}
 
                 {/* Messages */}
-                <div className="relative min-h-0 flex-1 overflow-y-auto bg-[#0a0a0f]">
+                <div className="relative min-h-0 flex-1 overflow-y-auto bg-background">
                   <div className="relative w-full space-y-3 p-3 pb-1">
                     {detail.sessions.length === 0 ? (
                       <div className="flex h-full min-h-52 flex-col items-center justify-center text-center">
-                        <Bot className="mb-2 size-8 text-zinc-600" />
-                        <p className="text-xs text-zinc-500">
+                        <Bot className="mb-2 size-8 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">
                           {t("inbox.noSessions")}
                         </p>
                       </div>
@@ -655,7 +655,7 @@ export default function Inbox() {
                 </div>
 
                 {/* Composer */}
-                <div className="shrink-0 border-t border-white/5 bg-[#0a0a0f]/60 backdrop-blur-md p-3">
+                <div className="shrink-0 border-t border-border bg-card/60 backdrop-blur-md p-3">
                   <div className="w-full max-w-none px-1">
                     {latestStatus === "human" && latestSession ? (
                       <form onSubmit={(event) => void submitReply(event)}>
@@ -672,37 +672,37 @@ export default function Inbox() {
                             rows={1}
                             maxLength={4000}
                             placeholder={t("inbox.replyPlaceholder")}
-                            className="max-h-32 min-h-9 resize-none rounded-xl border border-white/5 bg-[#0a0a0f]/40 text-[13px] text-zinc-200 placeholder:text-zinc-500"
+                            className="max-h-32 min-h-9 resize-none rounded-xl border border-border bg-card/60 text-[13px] text-foreground placeholder:text-muted-foreground"
                             disabled={sending}
                           />
                           <button
                             type="submit"
                             disabled={!reply.trim() || sending}
                             aria-label={t("inbox.sendReply")}
-                            className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0f4c81] text-white transition-colors hover:bg-[#0e4272] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {sending ? (
-                              <LoaderCircle className="size-4 animate-spin text-white" />
+                              <LoaderCircle className="size-4 animate-spin" />
                             ) : (
                               <Send className="size-4" />
                             )}
                           </button>
                         </div>
-                        <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+                        <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                           <span>{t("inbox.enterToSend")}</span>
                         </p>
                       </form>
                     ) : latestSession ? (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-[#0a0a0f]/40 px-3 py-2.5 text-[11px] text-zinc-500">
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/60 px-3 py-2.5 text-[11px] text-muted-foreground">
                         <span className="inline-flex items-center gap-2">
                           {latestStatus === "active" ? (
                             <>
-                              <Bot className="size-4 text-zinc-400" />
+                              <Bot className="size-4 text-muted-foreground" />
                               <span>{t("inbox.aiHandling")}</span>
                             </>
                           ) : (
                             <>
-                              <ShieldCheck className="size-4 text-zinc-400" />
+                              <ShieldCheck className="size-4 text-muted-foreground" />
                               <span>{t("inbox.endedHint")}</span>
                             </>
                           )}
@@ -712,7 +712,7 @@ export default function Inbox() {
                             type="button"
                             onClick={() => void changeTakeover("takeover")}
                             disabled={action !== null}
-                            className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-teal-500/30 bg-teal-500/10 px-2.5 text-xs font-medium text-teal-300 transition-colors hover:bg-teal-500/20 disabled:opacity-50"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
                           >
                             <ShieldCheck className="size-3.5" />
                             {t("inbox.takeover")}
@@ -754,7 +754,7 @@ function SessionHistory({
           )}
         </div>
         {session.workflow_name && (
-          <span className="shrink-0 rounded-full border border-white/5 bg-[#0a0a0f]/40 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+          <span className="shrink-0 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
             {session.workflow_name}
           </span>
         )}
@@ -777,7 +777,7 @@ function SessionHistory({
                 <div key={message.id}>
                   {showDay && <DayLabel value={message.created_at} />}
                   <div className="flex justify-center">
-                    <p className="max-w-[80%] rounded-full border border-white/5 bg-[#0a0a0f]/40 px-3 py-1 text-center text-[10px] text-zinc-500 uppercase tracking-tighter">
+                    <p className="max-w-[80%] rounded-full border border-border bg-card px-3 py-1 text-center text-[10px] text-muted-foreground uppercase tracking-tighter">
                       {message.content}
                     </p>
                   </div>
@@ -804,7 +804,7 @@ function DayLabel({ value }: { value: string | null }) {
 
   return (
     <p className="my-4 flex justify-center">
-      <span className="rounded-full border border-white/5 bg-[#0a0a0f]/50 px-2 py-0.5 text-[10px] font-medium text-zinc-500 uppercase tracking-tighter">
+      <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-tighter">
         {dayLabel(value, locale, t("inbox.dayUnknown"))}
       </span>
     </p>
@@ -823,10 +823,10 @@ function MessageBubble({ message }: { message: InboxMessage }) {
         className={cn(
           "max-w-[70%] rounded-xl px-3 py-2 text-[12.5px] leading-5 break-words whitespace-pre-wrap",
           isAdmin
-            ? "rounded-tl-none rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-white/5 bg-[#161b26] text-zinc-200"
+            ? "rounded-tl-none rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-border bg-secondary/80 text-foreground"
             : isCustomer
-              ? "rounded-tr-none rounded-tl-2xl rounded-br-2xl rounded-bl-2xl border border-white/10 bg-[#0f4c81] text-white"
-              : "rounded-tl-none rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-white/5 bg-[#161b26] text-zinc-200",
+              ? "rounded-tr-none rounded-tl-2xl rounded-br-2xl rounded-bl-2xl border border-primary/30 bg-primary/20 text-foreground"
+              : "rounded-tl-none rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-border bg-card text-foreground",
         )}
       >
         {message.content}

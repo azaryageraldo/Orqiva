@@ -104,7 +104,7 @@ export default function Sidebar({
   }[health];
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col bg-[#0a0b0f]">
+    <aside className="flex h-full min-h-0 w-full flex-col bg-sidebar">
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <SidebarSection
           label="side.workflowGroup"
@@ -114,13 +114,13 @@ export default function Sidebar({
         />
       </div>
 
-      <div className="border-t border-white/[0.04] px-3 py-3">
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-white/[0.04] bg-white/[0.02] px-2.5 py-2.5">
-          <span className="relative flex size-7 shrink-0 items-center justify-center rounded-[5px] border border-white/[0.04] bg-white/[0.03]">
+      <div className="border-t border-sidebar-border px-3 py-3">
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-sidebar-border bg-white/[0.02] px-2.5 py-2.5">
+          <span className="relative flex size-7 shrink-0 items-center justify-center rounded-[5px] border border-sidebar-border bg-white/[0.03]">
             <Server size={13} className="text-zinc-500" />
             <span
               className={cn(
-                "absolute -right-0.5 -bottom-0.5 size-2 rounded-full border-2 border-[#0a0b0f]",
+                "absolute -right-0.5 -bottom-0.5 size-2 rounded-full border-2 border-sidebar",
                 status.dot,
               )}
             />

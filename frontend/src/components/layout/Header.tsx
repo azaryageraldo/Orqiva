@@ -291,7 +291,7 @@ export default function Header({
               ref={notificationsRef}
               className="absolute z-[60] top-12 right-0 w-[280px] mt-1 max-w-[calc(100vw-4rem)]"
             >
-              <div className="border border-white/[0.08] bg-[#0a0b0f]/97 shadow-xl rounded-xl p-3">
+              <div className="border border-border bg-card/95 backdrop-blur-md shadow-xl rounded-xl p-3">
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 text-center">
                     <Bell size={28} className="text-zinc-600 mb-2" />
@@ -379,7 +379,7 @@ export default function Header({
 
           {userMenuOpen && (
             <div ref={userMenuRef} className="absolute z-[60] top-12 right-0 w-[60px] mt-1">
-              <div className="border border-white/[0.08] bg-[#0a0b0f]/95 backdrop-blur-md shadow-2xl rounded-xl p-1">
+              <div className="border border-border bg-card/95 backdrop-blur-md shadow-2xl rounded-xl p-1">
                 <button
                   type="button"
                   onClick={() => {

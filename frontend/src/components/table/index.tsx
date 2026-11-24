@@ -21,7 +21,7 @@ export function TableContainer({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-md border border-white/[0.08] bg-[#0e0f12]",
+        "overflow-hidden rounded-md border border-border bg-card",
         className,
       )}
     >

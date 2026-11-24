@@ -1437,7 +1437,7 @@ export default function Channel() {
             </label>
 
             {telegram && (
-              <div className="space-y-3 rounded-xl border border-white/[0.08] bg-[#0c0d11]/60 p-4">
+              <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-zinc-200">

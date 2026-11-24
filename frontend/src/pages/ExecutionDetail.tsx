@@ -222,16 +222,16 @@ export default function ExecutionDetail({
   if (!detail) {
     return (
       <section className="min-h-[calc(100vh-4rem)] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-xl border border-white/10 bg-[#0e0f12] p-8 text-center text-sm text-zinc-400">
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
           <p>{error || t("execution.detailUnavailable")}</p>
           <Button
             variant="outline"
             size="sm"
             onClick={onBack}
-            className="mt-4 gap-1.5 border-white/10"
+            className="mt-4 gap-1.5 border-border"
           >
             <ArrowLeft className="size-3.5" />
-            <span>Kembali ke Aktivitas</span>
+            <span>Back to Activity</span>
           </Button>
         </div>
       </section>
@@ -242,27 +242,27 @@ export default function ExecutionDetail({
     <section className="min-h-[calc(100vh-4rem)] px-4 py-5 sm:px-6 lg:px-8">
       <div className="w-full space-y-4">
         {/* Top Navigation & Breadcrumbs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
           <div className="flex items-center gap-2 text-xs">
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-[#0d0e11] px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/5 hover:text-zinc-100 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2.5 py-1 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             >
               <ArrowLeft className="size-3" />
-              <span>Aktivitas</span>
+              <span>Activity</span>
             </button>
-            <span className="text-zinc-600">/</span>
+            <span className="text-muted-foreground">/</span>
             <button
               type="button"
               onClick={() => onNavigate("workflows")}
-              className="text-zinc-400 hover:text-zinc-200 transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {detail.workflow_name || `Workflow #${detail.workflow_id}`}
             </button>
-            <span className="text-zinc-600">/</span>
-            <span className="font-mono text-zinc-200">
-              Sesi #{detail.chat_session_id ?? detail.id}
+            <span className="text-muted-foreground">/</span>
+            <span className="font-mono text-foreground">
+              Session #{detail.chat_session_id ?? detail.id}
             </span>
           </div>
 
@@ -271,18 +271,18 @@ export default function ExecutionDetail({
             <button
               type="button"
               onClick={handleCopyPayload}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-[#0d0e11] px-2.5 py-1 text-xs text-zinc-400 hover:bg-white/5 hover:text-zinc-200 transition-colors"
-              title="Salin JSON payload eksekusi"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title="Copy execution JSON payload"
             >
               {copiedPayload ? (
                 <>
                   <Check className="size-3 text-emerald-400" />
-                  <span className="text-emerald-400">Tersalin</span>
+                  <span className="text-emerald-400">Copied</span>
                 </>
               ) : (
                 <>
                   <Copy className="size-3" />
-                  <span>Salin Payload</span>
+                  <span>Copy Payload</span>
                 </>
               )}
             </button>
@@ -290,7 +290,7 @@ export default function ExecutionDetail({
         </div>
 
         {/* Header Summary Card */}
-        <div className="rounded-xl border border-white/10 bg-[#0e0f12] p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-primary">
@@ -352,8 +352,8 @@ export default function ExecutionDetail({
         {/* 2-Panel Main Grid */}
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Panel 1: Chat Transcript */}
-          <div className="flex flex-col rounded-xl border border-white/10 bg-[#0e0f12] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-3">
+          <div className="flex flex-col rounded-xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-3">
               <div className="flex items-center gap-2">
                 <MessageSquare className="size-4 text-primary" />
                 <h2 className="text-xs font-semibold text-zinc-200">
@@ -500,11 +500,11 @@ export default function ExecutionDetail({
           </div>
 
           {/* Panel 2: Execution Step Timeline */}
-          <div className="flex flex-col rounded-xl border border-white/10 bg-[#0e0f12] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-3">
+          <div className="flex flex-col rounded-xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-3">
               <div className="flex items-center gap-2">
                 <Layers className="size-4 text-primary" />
-                <h2 className="text-xs font-semibold text-zinc-200">
+                <h2 className="text-xs font-semibold text-foreground">
                   {t("activity.detail.activityLog")}
                 </h2>
               </div>
@@ -512,9 +512,9 @@ export default function ExecutionDetail({
                 <button
                   type="button"
                   onClick={() => setExpandedStep(null)}
-                  className="rounded px-2 py-0.5 text-[11px] text-zinc-400 hover:bg-white/5 hover:text-zinc-200 transition-colors"
+                  className="rounded px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 >
-                  Tutup Semua
+                  Collapse All
                 </button>
               </div>
             </div>
@@ -552,7 +552,7 @@ export default function ExecutionDetail({
         </div>
 
         {/* Collapsible Payload Section */}
-        <div className="rounded-xl border border-white/10 bg-[#0e0f12] overflow-hidden">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
           <button
             type="button"
             onClick={() => setShowRawPayload(!showRawPayload)}

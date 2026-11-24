@@ -60,7 +60,7 @@ export default function WorkflowToolbar({
     >
       <div className="flex flex-wrap items-center gap-2">
         {/* Filter Pills */}
-        <div className="inline-flex items-center rounded-lg border border-white/[0.08] bg-[#0c0d11] p-1">
+        <div className="inline-flex items-center rounded-lg border border-border bg-card p-1">
           {filterTabs.map((tab) => {
             const isActive = statusFilter === tab.id;
             return (
@@ -100,7 +100,7 @@ export default function WorkflowToolbar({
             aria-label={t("wf.searchAria")}
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="h-8 rounded-lg border-white/[0.08] bg-[#0c0d11] pr-7 pl-8 text-xs text-zinc-200 placeholder:text-zinc-500 focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/30 [&::-webkit-search-cancel-button]:hidden"
+            className="h-8 rounded-lg border-border bg-card pr-7 pl-8 text-xs text-foreground placeholder:text-muted-foreground focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/30 [&::-webkit-search-cancel-button]:hidden"
           />
           {search && (
             <button
@@ -149,7 +149,7 @@ export default function WorkflowToolbar({
           size="sm"
           disabled={importing}
           onClick={() => fileInputRef.current?.click()}
-          className="h-8 gap-1.5 rounded-lg border-white/[0.08] bg-[#0c0d11] px-3 text-xs font-medium text-zinc-300 hover:bg-white/[0.05] hover:text-white"
+          className="h-8 gap-1.5 rounded-lg border-border bg-card px-3 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
         >
           <Upload className="size-3.5" />
           <span>{importing ? "Importing..." : "Import"}</span>

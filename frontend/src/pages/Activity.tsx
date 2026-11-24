@@ -295,7 +295,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         )}
 
         {/* Table Container */}
-        <TableContainer className="rounded-md border border-white/10 bg-[#0e0f12]">
+        <TableContainer className="rounded-md border border-border bg-card">
           <TableWrapper>
             <Table>
               <Thead>

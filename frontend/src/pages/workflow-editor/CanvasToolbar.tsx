@@ -27,7 +27,7 @@ export default function CanvasToolbar({
   const { t } = useI18n();
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#0e0f12]/90 backdrop-blur-md p-1 shadow-2xl shadow-black/60">
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-lg border border-border bg-card/90 backdrop-blur-md p-1 shadow-2xl shadow-black/60">
       {onOpenLibrary && (
         <>
           <button
