@@ -111,6 +111,27 @@ export default function ExecutionDetail({
     };
   }, [workflowId, executionId, t]);
 
+  // shortcut: poll execution status every 2000ms until terminal state, upgrade to SSE when streaming is supported
+  useEffect(() => {
+    if (detail?.status !== "running") return;
+
+    let active = true;
+    const interval = window.setInterval(() => {
+      if (document.hidden) return;
+
+      getExecution(workflowId, executionId)
+        .then((result) => {
+          if (active) setDetail(result);
+        })
+        .catch(() => {});
+    }, 2000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [detail?.status, workflowId, executionId]);
+
   const steps = useMemo(() => detail?.steps ?? [], [detail]);
 
   const errorStep = useMemo(

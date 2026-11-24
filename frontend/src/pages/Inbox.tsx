@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowLeft,
@@ -140,6 +140,22 @@ export default function Inbox() {
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
+
+  const currentMessageCount = useMemo(
+    () => detail?.sessions.reduce((acc, s) => acc + s.messages.length, 0) ?? 0,
+    [detail],
+  );
+
+  // Auto-scroll when new messages arrive or active contact changes
+  useEffect(() => {
+    if (currentMessageCount > prevMessageCountRef.current || prevMessageCountRef.current === 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevMessageCountRef.current = currentMessageCount;
+  }, [currentMessageCount, selectedId]);
+
   const loadList = useCallback(async () => {
     setListLoading(true);
     setListError("");
@@ -167,6 +183,36 @@ export default function Inbox() {
     const timer = window.setTimeout(() => void loadList(), 0);
     return () => window.clearTimeout(timer);
   }, [loadList]);
+
+  // shortcut: background poll every 3500ms, upgrade to WebSocket/SSE when concurrent agents exceed 100
+  useEffect(() => {
+    let active = true;
+
+    const interval = window.setInterval(() => {
+      if (document.hidden) return;
+
+      getInbox()
+        .then((result) => {
+          if (!active) return;
+          setContacts(result);
+        })
+        .catch(() => {});
+
+      if (selectedId !== null) {
+        getContact(selectedId)
+          .then((result) => {
+            if (!active) return;
+            setDetail(result);
+          })
+          .catch(() => {});
+      }
+    }, 3500);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [selectedId]);
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -604,6 +650,7 @@ export default function Inbox() {
                         />
                       ))
                     )}
+                    <div ref={messagesEndRef} />
                   </div>
                 </div>
 
