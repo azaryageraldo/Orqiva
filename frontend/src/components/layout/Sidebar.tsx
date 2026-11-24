@@ -1,10 +1,17 @@
 import {
-  LayoutList,
-  List,
+  Activity,
+  Bot,
+  Globe,
+  Inbox,
+  LayoutDashboard,
+  LifeBuoy,
   Server,
+  Settings,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
+import OrqivaLogo from "@/components/brand/OrqivaLogo";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/constants";
@@ -38,16 +45,26 @@ type SidebarItem = {
   nav: NavKey;
 };
 
-const WORKFLOW_ITEMS: SidebarItem[] = [
-  { labelKey: "side.workflow", icon: LayoutList, nav: "workflows" },
-  { labelKey: "side.auditLog", icon: List, nav: "activity" },
+const MAIN_ITEMS: SidebarItem[] = [
+  { labelKey: "nav.dashboard", icon: LayoutDashboard, nav: "dashboard" },
+  { labelKey: "nav.workflows", icon: Bot, nav: "workflows" },
+  { labelKey: "nav.inbox", icon: Inbox, nav: "inbox" },
+  { labelKey: "nav.channel", icon: Globe, nav: "channel" },
+  { labelKey: "nav.activity", icon: Activity, nav: "activity" },
+];
+
+const CONFIG_ITEMS: SidebarItem[] = [
+  { labelKey: "nav.aiProviders", icon: Sparkles, nav: "ai-providers" },
+  { labelKey: "nav.settings", icon: Settings, nav: "settings" },
+  { labelKey: "nav.help", icon: LifeBuoy, nav: "help" },
 ];
 
 const ITEM_CLASS =
-  "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors";
-const ACTIVE_CLASS = "bg-white/[0.06] text-zinc-100";
+  "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition-colors";
+const ACTIVE_CLASS =
+  "bg-primary/10 text-primary border border-primary/20 shadow-sm";
 const IDLE_CLASS =
-  "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300";
+  "text-muted-foreground hover:bg-accent/50 hover:text-foreground";
 
 function SidebarSection({
   label,
@@ -55,7 +72,7 @@ function SidebarSection({
   activeNav,
   onNavigate,
 }: {
-  label: string;
+  label?: string;
   items: SidebarItem[];
   activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
@@ -63,14 +80,17 @@ function SidebarSection({
   const { t } = useI18n();
 
   return (
-    <div>
-      <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-zinc-600 uppercase">
-        {t(label)}
-      </p>
+    <div className="space-y-1">
+      {label && (
+        <p className="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
+          {label}
+        </p>
+      )}
 
       <div className="space-y-0.5">
         {items.map((item) => {
           const active = activeNav === item.nav;
+          const Icon = item.icon;
 
           return (
             <button
@@ -80,8 +100,15 @@ function SidebarSection({
               aria-current={active ? "page" : undefined}
               className={cn(ITEM_CLASS, active ? ACTIVE_CLASS : IDLE_CLASS)}
             >
-              <item.icon size={14} strokeWidth={1.5} />
-              <span className="font-medium">{t(item.labelKey)}</span>
+              <Icon
+                size={16}
+                strokeWidth={1.75}
+                className={cn(
+                  "shrink-0 transition-colors",
+                  active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
+                )}
+              />
+              <span className="truncate">{t(item.labelKey)}</span>
             </button>
           );
         })}
@@ -104,20 +131,42 @@ export default function Sidebar({
   }[health];
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col bg-sidebar">
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+    <aside className="flex h-full min-h-0 w-full flex-col bg-sidebar border-r border-sidebar-border select-none">
+      {/* Brand Header */}
+      <div className="flex h-12 shrink-0 items-center px-4 border-b border-sidebar-border">
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigate("dashboard");
+          }}
+          className="flex items-center gap-2.5 transition-opacity hover:opacity-90"
+        >
+          <OrqivaLogo showWordmark markClassName="size-6" wordmarkClassName="text-sm font-semibold tracking-tight text-foreground" />
+        </a>
+      </div>
+
+      {/* Navigation Sections */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 space-y-4">
         <SidebarSection
-          label="side.workflowGroup"
-          items={WORKFLOW_ITEMS}
+          items={MAIN_ITEMS}
+          activeNav={activeNav}
+          onNavigate={onNavigate}
+        />
+
+        <SidebarSection
+          label="Configuration"
+          items={CONFIG_ITEMS}
           activeNav={activeNav}
           onNavigate={onNavigate}
         />
       </div>
 
-      <div className="border-t border-sidebar-border px-3 py-3">
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-sidebar-border bg-white/[0.02] px-2.5 py-2.5">
-          <span className="relative flex size-7 shrink-0 items-center justify-center rounded-[5px] border border-sidebar-border bg-white/[0.03]">
-            <Server size={13} className="text-zinc-500" />
+      {/* Footer Service Status */}
+      <div className="shrink-0 border-t border-sidebar-border p-3">
+        <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-card/40 px-2.5 py-2">
+          <span className="relative flex size-6 shrink-0 items-center justify-center rounded-md border border-sidebar-border bg-secondary/50">
+            <Server size={12} className="text-muted-foreground" />
             <span
               className={cn(
                 "absolute -right-0.5 -bottom-0.5 size-2 rounded-full border-2 border-sidebar",
@@ -126,14 +175,14 @@ export default function Sidebar({
             />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[9px] font-medium tracking-[0.14em] text-zinc-600 uppercase">
-              {t("settings.serviceLabel")}
+            <p className="truncate text-[9px] font-medium tracking-wider text-muted-foreground uppercase">
+              System Runtime
             </p>
-            <p className={cn("truncate text-[11px] font-medium", status.text)}>
+            <p className={cn("truncate text-[11px] font-medium leading-none", status.text)}>
               {statusLabel}
             </p>
           </div>
-          <span className="shrink-0 text-[9px] font-medium text-zinc-600">
+          <span className="shrink-0 text-[10px] font-mono text-muted-foreground">
             v{APP_VERSION}
           </span>
         </div>

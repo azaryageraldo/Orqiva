@@ -79,7 +79,7 @@ export default function DashboardLayout({
 
       <div className="flex min-h-[calc(100vh-3rem)]">
         {!hideSidebar && (
-          <div className="sticky top-12 hidden h-[calc(100vh-3rem)] w-[208px] shrink-0 border-r border-white/[0.06] lg:block">
+          <div className="sticky top-12 hidden h-[calc(100vh-3rem)] w-56 shrink-0 lg:block">
             <Sidebar
               health={health}
               activeNav={activeNav}
@@ -92,11 +92,11 @@ export default function DashboardLayout({
           <>
             <button
               type="button"
-              aria-label="Tutup menu"
+              aria-label="Close menu"
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-x-0 top-12 bottom-0 z-20 bg-black/60 lg:hidden"
+              className="fixed inset-x-0 top-12 bottom-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden"
             />
-            <div className="fixed top-12 bottom-0 left-0 z-30 w-[208px] border-r border-white/[0.06] shadow-2xl lg:hidden">
+            <div className="fixed top-12 bottom-0 left-0 z-50 w-64 shadow-2xl lg:hidden">
               <Sidebar
                 health={health}
                 activeNav={activeNav}

@@ -3,19 +3,16 @@
 import * as React from "react";
 import {
   Bell,
+  Bot,
   ChevronDown,
   KeyRound,
   LifeBuoy,
   LogOut,
   Menu,
-  Layout,
-  Bot,
-  Globe,
+  Plus,
   Settings as SettingsIcon,
   ShieldAlert,
   User,
-  Plus,
-  Activity,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -73,23 +70,16 @@ interface HeaderProps {
 
 export type { NotificationItem };
 
-const NAV_ITEMS: Array<{
-  key: NavKey;
-  label: string;
-  icon: React.ElementType;
-  matches: NavKey[];
-}> = [
-  { key: "dashboard", label: "Dashboard", icon: Layout, matches: ["dashboard"] },
-  { key: "inbox", label: "Inbox", icon: Activity, matches: ["inbox"] },
-  { key: "channel", label: "Channel", icon: Globe, matches: ["channel"] },
-  { key: "workflows", label: "Agent", icon: Bot, matches: ["workflows"] },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: SettingsIcon,
-    matches: ["settings"],
-  },
-];
+const PAGE_LABELS: Record<NavKey, string> = {
+  dashboard: "Dashboard",
+  workflows: "Workflows",
+  inbox: "Inbox",
+  channel: "Channel",
+  activity: "Audit Log",
+  "ai-providers": "AI Providers",
+  settings: "Settings",
+  help: "Help & Support",
+};
 
 function initialsOf(name: string): string {
   return (
@@ -205,63 +195,42 @@ export default function Header({
 
   return (
     <header
-      className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#090a0c]/80 backdrop-blur-md px-2.5 sm:px-4"
+      className="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between border-b border-border bg-card/60 backdrop-blur-md px-3 sm:px-5"
     >
-      {showSidebarToggle && (
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          aria-label={t("side.openMenu")}
-          className="flex size-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200 lg:hidden"
+      <div className="flex items-center gap-3 min-w-0">
+        {showSidebarToggle && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label={t("side.openMenu")}
+            className="flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:text-foreground lg:hidden"
+          >
+            <Menu size={16} strokeWidth={1.75} />
+          </button>
+        )}
+
+        {/* Mobile Logo */}
+        <a
+          href="/"
+          aria-label="Orqiva"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigate("dashboard");
+          }}
+          className="flex items-center gap-2 lg:hidden"
         >
-          <Menu size={18} strokeWidth={1.5} />
-        </button>
-      )}
+          <OrqivaLogo showWordmark={false} markClassName="size-6" />
+        </a>
 
-      <a
-        href="/"
-        aria-label="Orqiva"
-        className="flex shrink-0 items-center gap-2 pl-0.5"
-      >
-        <OrqivaLogo showWordmark={false} markClassName="size-6" />
-        <span className="hidden text-[13px] font-semibold tracking-tight text-zinc-100 sm:block">
-          Orqiva
-        </span>
-      </a>
+        {/* Breadcrumb Header (Supabase style) */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs">
+          <span className="font-semibold text-foreground/80 hidden sm:inline">Orqiva</span>
+          <span className="text-muted-foreground/40 hidden sm:inline">/</span>
+          <span className="font-medium text-foreground">{PAGE_LABELS[activeNav] || "Dashboard"}</span>
+        </nav>
+      </div>
 
-      <nav
-        aria-label={t("topnav.label")}
-        className="ml-2.5 flex min-w-0 items-center gap-0.5 overflow-x-auto no-scrollbar"
-      >
-        {NAV_ITEMS.map((item) => {
-          const active = item.matches.includes(activeNav);
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => {
-                onNavigate(item.key);
-                setNotificationsOpen(false);
-                setUserMenuOpen(false);
-              }}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "inline-flex h-9 shrink-0 items-center justify-center rounded-md px-2.5 text-[12px] font-medium transition-colors whitespace-nowrap",
-                active
-                  ? "bg-primary/10 border border-primary/20 text-primary"
-                  : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300",
-              )}
-            >
-              <Icon size={14} strokeWidth={1.5} />
-              <span className="ml-1.5">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="ml-auto flex shrink-0 items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {/* Notifications Bell */}
         <div className="relative">
           <button
@@ -378,18 +347,18 @@ export default function Header({
           </button>
 
           {userMenuOpen && (
-            <div ref={userMenuRef} className="absolute z-[60] top-12 right-0 w-[60px] mt-1">
-              <div className="border border-border bg-card/95 backdrop-blur-md shadow-2xl rounded-xl p-1">
+            <div ref={userMenuRef} className="absolute z-[60] top-12 right-0 w-48 mt-1">
+              <div className="border border-border bg-card/95 backdrop-blur-md shadow-2xl rounded-xl p-1.5 space-y-0.5">
                 <button
                   type="button"
                   onClick={() => {
                     setUserMenuOpen(false);
                     onNavigate("settings");
                   }}
-                  className="flex items-center gap-2 p-2 text-[13px] text-zinc-100 hover:bg-white/5"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent"
                 >
-                  <SettingsIcon size={15} strokeWidth={1.5} />
-                  {t("nav.settings")}
+                  <SettingsIcon size={14} strokeWidth={1.5} />
+                  <span>{t("nav.settings")}</span>
                 </button>
                 <button
                   type="button"
@@ -397,10 +366,10 @@ export default function Header({
                     setUserMenuOpen(false);
                     onNavigate("ai-providers");
                   }}
-                  className="flex items-center gap-2 p-2 text-[13px] text-zinc-100 hover:bg-white/5"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent"
                 >
-                  <KeyRound size={15} strokeWidth={1.5} />
-                  {t("nav.apiKeys")}
+                  <KeyRound size={14} strokeWidth={1.5} />
+                  <span>{t("nav.apiKeys")}</span>
                 </button>
                 <button
                   type="button"
@@ -408,33 +377,33 @@ export default function Header({
                     setUserMenuOpen(false);
                     onNavigate("help");
                   }}
-                  className="flex items-center gap-2 p-2 text-[13px] text-zinc-100 hover:bg-white/5"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent"
                 >
-                  <LifeBuoy size={15} strokeWidth={1.5} />
-                  {t("nav.help")}
+                  <LifeBuoy size={14} strokeWidth={1.5} />
+                  <span>{t("nav.help")}</span>
                 </button>
 
-                <div className="border-t border-white/[0.06] my-1" />
+                <div className="border-t border-border my-1" />
 
                 <button
                   type="button"
                   disabled={loggingOut}
                   onClick={onLogout}
                   className={cn(
-                    "flex items-center gap-2 p-2 text-[13px] transition-colors",
-                    loggingOut && "text-zinc-500 pointer-events-none",
-                    !loggingOut ? "text-zinc-100 hover:bg-white/5" : "text-destructive/30",
+                    "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors",
+                    loggingOut && "text-muted-foreground pointer-events-none",
+                    !loggingOut ? "text-foreground hover:bg-accent" : "text-destructive/50",
                   )}
                 >
                   {loggingOut ? (
                     <span className="flex items-center gap-2">
-                      <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                       {t("header.loggingOut")}
                     </span>
                   ) : (
-                    <LogOut size={15} strokeWidth={1.5} />
+                    <LogOut size={14} strokeWidth={1.5} />
                   )}
-                  {loggingOut ? t("header.loggingOut") : t("header.logout")}
+                  <span>{loggingOut ? t("header.loggingOut") : t("header.logout")}</span>
                 </button>
               </div>
             </div>

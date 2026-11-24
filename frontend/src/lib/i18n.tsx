@@ -23,6 +23,7 @@ const EN: Dictionary = {
   "nav.inbox": "Inbox",
   "nav.channel": "Channel",
   "nav.activity": "Audit Log",
+  "nav.aiProviders": "AI Providers",
   "nav.apiKeys": "API Keys",
   "nav.settings": "Settings",
   "nav.help": "Help & Support",
