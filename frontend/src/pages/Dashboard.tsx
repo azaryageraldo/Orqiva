@@ -528,13 +528,17 @@ export default function Dashboard({
           >
             <CircleAlert className="size-4 shrink-0 text-amber-400 mt-0.5" />
             <div className="flex-1 leading-relaxed">
-              <span className="font-semibold text-amber-300">Peringatan Antrean Latar:</span>{" "}
-              Terdapat {queueHealth.stalled_jobs} pesan yang menunggu lebih dari 2 menit di antrean.
-              Pastikan worker{" "}
+              <span className="font-semibold text-amber-300">Background Worker Alert:</span>{" "}
+              There are {queueHealth.stalled_jobs} message(s) waiting in the queue for over 2 minutes.
+              Ensure your worker is running via{" "}
               <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-amber-100">
                 php artisan queue:work
               </code>{" "}
-              sedang berjalan di server agar pesan pelanggan diproses normal oleh AI.
+              or CLI{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-amber-100">
+                orqiva start
+              </code>{" "}
+              so AI responses can process normally.
             </div>
           </div>
         )}
@@ -986,15 +990,15 @@ export default function Dashboard({
                   text={HEALTH_STYLES[health].text}
                 />
                 <SystemRow
-                  label="Antrean Latar (Queue)"
+                  label="Background Queue"
                   value={
                     !queueHealth
-                      ? "Memeriksa..."
+                      ? "Checking..."
                       : queueHealth.driver === "sync"
-                        ? "Sinkron (sync)"
+                        ? "Sync"
                         : queueHealth.stalled_jobs > 0
-                          ? `Tertahan (${queueHealth.stalled_jobs})`
-                          : `Siap (${queueHealth.pending_jobs} antre)`
+                          ? `Stalled (${queueHealth.stalled_jobs})`
+                          : `Ready (${queueHealth.pending_jobs} queued)`
                   }
                   dot={
                     !queueHealth

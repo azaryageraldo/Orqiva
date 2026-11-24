@@ -26,7 +26,7 @@ class GeminiService
 
         if (! is_string($apiKey) || trim($apiKey) === '') {
             throw new RuntimeException(
-                'API key Google Gemini belum tersedia. Simpan key di menu API Keys.'
+                'Google Gemini API key is not configured. Please save a key in the API Keys menu.'
             );
         }
 

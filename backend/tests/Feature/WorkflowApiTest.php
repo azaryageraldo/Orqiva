@@ -381,11 +381,11 @@ class WorkflowApiTest extends TestCase
             ->postJson("/api/v1/workflows/{$source->id}/duplicate");
 
         $response->assertCreated();
-        $this->assertSame('Original Flow (Salinan)', $response->json('data.name'));
+        $this->assertSame('Original Flow (Copy)', $response->json('data.name'));
         $this->assertSame('draft', $response->json('data.status'));
         $this->assertDatabaseHas('workflows', [
             'user_id' => $owner->id,
-            'name' => 'Original Flow (Salinan)',
+            'name' => 'Original Flow (Copy)',
             'status' => 'draft',
         ]);
     }

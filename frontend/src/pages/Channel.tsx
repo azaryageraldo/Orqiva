@@ -340,12 +340,12 @@ export default function Channel() {
       await manageTelegramWebhook(telegram.id, "set", hookUrl);
       const info = await getTelegramWebhook(telegram.id);
       setWebhookInfo(info);
-      setNotice("Webhook berhasil didaftarkan ke Telegram.");
+      setNotice("Webhook successfully registered with Telegram.");
     } catch (caught) {
       setError(
         getErrorMessage(
           caught,
-          "Gagal mendaftarkan webhook. Pastikan server dapat diakses dengan domain / HTTPS publik.",
+          "Failed to register webhook. Telegram requires a public URL with HTTPS. For local setups, use a tunnel (e.g. ngrok or Cloudflare Tunnel) or switch to polling mode.",
         ),
       );
     } finally {
@@ -361,9 +361,9 @@ export default function Channel() {
     try {
       await manageTelegramWebhook(telegram.id, "delete");
       setWebhookInfo({ url: "" });
-      setNotice("Webhook dinonaktifkan. Anda dapat menggunakan polling (php artisan channels:telegram-poll).");
+      setNotice("Webhook deactivated. Telegram updates will be received via polling (php artisan channels:telegram-poll).");
     } catch (caught) {
-      setError(getErrorMessage(caught, "Gagal menghapus webhook."));
+      setError(getErrorMessage(caught, "Failed to remove webhook."));
     } finally {
       setWebhookBusy(false);
     }
@@ -1441,16 +1441,16 @@ export default function Channel() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-zinc-200">
-                      Webhook Telegram
+                      Telegram Webhook
                     </span>
                     <span className="rounded bg-sky-400/10 px-2 py-0.5 text-[10px] font-medium text-sky-400">
-                      Opsional
+                      Optional
                     </span>
                   </div>
                   {webhookInfo?.url ? (
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400">
                       <span className="size-1.5 rounded-full bg-emerald-400" />
-                      Aktif (Webhook)
+                      Active (Webhook)
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
@@ -1461,11 +1461,17 @@ export default function Channel() {
                 </div>
 
                 <p className="text-xs text-zinc-400 leading-relaxed">
-                  Jika Orqiva dipasang di server publik dengan domain HTTPS, Anda dapat mendaftarkan Webhook agar Telegram mengirim pesan instan tanpa perlu menjalankan antrean polling di terminal.
+                  If running locally with a public tunnel (ngrok / Cloudflare Tunnel) or deployed on a public domain with HTTPS, you can register a Webhook so Telegram delivers updates instantly in real time.
                 </p>
 
+                {window.location.protocol !== "https:" && (
+                  <p className="text-[11px] text-amber-300/90 leading-relaxed bg-amber-500/10 border border-amber-500/20 rounded-md p-2">
+                    💡 <strong>Local setup tip:</strong> Telegram requires a public HTTPS URL. Run <code className="font-mono text-amber-200">ngrok http 5173</code> to expose your local instance, or use Long Polling mode.
+                  </p>
+                )}
+
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-medium text-zinc-300">URL Webhook:</span>
+                  <span className="text-[11px] font-medium text-zinc-300">Webhook URL:</span>
                   <div className="flex items-center gap-2">
                     <input
                       readOnly
@@ -1500,7 +1506,7 @@ export default function Channel() {
                     className="h-7 text-xs border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
                   >
                     {webhookBusy ? <LoaderCircle className="mr-1 size-3 animate-spin" /> : null}
-                    Daftarkan Webhook
+                    Register Webhook
                   </Button>
                   {webhookInfo?.url && (
                     <Button
@@ -1511,7 +1517,7 @@ export default function Channel() {
                       onClick={() => void handleDeleteWebhook()}
                       className="h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
                     >
-                      Hapus (Gunakan Polling)
+                      Remove (Use Polling)
                     </Button>
                   )}
                 </div>

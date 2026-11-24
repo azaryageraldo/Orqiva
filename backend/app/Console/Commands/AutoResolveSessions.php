@@ -12,14 +12,14 @@ class AutoResolveSessions extends Command
      *
      * @var string
      */
-    protected $signature = 'sessions:auto-resolve {--hours=24 : Batas inaktivitas dalam jam}';
+    protected $signature = 'sessions:auto-resolve {--hours=24 : Inactivity threshold in hours}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Menutup sesi chat yang tidak aktif secara otomatis setelah batas waktu tertentu';
+    protected $description = 'Automatically resolve inactive chat sessions after a given duration';
 
     public function handle(): int
     {
@@ -38,7 +38,7 @@ class AutoResolveSessions extends Command
             ->get(['id']);
 
         if ($sessions->isEmpty()) {
-            $this->info("Tidak ada sesi chat yang perlu ditutup (batas: {$hours} jam).");
+            $this->info("No inactive chat sessions need to be resolved (threshold: {$hours} hours).");
 
             return Command::SUCCESS;
         }
@@ -54,8 +54,9 @@ class AutoResolveSessions extends Command
                 'current_node_id' => null,
             ]);
 
-        $this->info("Berhasil menutup {$sessions->count()} sesi chat yang tidak aktif selama {$hours} jam.");
+        $this->info("Successfully resolved {$sessions->count()} inactive chat sessions ({$hours} hours threshold).");
 
         return Command::SUCCESS;
     }
 }
+

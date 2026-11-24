@@ -224,7 +224,7 @@ export function DateRangePicker({
 
           <div className="mt-3 flex items-center justify-between gap-2">
             <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
-              Batal
+              Cancel
             </Button>
             <Button
               variant="default"
@@ -232,7 +232,7 @@ export function DateRangePicker({
               onClick={() => setOpen(false)}
               disabled={!value?.from || !value?.to}
             >
-              Terapkan
+              Apply
             </Button>
           </div>
         </SheetContent>

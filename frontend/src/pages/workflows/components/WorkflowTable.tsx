@@ -69,13 +69,13 @@ export default function WorkflowTable({
                 />
               </Th>
               <Th className="px-4 py-3 text-left font-medium text-xs text-zinc-400">
-                Alur Kerja
+                Workflow
               </Th>
               <Th className="w-36 px-4 py-3 text-left font-medium text-xs text-zinc-400">
                 {t("wf.col.status")}
               </Th>
               <Th className="w-48 px-4 py-3 text-left font-medium text-xs text-zinc-400">
-                Terakhir Diperbarui
+                Last Updated
               </Th>
               <Th className="w-36 px-4 py-3 text-right font-medium text-xs text-zinc-400">
                 {t("wf.col.actions")}
@@ -107,12 +107,12 @@ export default function WorkflowTable({
                       <GitFork className="size-7 rotate-90 text-primary/70" />
                     </div>
                     <h3 className="text-sm font-semibold text-zinc-200">
-                      {searchQuery ? t("wf.noMatch") : "Belum ada alur kerja"}
+                      {searchQuery ? t("wf.noMatch") : "No workflows yet"}
                     </h3>
                     <p className="mt-1.5 max-w-sm text-xs text-zinc-400 leading-relaxed">
                       {searchQuery
-                        ? "Coba gunakan kata kunci lain atau bersihkan kotak pencarian."
-                        : "Rancang alur respon percakapan otomatis Anda untuk menangani pertanyaan pelanggan secara cerdas."}
+                        ? "Try another search keyword or clear the search input."
+                        : "Design your automated conversation flows to handle customer inquiries intelligently."}
                     </p>
                     {onCreateNew && !searchQuery && (
                       <Button

@@ -115,7 +115,7 @@ class InboxController extends Controller
 
         if ($session->status === ChatSession::STATUS_ENDED) {
             throw ValidationException::withMessages([
-                'session' => 'Sesi ini sudah berakhir. Pelanggan perlu membuka widget baru.',
+                'session' => 'This session has already ended. The customer needs to start a new session.',
             ]);
         }
 

@@ -55,7 +55,7 @@ class AiProviderCatalog
 
         if ($models === []) {
             throw new RuntimeException(
-                'Tidak ada model chat yang tersedia untuk API key '.$this->label($provider).'.'
+                'No chat models available for API key '.$this->label($provider).'.'
             );
         }
 

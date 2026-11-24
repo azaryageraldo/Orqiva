@@ -560,7 +560,7 @@ class ChannelService
             return ['success' => true, 'url' => $url, 'result' => $result];
         } catch (Throwable $e) {
             throw ValidationException::withMessages([
-                'webhook' => 'Gagal mendaftarkan webhook ke Telegram: '.$e->getMessage(),
+                'webhook' => 'Failed to register webhook with Telegram: '.$e->getMessage(),
             ]);
         }
     }

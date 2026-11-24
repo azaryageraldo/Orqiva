@@ -46,7 +46,7 @@ export default function WorkflowToolbar({
 }: WorkflowToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const filterTabs: Array<{ id: WorkflowFilterStatus; label: string; count: number }> = [
-    { id: "all", label: "Semua", count: totalCount },
+    { id: "all", label: "All", count: totalCount },
     { id: "active", label: t("wf.on"), count: activeCount },
     { id: "inactive", label: t("wf.off"), count: inactiveCount },
   ];
@@ -152,7 +152,7 @@ export default function WorkflowToolbar({
           className="h-8 gap-1.5 rounded-lg border-white/[0.08] bg-[#0c0d11] px-3 text-xs font-medium text-zinc-300 hover:bg-white/[0.05] hover:text-white"
         >
           <Upload className="size-3.5" />
-          <span>{importing ? "Mengimpor..." : "Impor"}</span>
+          <span>{importing ? "Importing..." : "Import"}</span>
         </Button>
         <Button
           type="button"

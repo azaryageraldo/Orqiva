@@ -143,7 +143,7 @@ class WorkflowService
         $source = $this->getWorkflow($user, $id);
 
         return $user->workflows()->create([
-            'name' => $source->name.' (Salinan)',
+            'name' => $source->name.' (Copy)',
             'description' => $source->description,
             'status' => 'draft',
             'definition' => $source->definition,
@@ -176,9 +176,9 @@ class WorkflowService
     {
         $rawWorkflow = $payload['workflow'] ?? $payload;
 
-        $name = trim((string) ($rawWorkflow['name'] ?? 'Alur Kerja Impor'));
+        $name = trim((string) ($rawWorkflow['name'] ?? 'Imported Workflow'));
         if ($name === '') {
-            $name = 'Alur Kerja Impor';
+            $name = 'Imported Workflow';
         }
 
         $description = isset($rawWorkflow['description']) ? (string) $rawWorkflow['description'] : null;
@@ -186,7 +186,7 @@ class WorkflowService
 
         if (! is_array($definition)) {
             throw ValidationException::withMessages([
-                'definition' => 'Format template tidak valid: definition harus berupa objek.',
+                'definition' => 'Invalid template format: definition must be an object.',
             ]);
         }
 

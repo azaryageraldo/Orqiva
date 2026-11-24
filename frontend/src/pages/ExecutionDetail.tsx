@@ -301,9 +301,9 @@ export default function ExecutionDetail({
                   {detail.workflow_name || `Workflow #${detail.workflow_id}`}
                 </h1>
                 <p className="text-xs text-zinc-400">
-                  Kontak:{" "}
+                  Contact:{" "}
                   <span className="font-medium text-zinc-200">
-                    {detail.contact_name || "Pelanggan Baru"}
+                    {detail.contact_name || "New Customer"}
                   </span>
                   {detail.contact_public_id && (
                     <span className="font-mono text-zinc-500">
@@ -416,7 +416,7 @@ export default function ExecutionDetail({
                       >
                         <div className="flex items-center gap-1 text-[10px] text-zinc-500">
                           {isCustomer ? (
-                            <span>{detail.contact_name || "Pelanggan"}</span>
+                            <span>{detail.contact_name || "Customer"}</span>
                           ) : isAdmin ? (
                             <span className="text-amber-400 font-medium">Admin</span>
                           ) : (
@@ -438,7 +438,7 @@ export default function ExecutionDetail({
                   })}
                   <div className="my-3 flex items-center gap-2 text-[10px] text-zinc-500 font-medium tracking-wider uppercase">
                     <div className="h-px flex-1 bg-white/10" />
-                    <span>Eksekusi Ini Dimulai</span>
+                    <span>This Execution Started</span>
                     <div className="h-px flex-1 bg-white/10" />
                   </div>
                 </div>
@@ -450,21 +450,21 @@ export default function ExecutionDetail({
                     <MessageSquare className="size-5" />
                   </div>
                   <p className="text-xs text-zinc-400">
-                    Tidak ada respon percakapan yang dihasilkan pada sesi ini.
+                    No conversation responses were generated in this session.
                   </p>
                 </div>
               ) : (
                 <>
-                  {/* Pesan Masuk dari Manusia / Pelanggan (Pemicu Turn Ini) */}
+                  {/* Incoming Customer Message (Turn Trigger) */}
                   {customerInputText && (
                     <div className="flex flex-col items-end space-y-1">
                       <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
                         <span className="font-medium text-zinc-200">
-                          {detail.contact_name || "Pelanggan"}
+                          {detail.contact_name || "Customer"}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.2 text-[9px] font-medium text-zinc-300">
                           <User className="size-2.5 text-zinc-400" />
-                          Pesan Masuk (Pemicu)
+                          Incoming Trigger
                         </span>
                       </div>
                       <div className="rounded-2xl rounded-tr-sm border border-white/15 bg-white/10 p-3 text-xs leading-relaxed text-zinc-100 max-w-[85%] whitespace-pre-wrap shadow-sm">

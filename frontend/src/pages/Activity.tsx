@@ -268,7 +268,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                aria-label="Hapus pencarian"
+                aria-label="Clear search"
                 className="absolute top-1/2 right-2 -translate-y-1/2 text-zinc-500 transition hover:text-zinc-200"
               >
                 <X className="size-3.5" />
@@ -304,10 +304,10 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
                     #
                   </Th>
                   <Th className="px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
-                    Pelanggan & Sesi
+                    Customer & Session
                   </Th>
                   <Th className="min-w-[180px] px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
-                    Alur Kerja
+                    Workflow
                   </Th>
                   <Th className="w-32 px-4 py-2.5 text-left font-medium text-xs text-zinc-400">
                     {t("activity.col.logStatus")}

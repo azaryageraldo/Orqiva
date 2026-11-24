@@ -201,8 +201,8 @@ export default function App() {
                 realNotifs.push({
                   id,
                   type: "workflow.error",
-                  title: "Workflow gagal",
-                  description: `${exec.workflow_name || "Workflow"} #${exec.workflow_id}: ${exec.error || "Gagal dieksekusi"}`,
+                  title: "Workflow failed",
+                  description: `${exec.workflow_name || "Workflow"} #${exec.workflow_id}: ${exec.error || "Execution failed"}`,
                   timestamp: exec.started_at || new Date().toISOString(),
                   read: readList.includes(id),
                   url: `/activity/${exec.workflow_id}/${exec.id}`,
@@ -212,8 +212,8 @@ export default function App() {
                 realNotifs.push({
                   id,
                   type: "message.received",
-                  title: "Eskalasi ke Admin",
-                  description: `Sesi ${exec.contact_name || "Pelanggan"} membutuhkan respons CS`,
+                  title: "Human Escalation",
+                  description: `Session ${exec.contact_name || "Customer"} requires agent response`,
                   timestamp: exec.started_at || new Date().toISOString(),
                   read: readList.includes(id),
                   url: "/inbox",

@@ -42,7 +42,7 @@ class AutoResolveSessionsTest extends TestCase
         $contact = Contact::create([
             'user_id' => $user->id,
             'public_id' => 'ct_test_123',
-            'name' => 'Pelanggan Lama',
+            'name' => 'Old Customer',
         ]);
 
         // Sesi aktif baru (1 jam lalu)

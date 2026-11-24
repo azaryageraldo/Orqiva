@@ -69,7 +69,7 @@ export default function WorkflowRow({
               </p>
             ) : (
               <p className="mt-0.5 text-xs text-zinc-600 italic">
-                Tanpa deskripsi
+                No description
               </p>
             )}
           </div>
@@ -101,8 +101,8 @@ export default function WorkflowRow({
         <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
           <button
             type="button"
-            title="Buka Editor Canvas"
-            aria-label="Buka Editor Canvas"
+            title="Open Canvas Editor"
+            aria-label="Open Canvas Editor"
             onClick={() => onOpen(String(item.id))}
             className="flex size-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-primary/[0.1] hover:text-primary focus-visible:outline-none"
           >
@@ -110,8 +110,8 @@ export default function WorkflowRow({
           </button>
           <button
             type="button"
-            title="Duplikasi Alur Kerja"
-            aria-label="Duplikasi Alur Kerja"
+            title="Duplicate Workflow"
+            aria-label="Duplicate Workflow"
             onClick={() => onDuplicate?.(item)}
             className="flex size-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:outline-none"
           >
@@ -119,8 +119,8 @@ export default function WorkflowRow({
           </button>
           <button
             type="button"
-            title="Ekspor Template JSON"
-            aria-label="Ekspor Template JSON"
+            title="Export JSON Template"
+            aria-label="Export JSON Template"
             onClick={() => onExport?.(item)}
             className="flex size-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:outline-none"
           >

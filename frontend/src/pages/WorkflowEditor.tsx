@@ -1470,26 +1470,26 @@ export default function WorkflowEditor({
         tone="danger"
         title={
           confirmDeleteNode?.isTrigger
-            ? "Hapus Node Pemicu (Trigger)?"
+            ? "Delete Trigger Node?"
             : confirmDeleteNode?.count === 1
-              ? "Hapus Node Terhubung?"
-              : `Hapus ${confirmDeleteNode?.count} Node Terhubung?`
+              ? "Delete Connected Node?"
+              : `Delete ${confirmDeleteNode?.count} Connected Nodes?`
         }
         description={
           <div className="space-y-3 pt-0.5">
             <p className="text-muted-foreground text-xs leading-relaxed">
               {confirmDeleteNode?.isTrigger
-                ? "Node Trigger adalah titik awal pesan masuk. Menghapus node ini akan menyebabkan alur kerja tidak dapat dipicu oleh pesan baru sampai node Trigger baru dibuat."
-                : "Node yang dipilih memiliki koneksi aktif dalam alur kerja. Menghapusnya akan memutus jalur alur percakapan."}
+                ? "The Trigger node is the entry point for incoming messages. Deleting it will prevent the workflow from being started until a new Trigger node is added."
+                : "The selected node has active connections in the workflow. Deleting it will disconnect the conversation flow."}
             </p>
             <div className="flex items-start gap-2.5 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-300 leading-relaxed">
               <span className="mt-1 size-1.5 shrink-0 rounded-full bg-red-400" />
-              <span>Semua garis koneksi yang terhubung ke node ini akan ikut dihapus. Lanjutkan?</span>
+              <span>All connected lines (edges) linked to this node will also be removed. Continue?</span>
             </div>
           </div>
         }
-        cancelLabel="Batal"
-        confirmLabel="Tetap Hapus"
+        cancelLabel="Cancel"
+        confirmLabel="Delete Anyway"
         confirmVariant="destructive"
         onConfirm={performDeleteNodes}
       />

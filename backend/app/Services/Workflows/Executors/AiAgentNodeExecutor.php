@@ -79,10 +79,10 @@ class AiAgentNodeExecutor implements NodeExecutorInterface
                     }
 
                     $role = match ($message['role'] ?? null) {
-                        'customer' => 'Pelanggan',
+                        'customer' => 'Customer',
                         'admin' => 'Admin',
                         'assistant' => 'AI',
-                        default => 'Sistem',
+                        default => 'System',
                     };
 
                     return $role.': '.trim((string) ($message['content'] ?? ''));

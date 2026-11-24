@@ -173,9 +173,9 @@ export default function Workflows({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setSuccess(`Template alur kerja "${item.name}" berhasil diunduh.`);
+      setSuccess(`Workflow template "${item.name}" downloaded successfully.`);
     } catch (caught) {
-      setError(getErrorMessage(caught, "Gagal mengekspor alur kerja."));
+      setError(getErrorMessage(caught, "Failed to export workflow."));
     }
   }
 
@@ -184,10 +184,10 @@ export default function Workflows({
     setSuccess("");
     try {
       const cloned = await duplicateWorkflow(String(item.id));
-      setSuccess(`Alur kerja "${item.name}" berhasil diduplikasi sebagai "${cloned.name}".`);
+      setSuccess(`Workflow "${item.name}" duplicated as "${cloned.name}".`);
       await loadWorkflows(1, "");
     } catch (caught) {
-      setError(getErrorMessage(caught, "Gagal menduplikasi alur kerja."));
+      setError(getErrorMessage(caught, "Failed to duplicate workflow."));
     }
   }
 
@@ -200,13 +200,13 @@ export default function Workflows({
       const text = await file.text();
       const parsed = JSON.parse(text);
       const created = await importWorkflow(parsed);
-      setSuccess(`Alur kerja "${created.name}" berhasil diimpor.`);
+      setSuccess(`Workflow "${created.name}" imported successfully.`);
       await loadWorkflows(1, "");
     } catch (caught) {
       setError(
         getErrorMessage(
           caught,
-          "Gagal mengimpor alur kerja. Pastikan berkas adalah JSON template yang valid.",
+          "Failed to import workflow. Please ensure the file is a valid JSON template.",
         ),
       );
     } finally {

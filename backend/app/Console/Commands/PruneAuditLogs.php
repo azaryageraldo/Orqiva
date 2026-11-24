@@ -14,38 +14,39 @@ class PruneAuditLogs extends Command
      *
      * @var string
      */
-    protected $signature = 'orqiva:prune {--days=30 : Batas hari retensi log eksekusi}';
+    protected $signature = 'orqiva:prune {--days=30 : Execution log retention in days}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Membersihkan log audit eksekusi lama dan antrean gagal untuk memelihara database';
+    protected $description = 'Prune old execution audit logs and failed queue jobs to keep database lightweight';
 
     public function handle(): int
     {
         $days = max(1, (int) $this->option('days'));
         $cutoff = now()->subDays($days);
 
-        // Hapus eksekusi alur kerja lama yang sudah berstatus terminal
+        // Delete old workflow executions that reached a terminal status
         $deleted = WorkflowExecution::query()
             ->whereIn('status', ['success', 'failed'])
             ->where('created_at', '<', $cutoff)
             ->delete();
 
-        $this->info("Berhasil membersihkan {$deleted} log eksekusi yang lebih lama dari {$days} hari.");
+        $this->info("Successfully pruned {$deleted} execution logs older than {$days} days.");
 
-        // Bersihkan failed jobs jika tabel exists
+        // Clean up failed queue jobs if table exists
         if (Schema::hasTable('failed_jobs')) {
             try {
                 Artisan::call('queue:prune-failed', ['--hours' => 168]);
-                $this->info('Berhasil membersihkan failed jobs antrean yang lebih lama dari 7 hari.');
+                $this->info('Successfully pruned failed queue jobs older than 7 days.');
             } catch (\Throwable) {
-                // Abaikan jika command tidak tersedia
+                // Ignore if queue command is unavailable
             }
         }
 
         return Command::SUCCESS;
     }
 }
+
