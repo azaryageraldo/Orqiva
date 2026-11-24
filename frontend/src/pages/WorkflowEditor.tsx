@@ -25,7 +25,6 @@ import "@xyflow/react/dist/style.css";
 import {
   Check,
   MousePointer2,
-  Plus,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -1229,27 +1228,6 @@ export default function WorkflowEditor({
               setShowLibrary(true);
             }}
           />
-          <button
-            type="button"
-            onClick={() => {
-              if (showLibrary) {
-                setShowLibrary(false);
-                setPendingParentId(null);
-                setPendingAddPosition(null);
-              } else {
-                if (selectedNode) saveNodeChanges();
-                setPendingParentId(null);
-                setPendingAddPosition(null);
-                setShowLibrary(true);
-              }
-            }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center size-9 rounded-full border border-primary/30 bg-primary text-primary-foreground shadow-lg backdrop-blur transition hover:bg-primary/90"
-            aria-expanded={showLibrary}
-            aria-label={showLibrary ? t("editor.closeLibrary") : t("editor.openLibrary")}
-            title={showLibrary ? t("editor.closeLibrary") : t("editor.openLibrary")}
-          >
-            {showLibrary ? <X size={15} /> : <Plus size={16} />}
-          </button>
           {isLoading && (
             <div role="status" className="absolute left-4 top-14 z-10 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground">
               {t("editor.loadingWorkflow")}

@@ -29,23 +29,23 @@ export default function EditorHeader({
           type="button"
           onClick={onBack}
           aria-label={t("editor.workflow")}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100 transition-colors"
+          className="inline-flex size-7 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-3.5" />
         </button>
 
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-4 w-px bg-border" />
 
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={onBack}
-            className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors truncate"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors truncate"
           >
             {t("editor.workflow")}
           </button>
-          <span className="text-zinc-600 text-xs">/</span>
-          <span className="truncate text-xs font-semibold text-zinc-100 max-w-[280px]">
+          <span className="text-muted-foreground/40 text-xs">/</span>
+          <span className="truncate text-xs font-semibold text-foreground max-w-[280px]">
             {workflowName || t("editor.title")}
           </span>
         </div>
@@ -54,21 +54,21 @@ export default function EditorHeader({
       {/* Right Actions */}
       <div className="flex items-center gap-3">
         {/* Save Status Indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-zinc-400">
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
           {isLoading ? (
             <>
-              <LoaderCircle className="size-3 animate-spin text-zinc-500" />
-              <span className="text-[11px] text-zinc-500">{t("editor.loading")}</span>
+              <LoaderCircle className="size-3 animate-spin text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">{t("editor.loading")}</span>
             </>
           ) : isDirty ? (
             <>
               <span className="size-1.5 rounded-full bg-amber-400" />
-              <span className="text-[11px] text-amber-400/90">{t("editor.unsaved")}</span>
+              <span className="text-[11px] text-amber-400 font-medium">{t("editor.unsaved")}</span>
             </>
           ) : (
             <>
               <Check className="size-3 text-emerald-400" />
-              <span className="text-[11px] text-zinc-400">{t("editor.saved")}</span>
+              <span className="text-[11px] text-muted-foreground">{t("editor.saved")}</span>
             </>
           )}
         </div>
@@ -81,8 +81,8 @@ export default function EditorHeader({
           className={cn(
             "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40",
             isDirty
-              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30 hover:bg-primary/90"
-              : "border border-white/10 bg-white/[0.04] text-zinc-400",
+              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary/90"
+              : "border border-border bg-muted/40 text-muted-foreground",
           )}
         >
           {isSaving ? (

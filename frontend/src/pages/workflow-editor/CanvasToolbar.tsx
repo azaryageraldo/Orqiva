@@ -36,10 +36,10 @@ export default function CanvasToolbar({
             disabled={isLoading}
             className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            <Plus className="size-3.5" />
-            <span>Tambah Langkah</span>
+            <Plus className="size-3.5" strokeWidth={2} />
+            <span>Add Step</span>
           </button>
-          <div className="h-4 w-px bg-white/10 mx-0.5" />
+          <div className="h-4 w-px bg-border mx-0.5" />
         </>
       )}
 
@@ -50,7 +50,7 @@ export default function CanvasToolbar({
             onClick={onTidy}
             disabled={isLoading || isDisabled}
             aria-label={t("editor.tidy")}
-            className="inline-flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200 transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
+            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
           >
             <Wand2 className="size-3.5" />
           </button>
@@ -69,7 +69,7 @@ export default function CanvasToolbar({
             className={`inline-flex size-7 items-center justify-center rounded-md transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${
               blockMode
                 ? "bg-primary/20 text-primary border border-primary/30"
-                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
             }`}
           >
             <BoxSelect className="size-3.5" />
@@ -82,7 +82,7 @@ export default function CanvasToolbar({
 
       {selectedCount > 0 && (
         <>
-          <div className="h-4 w-px bg-white/10 mx-0.5" />
+          <div className="h-4 w-px bg-border mx-0.5" />
           <Tooltip>
             <TooltipTrigger>
               <button

@@ -67,12 +67,12 @@ export default function AutomationNode({
   const preview = previewFor(data, t);
 
   return (
-    <div className="group relative w-[240px]">
+    <div className="group relative w-[260px]">
       <div
-        className={`relative overflow-hidden rounded-xl border bg-card shadow-lg shadow-black/30 transition ${
+        className={`relative overflow-hidden rounded-xl border bg-card/95 backdrop-blur-sm shadow-xl shadow-black/40 transition-all ${
           selected
-            ? "border-primary/70 ring-2 ring-primary/25"
-            : "border-border hover:border-ring/50"
+            ? "border-primary ring-2 ring-primary/25 shadow-primary/10"
+            : "border-border hover:border-zinc-700/80"
         }`}
       >
         <span
@@ -97,36 +97,36 @@ export default function AutomationNode({
         <Handle
           type="target"
           position={Position.Top}
-          className="!size-2.5 !rounded-full !border-2 !border-background !bg-muted-foreground/70"
+          className="!size-2.5 !rounded-full !border-2 !border-card !bg-zinc-500 hover:!bg-primary transition-colors"
         />
 
-        <div className="flex items-start gap-2.5 px-3 pt-3.5 pb-2.5 pr-9">
+        <div className="flex items-start gap-2.5 px-3.5 pt-3.5 pb-2.5 pr-9">
           <span
-            className={`flex size-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-white/5 ${style.tile}`}
+            className={`flex size-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-white/10 ${style.tile}`}
           >
-            <Icon size={18} weight="duotone" />
+            <Icon size={16} weight="duotone" />
           </span>
 
-          <div className="min-w-0 flex-1 pt-0.5">
+          <div className="min-w-0 flex-1">
             <p
-              className="truncate text-[13px] font-semibold leading-4 text-foreground"
+              className="truncate text-[12.5px] font-semibold leading-tight text-foreground"
               title={nodeTitle}
             >
               {nodeTitle}
             </p>
             <span
-              className={`mt-1 inline-flex max-w-full truncate rounded border px-1.5 py-px text-[9px] font-semibold tracking-[0.08em] uppercase ${style.badge}`}
+              className={`mt-1 inline-flex max-w-full truncate rounded px-1.5 py-0.5 text-[9px] font-mono font-semibold tracking-wider uppercase ${style.badge}`}
             >
               {data.label}
             </span>
           </div>
         </div>
 
-        <div className="mx-3 mb-2.5 rounded-md border border-border/50 bg-background/40 px-2 py-1.5">
+        <div className="mx-3.5 mb-3 rounded-lg border border-border/60 bg-background/60 px-2.5 py-1.5">
           <p
-            className={`truncate text-[10.5px] leading-4 ${
-              preview.mono ? "font-mono" : ""
-            } ${preview.muted ? "text-muted-foreground/70" : "text-muted-foreground"}`}
+            className={`truncate text-[11px] leading-relaxed ${
+              preview.mono ? "font-mono text-primary/90" : "text-muted-foreground"
+            } ${preview.muted ? "text-muted-foreground/60 italic" : ""}`}
             title={preview.text}
           >
             {preview.text}
@@ -141,7 +141,7 @@ export default function AutomationNode({
               position={Position.Right}
               title={t("editor.ifMatch")}
               style={{ top: "50%", background: "#34d399" }}
-              className="!size-3 !rounded-full !border-2 !border-background"
+              className="!size-2.5 !rounded-full !border-2 !border-card hover:!scale-125 transition-transform"
             />
             <Handle
               id="false"
@@ -149,7 +149,7 @@ export default function AutomationNode({
               position={Position.Bottom}
               title={t("editor.else")}
               style={{ left: "50%", background: "#fb7185" }}
-              className="!size-3 !rounded-full !border-2 !border-background"
+              className="!size-2.5 !rounded-full !border-2 !border-card hover:!scale-125 transition-transform"
             />
           </>
         ) : canAppend ? (
@@ -157,14 +157,14 @@ export default function AutomationNode({
             type="source"
             position={Position.Bottom}
             style={{ background: style.handle }}
-            className="!size-3 !rounded-full !border-2 !border-background"
+            className="!size-2.5 !rounded-full !border-2 !border-card hover:!scale-125 transition-transform"
           />
         ) : null}
       </div>
 
       {isTerminal ? (
         <>
-          <span className="pointer-events-none absolute top-full left-1/2 h-4 w-px -translate-x-1/2 bg-border" />
+          <span className="pointer-events-none absolute top-full left-1/2 h-3.5 w-px -translate-x-1/2 bg-border" />
           <button
             type="button"
             aria-label={t("editor.addComponent")}
@@ -173,9 +173,9 @@ export default function AutomationNode({
               event.stopPropagation();
               editorActions?.requestAddFrom(id);
             }}
-            className="nodrag absolute top-full left-1/2 z-10 mt-4 flex size-7 -translate-x-1/2 items-center justify-center rounded-full border border-primary/50 bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition hover:scale-105 hover:bg-primary/90"
+            className="nodrag absolute top-full left-1/2 z-10 mt-3.5 flex size-6 -translate-x-1/2 items-center justify-center rounded-full border border-primary/40 bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition hover:scale-110 hover:bg-primary/90"
           >
-            <Plus size={14} strokeWidth={2.5} />
+            <Plus size={13} strokeWidth={2.5} />
           </button>
         </>
       ) : null}
