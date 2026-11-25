@@ -80,7 +80,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
   const requestRef = useRef(0);
 
   const loadData = useCallback(
-    async (targetPage = 1, currentFilter = statusFilter, isRefresh = false) => {
+    async (targetPage = 1, currentFilter: FilterStatus = "all", isRefresh = false) => {
       const requestId = ++requestRef.current;
 
       if (isRefresh) {
@@ -111,11 +111,12 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         }
       }
     },
-    [statusFilter, t],
+    [t],
   );
 
   useEffect(() => {
-    void loadData(1, statusFilter);
+    const timer = window.setTimeout(() => void loadData(1, statusFilter), 0);
+    return () => window.clearTimeout(timer);
   }, [loadData, statusFilter]);
 
   const filteredExecutions = useMemo(() => {
@@ -132,7 +133,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
 
   const filterTabs: Array<{ id: FilterStatus; label: string; count: number }> =
     [
-      { id: "all", label: "Semua", count: summary.total },
+      { id: "all", label: "All", count: summary.total },
       { id: "success", label: t("activity.success"), count: summary.success },
       { id: "running", label: t("activity.running"), count: summary.running },
       { id: "waiting", label: t("activity.waiting"), count: summary.waiting },
@@ -196,7 +197,7 @@ export default function Activity({ onOpenExecution }: ActivityProps) {
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground font-heading">
               {t("activity.title")}
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">

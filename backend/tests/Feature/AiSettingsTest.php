@@ -263,4 +263,87 @@ class AiSettingsTest extends TestCase
             'provider' => 'gemini',
         ]);
     }
+
+    public function test_selected_models_filter_workflow_dropdown_while_keeping_all_detected_models(): void
+    {
+        Http::fake([
+            'https://api.openai.com/v1/models' => Http::response([
+                'data' => [
+                    ['id' => 'gpt-4o'],
+                    ['id' => 'gpt-4o-mini'],
+                    ['id' => 'gpt-4.1-mini'],
+                ],
+            ]),
+        ]);
+
+        $user = $this->user();
+
+        // Saving without selected_models defaults to [default_model] (1 model).
+        $this->actingAs($user)
+            ->putJson('/api/v1/ai-settings', [
+                'provider' => 'openai',
+                'api_key' => 'sk-openai-multi',
+                'default_model' => 'gpt-4o-mini',
+            ])
+            ->assertOk()
+            ->assertJsonCount(3, 'data.providers.1.models')
+            ->assertJsonPath('data.providers.1.selected_models', ['gpt-4o-mini'])
+            ->assertJsonCount(1, 'data.models')
+            ->assertJsonPath('data.models.0.id', 'gpt-4o-mini');
+
+        // Selecting 2 of 3 models updates data.models while keeping all 3 in providers[].models.
+        $this->actingAs($user)
+            ->putJson('/api/v1/ai-settings', [
+                'provider' => 'openai',
+                'selected_models' => ['gpt-4o', 'gpt-4.1-mini'],
+                'default_model' => 'gpt-4.1-mini',
+            ])
+            ->assertOk()
+            ->assertJsonCount(3, 'data.providers.1.models')
+            ->assertJsonPath('data.providers.1.selected_models', ['gpt-4o', 'gpt-4.1-mini'])
+            ->assertJsonPath('data.providers.1.default_model', 'gpt-4.1-mini')
+            ->assertJsonCount(2, 'data.models')
+            ->assertJsonPath('data.models.0.id', 'gpt-4o')
+            ->assertJsonPath('data.models.1.id', 'gpt-4.1-mini');
+
+        // Rejects empty selected_models or default_model outside selected_models.
+        $this->actingAs($user)
+            ->putJson('/api/v1/ai-settings', [
+                'provider' => 'openai',
+                'selected_models' => [],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('selected_models');
+
+        $this->actingAs($user)
+            ->putJson('/api/v1/ai-settings', [
+                'provider' => 'openai',
+                'selected_models' => ['gpt-4o'],
+                'default_model' => 'gpt-4o-mini',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('default_model');
+    }
+
+    public function test_legacy_provider_without_selected_models_defaults_to_default_model_only(): void
+    {
+        $user = $this->user();
+
+        AiProviderSetting::create([
+            'user_id' => $user->id,
+            'provider' => 'openrouter',
+            'api_key' => 'sk-or-legacy',
+            'models' => ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonnet', 'google/gemini-2.5-flash'],
+            'selected_models' => null,
+            'default_model' => 'anthropic/claude-3.5-sonnet',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/ai-settings')
+            ->assertOk()
+            ->assertJsonCount(3, 'data.providers.2.models')
+            ->assertJsonPath('data.providers.2.selected_models', ['anthropic/claude-3.5-sonnet'])
+            ->assertJsonCount(1, 'data.models')
+            ->assertJsonPath('data.models.0.id', 'anthropic/claude-3.5-sonnet');
+    }
 }

@@ -20,6 +20,7 @@ class WorkflowController extends Controller
             $request->user(),
             [
                 'search' => $request->query('search', ''),
+                'status' => $request->query('status', ''),
                 'page' => $request->query('page', 1),
                 'per_page' => $request->query('per_page', 10),
             ]

@@ -213,7 +213,7 @@ export default function ExecutionDetail({
       <section className="min-h-[calc(100vh-4rem)] px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex min-h-72 flex-col items-center justify-center gap-3">
           <LoaderCircle className="size-6 animate-spin text-primary" />
-          <p className="text-xs text-zinc-500">Memuat detail eksekusi sesi...</p>
+          <p className="text-xs text-muted-foreground">Loading session execution details...</p>
         </div>
       </section>
     );
@@ -323,7 +323,7 @@ export default function ExecutionDetail({
               </div>
               <div className="flex items-center gap-1.5">
                 <Layers className="size-3.5 text-zinc-500" />
-                <span>{steps.length} langkah</span>
+                <span>{steps.length} steps</span>
                 {totalDurationMs > 0 && (
                   <span className="text-zinc-500 font-mono">
                     ({totalDurationMs} ms)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowLeft,
@@ -157,7 +157,7 @@ export default function Inbox() {
     prevMessageCountRef.current = currentMessageCount;
   }, [currentMessageCount, selectedId]);
 
-  const loadList = useCallback(async () => {
+  async function loadList() {
     setListLoading(true);
     setListError("");
 
@@ -178,12 +178,44 @@ export default function Inbox() {
     } finally {
       setListLoading(false);
     }
-  }, [t]);
+  }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadList(), 0);
-    return () => window.clearTimeout(timer);
-  }, [loadList]);
+    let active = true;
+
+    const timer = window.setTimeout(() => {
+      setListLoading(true);
+      setListError("");
+
+      getInbox()
+        .then((result) => {
+          if (!active) return;
+          setContacts(result);
+          setSelectedId((current) => {
+            if (current !== null && result.some((item) => item.id === current)) {
+              return current;
+            }
+
+            return window.matchMedia("(min-width: 1024px)").matches
+              ? (result[0]?.id ?? null)
+              : null;
+          });
+        })
+        .catch((caught: unknown) => {
+          if (active) {
+            setListError(getErrorMessage(caught, t("inbox.listError")));
+          }
+        })
+        .finally(() => {
+          if (active) setListLoading(false);
+        });
+    }, 0);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [t]);
 
   // shortcut: background poll every 3500ms, upgrade to WebSocket/SSE when concurrent agents exceed 100
   useEffect(() => {
@@ -329,6 +361,15 @@ export default function Inbox() {
   return (
     <section className="flex h-[calc(100dvh-3rem)] min-h-0 flex-col overflow-hidden bg-background">
       <div className="flex min-h-0 w-full flex-1 flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
+        <div className="mb-4 shrink-0">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground font-heading">
+            {t("inbox.title")}
+          </h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Live conversation support deck and human agent chat takeover.
+          </p>
+        </div>
+
         {/* Workspace */}
         <div className="grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* Contact list */}

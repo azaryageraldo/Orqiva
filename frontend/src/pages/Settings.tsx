@@ -5,7 +5,6 @@ import {
   LoaderCircle,
   Pencil,
   ShieldCheck,
-  SlidersHorizontal,
   User,
 } from "lucide-react";
 
@@ -147,14 +146,10 @@ export default function Settings({
     <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="w-full space-y-6">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-            <SlidersHorizontal className="size-4" />
-            {t("settings.eyebrow")}
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground font-heading">
             {t("settings.title")}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {t("settings.subtitle")}
           </p>
         </div>

@@ -21,6 +21,8 @@ import "./App.css";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Workflows = lazy(() => import("./pages/workflows"));
+const Datapoints = lazy(() => import("./pages/Datapoints"));
+const Data = lazy(() => import("./pages/Data"));
 const WorkflowEditor = lazy(() => import("./pages/WorkflowEditor"));
 const Activity = lazy(() => import("./pages/Activity"));
 const Inbox = lazy(() => import("./pages/Inbox"));
@@ -145,7 +147,9 @@ export default function App() {
       if (!list.includes(id)) {
         localStorage.setItem("orqiva_read_notifs", JSON.stringify([...list, id]));
       }
-    } catch {}
+    } catch {
+      // Ignore storage write errors in restricted browsing contexts.
+    }
 
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
@@ -165,6 +169,8 @@ export default function App() {
   const activeNav: NavKey = useMemo(() => {
     const path = location.pathname;
     if (path.startsWith("/workflows")) return "workflows";
+    if (path.startsWith("/datapoints")) return "datapoints";
+    if (path.startsWith("/data")) return "data";
     if (path.startsWith("/activity")) return "activity";
     if (path.startsWith("/inbox")) return "inbox";
     if (path.startsWith("/channel")) return "channel";
@@ -191,7 +197,9 @@ export default function App() {
             try {
               const stored = localStorage.getItem("orqiva_read_notifs");
               if (stored) readList = JSON.parse(stored);
-            } catch {}
+            } catch {
+              // Ignore storage read errors in restricted browsing contexts.
+            }
 
             const realNotifs: NotificationItem[] = [];
 
@@ -342,6 +350,8 @@ export default function App() {
       onLogout={() => void handleLogout()}
       onDashboardClick={() => navigate("/dashboard")}
       onWorkflowsClick={() => navigate("/workflows")}
+      onDatapointsClick={() => navigate("/datapoints")}
+      onDataClick={() => navigate("/data")}
       onInboxClick={() => navigate("/inbox")}
       onChannelClick={() => navigate("/channel")}
       onActivityClick={() => navigate("/activity")}
@@ -380,6 +390,8 @@ export default function App() {
             path="/workflows/:workflowId"
             element={<WorkflowEditorWrapper />}
           />
+          <Route path="/datapoints" element={<Datapoints />} />
+          <Route path="/data" element={<Data />} />
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/channel" element={<Channel />} />
           <Route

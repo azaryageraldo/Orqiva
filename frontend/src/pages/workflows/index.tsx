@@ -84,7 +84,7 @@ export default function Workflows({
   }
 
   const loadWorkflows = useCallback(
-    async (targetPage = 1, query = "") => {
+    async (targetPage = 1, query = "", status: WorkflowFilterStatus = statusFilter) => {
       const requestId = ++requestRef.current;
 
       setLoading(true);
@@ -94,6 +94,7 @@ export default function Workflows({
         const result = await getWorkflows({
           page: targetPage,
           search: query,
+          status,
         });
 
         if (requestId !== requestRef.current) return;
@@ -111,7 +112,7 @@ export default function Workflows({
         if (requestId === requestRef.current) setLoading(false);
       }
     },
-    [t],
+    [statusFilter, t],
   );
 
   // Debounced search: only update query after user stops typing.
@@ -121,7 +122,7 @@ export default function Workflows({
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  // Fetch when searchQuery or page changes.
+  // Fetch when searchQuery or statusFilter changes.
   useEffect(() => {
     let active = true;
     const requestId = ++requestRef.current;
@@ -130,7 +131,7 @@ export default function Workflows({
       setLoading(true);
     }, 0);
 
-    getWorkflows({ page: 1, search: searchQuery })
+    getWorkflows({ page: 1, search: searchQuery, status: statusFilter })
       .then((result) => {
         if (!active || requestId !== requestRef.current) return;
 
@@ -154,7 +155,7 @@ export default function Workflows({
       active = false;
       window.clearTimeout(loadingTimer);
     };
-  }, [searchQuery, t]);
+  }, [searchQuery, statusFilter, t]);
 
   async function handleExport(item: WorkflowItem) {
     setError("");
@@ -405,120 +406,114 @@ export default function Workflows({
       <div className="w-full space-y-6">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground font-heading">
               {t("nav.workflows")}
             </h1>
-            <p className="mt-0.5 text-xs text-zinc-400">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {t("wf.subtitle")}
             </p>
           </div>
         </div>
 
-        {workflowToEdit ? (
-          <WorkflowEditDialog
-            open={Boolean(workflowToEdit)}
-            onOpenChange={() => {
-              if (!savingEdit) setWorkflowToEdit(null);
-            }}
-            name={editName}
-            description={editDescription}
-            saving={savingEdit}
-            error={error}
-            onNameChange={setEditName}
-            onDescriptionChange={setEditDescription}
-            onSaveClose={handleEditSubmit}
-            onCancel={() => setWorkflowToEdit(null)}
-            t={t}
-          />
-        ) : null}
+        <WorkflowEditDialog
+          open={Boolean(workflowToEdit)}
+          onOpenChange={() => {
+            if (!savingEdit) setWorkflowToEdit(null);
+          }}
+          name={editName}
+          description={editDescription}
+          saving={savingEdit}
+          error={error}
+          onNameChange={setEditName}
+          onDescriptionChange={setEditDescription}
+          onSaveClose={handleEditSubmit}
+          onCancel={() => setWorkflowToEdit(null)}
+          t={t}
+        />
 
-        {!workflowToEdit && (
-          <>
-            <WorkflowToolbar
-              search={search}
-              onSearchChange={setSearch}
-              onClearSearch={() => setSearch("")}
-              statusFilter={statusFilter}
-              onStatusFilterChange={setStatusFilter}
-              totalCount={workflows.length}
-              activeCount={activeCount}
-              inactiveCount={inactiveCount}
-              onCreate={() => setShowCreate(true)}
-              onImport={handleImport}
-              importing={importing}
-              onDeleteSelected={handleDeleteSelected}
-              selectedCount={selectedIds.size}
-              t={t}
-              deletingSelected={deletingSelected}
-            />
+        <WorkflowToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onClearSearch={() => setSearch("")}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          totalCount={statusFilter === "all" ? total : workflows.length}
+          activeCount={statusFilter === "active" ? total : activeCount}
+          inactiveCount={statusFilter === "inactive" ? total : inactiveCount}
+          onCreate={() => setShowCreate(true)}
+          onImport={handleImport}
+          importing={importing}
+          onDeleteSelected={() => setWorkflowToDeleteSelected(new Set(selectedIds))}
+          selectedCount={selectedIds.size}
+          t={t}
+          deletingSelected={deletingSelected}
+        />
 
-            {error && (
-              <div
-                role="alert"
-                className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
-              >
-                <p>{error}</p>
-                <button
-                  type="button"
-                  onClick={() => setError("")}
-                  aria-label={t("wf.dismissError")}
-                  className="text-destructive/70 transition hover:text-destructive"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            )}
-
-            {success && (
-              <div
-                role="status"
-                className="flex items-start justify-between gap-4 rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-xs text-primary"
-              >
-                <p>{success}</p>
-                <button
-                  type="button"
-                  onClick={() => setSuccess("")}
-                  aria-label="Dismiss success message"
-                  className="text-primary/70 transition hover:text-primary"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            )}
-
-            <WorkflowTable
-              workflows={filteredWorkflows}
-              loading={loading}
-              isSelected={isSelectedMap}
-              isUpdating={statusUpdatingId}
-              formatDate={formatDate}
-              t={t}
-              onSelectAll={toggleAll}
-              onSelectOne={toggleSelected}
-              onOpen={(id) => onOpenWorkflow(id)}
-              onEdit={beginEdit}
-              onDelete={setWorkflowToDelete}
-              onToggleStatus={toggleStatus}
-              onExport={handleExport}
-              onDuplicate={handleDuplicate}
-              onCreateNew={() => setShowCreate(true)}
-              allSelected={allSelected}
-              searchQuery={searchQuery}
-            />
-
-            <WorkflowPagination
-              page={page}
-              lastPage={lastPage}
-              from={from}
-              to={to}
-              total={total}
-              loading={loading}
-              t={t}
-              onPrevious={() => void loadWorkflows(page - 1, searchQuery)}
-              onNext={() => void loadWorkflows(page + 1, searchQuery)}
-            />
-          </>
+        {error && (
+          <div
+            role="alert"
+            className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
+          >
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => setError("")}
+              aria-label={t("wf.dismissError")}
+              className="text-destructive/70 transition hover:text-destructive"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         )}
+
+        {success && (
+          <div
+            role="status"
+            className="flex items-start justify-between gap-4 rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-xs text-primary"
+          >
+            <p>{success}</p>
+            <button
+              type="button"
+              onClick={() => setSuccess("")}
+              aria-label="Dismiss success message"
+              className="text-primary/70 transition hover:text-primary"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
+
+        <WorkflowTable
+          workflows={filteredWorkflows}
+          loading={loading}
+          isSelected={isSelectedMap}
+          isUpdating={statusUpdatingId}
+          formatDate={formatDate}
+          t={t}
+          onSelectAll={toggleAll}
+          onSelectOne={toggleSelected}
+          onOpen={(id) => onOpenWorkflow(id)}
+          onEdit={beginEdit}
+          onDelete={setWorkflowToDelete}
+          onToggleStatus={toggleStatus}
+          onExport={handleExport}
+          onDuplicate={handleDuplicate}
+          onCreateNew={() => setShowCreate(true)}
+          allSelected={allSelected}
+          searchQuery={searchQuery}
+        />
+
+        <WorkflowPagination
+          page={page}
+          lastPage={lastPage}
+          from={from}
+          to={to}
+          total={total}
+          loading={loading}
+          t={t}
+          onPrevious={() => void loadWorkflows(page - 1, searchQuery, statusFilter)}
+          onNext={() => void loadWorkflows(page + 1, searchQuery, statusFilter)}
+        />
 
         <WorkflowCreateDialog
           open={showCreate}

@@ -5,16 +5,20 @@ import type { WorkflowOption } from "./channel";
 export type WorkflowQuery = {
   page?: number;
   search?: string;
+  status?: "all" | "active" | "inactive" | "draft";
 };
 
 export async function getWorkflows({
   page = 1,
   search = "",
+  status = "all",
 }: WorkflowQuery = {}): Promise<WorkflowPage> {
+  const apiStatus = status === "inactive" ? "draft" : status;
   const response = await api.get<{ data: WorkflowPage }>("/workflows", {
     params: {
       page,
       ...(search.trim() ? { search: search.trim() } : {}),
+      ...(apiStatus !== "all" ? { status: apiStatus } : {}),
     },
   });
 

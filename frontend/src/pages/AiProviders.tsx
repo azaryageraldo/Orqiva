@@ -10,10 +10,12 @@ import {
   KeyRound,
   LoaderCircle,
   Save,
+  Search,
   ShieldCheck,
   Timer,
   Trash2,
   TriangleAlert,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -78,6 +80,8 @@ export default function AiProviders() {
   const [dialogProvider, setDialogProvider] = useState<AiProvider | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [modelSearch, setModelSearch] = useState("");
   const [detectedModels, setDetectedModels] = useState<string[] | null>(null);
   const [dialogError, setDialogError] = useState("");
   const [detecting, setDetecting] = useState(false);
@@ -122,15 +126,27 @@ export default function AiProviders() {
     (provider) => provider.provider === dialogProvider,
   );
   const availableModels = detectedModels ?? activeSetting?.models ?? [];
+  const filteredModels = availableModels.filter((model) =>
+    model.toLowerCase().includes(modelSearch.trim().toLowerCase()),
+  );
 
   function openProvider(provider: AiProvider) {
     const setting = settings?.providers.find(
       (candidate) => candidate.provider === provider,
     );
+    const initialSelected = setting?.selected_models?.length
+      ? setting.selected_models
+      : setting?.default_model
+        ? [setting.default_model]
+        : setting?.models[0]
+          ? [setting.models[0]]
+          : [];
 
     setDialogProvider(provider);
     setApiKey("");
-    setDefaultModel(setting?.default_model ?? setting?.models[0] ?? "");
+    setSelectedModels(initialSelected);
+    setDefaultModel(setting?.default_model ?? initialSelected[0] ?? "");
+    setModelSearch("");
     setDetectedModels(null);
     setDialogError("");
   }
@@ -139,8 +155,28 @@ export default function AiProviders() {
     setDialogProvider(null);
     setApiKey("");
     setDefaultModel("");
+    setSelectedModels([]);
+    setModelSearch("");
     setDetectedModels(null);
     setDialogError("");
+  }
+
+  function toggleSelectedModel(modelId: string) {
+    setDialogError("");
+    setSelectedModels((current) => {
+      const exists = current.includes(modelId);
+      const next = exists
+        ? current.filter((item) => item !== modelId)
+        : [...current, modelId];
+
+      if (exists && defaultModel === modelId) {
+        setDefaultModel(next[0] ?? "");
+      } else if (!exists && !defaultModel) {
+        setDefaultModel(modelId);
+      }
+
+      return next;
+    });
   }
 
   async function handleDetect() {
@@ -158,11 +194,22 @@ export default function AiProviders() {
         ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
       });
 
+      const preserved = selectedModels.filter((id) =>
+        result.models.includes(id),
+      );
+      const nextSelected =
+        preserved.length > 0
+          ? preserved
+          : result.models[0]
+            ? [result.models[0]]
+            : [];
+
       setDetectedModels(result.models);
+      setSelectedModels(nextSelected);
       setDefaultModel((current) =>
-        current && result.models.includes(current)
+        current && nextSelected.includes(current)
           ? current
-          : (result.models[0] ?? ""),
+          : (nextSelected[0] ?? ""),
       );
     } catch (caught) {
       setDialogError(getErrorMessage(caught, t("ai.errorDetect")));
@@ -179,6 +226,11 @@ export default function AiProviders() {
       return;
     }
 
+    if (availableModels.length > 0 && selectedModels.length === 0) {
+      setDialogError("Select at least one model to use in workflows.");
+      return;
+    }
+
     setSaving(true);
     setDialogError("");
 
@@ -186,6 +238,7 @@ export default function AiProviders() {
       const result = await updateAiSettings({
         provider: dialogProvider,
         ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
+        ...(selectedModels.length > 0 ? { selected_models: selectedModels } : {}),
         ...(defaultModel ? { default_model: defaultModel } : {}),
       });
 
@@ -263,14 +316,10 @@ export default function AiProviders() {
       <div className="w-full space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-              <KeyRound className="size-4" />
-              {t("ai.eyebrow")}
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground font-heading">
               {t("nav.apiKeys")}
             </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {t("ai.subtitle")}
             </p>
           </div>
@@ -407,9 +456,7 @@ export default function AiProviders() {
                       <KeyRound className="size-3.5 shrink-0" />
                       <span className="truncate">
                         {configured
-                          ? t("ai.modelsAvailable", {
-                              count: setting?.models.length ?? 0,
-                            })
+                          ? `${setting?.selected_models?.length ?? 0} selected · ${setting?.models.length ?? 0} detected`
                           : t("ai.keyNotSaved")}
                       </span>
                     </span>
@@ -556,7 +603,9 @@ export default function AiProviders() {
                 onChange={(event) => {
                   setApiKey(event.target.value);
                   setDetectedModels(null);
+                  setSelectedModels([]);
                   setDefaultModel("");
+                  setModelSearch("");
                   setDialogError("");
                 }}
                 autoComplete="new-password"
@@ -574,9 +623,14 @@ export default function AiProviders() {
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label htmlFor="ai-provider-model">{t("ai.defaultModel")}</Label>
+                <div>
+                  <Label>Workflow AI models</Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Choose which models appear in the workflow canvas dropdown.
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
@@ -592,31 +646,122 @@ export default function AiProviders() {
                   {detecting ? t("ai.detecting") : t("ai.detectModels")}
                 </Button>
               </div>
+
+              {availableModels.length > 0 && (
+                <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="relative flex-1 min-w-[180px]">
+                      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        value={modelSearch}
+                        onChange={(event) => setModelSearch(event.target.value)}
+                        placeholder="Filter detected models..."
+                        className="h-8 pr-7 pl-8 text-xs [&::-webkit-search-cancel-button]:hidden"
+                      />
+                      {modelSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setModelSearch("")}
+                          aria-label="Clear model filter"
+                          className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="font-mono text-muted-foreground">
+                        {selectedModels.length}/{availableModels.length} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetDefault =
+                            defaultModel && availableModels.includes(defaultModel)
+                              ? defaultModel
+                              : availableModels[0];
+                          if (targetDefault) {
+                            setSelectedModels([targetDefault]);
+                            setDefaultModel(targetDefault);
+                          }
+                        }}
+                        className="rounded border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        Default only
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-background divide-y divide-border/50">
+                    {filteredModels.length === 0 ? (
+                      <p className="py-6 text-center text-xs text-muted-foreground">
+                        No models match "{modelSearch}".
+                      </p>
+                    ) : (
+                      filteredModels.map((model) => {
+                        const checked = selectedModels.includes(model);
+                        const isDefault = model === defaultModel;
+
+                        return (
+                          <label
+                            key={model}
+                            className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-xs transition-colors ${
+                              checked
+                                ? "bg-primary/[0.06] text-foreground"
+                                : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleSelectedModel(model)}
+                                className="size-3.5 shrink-0 cursor-pointer accent-primary"
+                              />
+                              <span className="truncate font-mono text-[11.5px]">
+                                {model}
+                              </span>
+                            </span>
+                            {isDefault && (
+                              <span className="shrink-0 rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9.5px] font-medium text-primary">
+                                Default
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ai-provider-model">{t("ai.defaultModel")}</Label>
               <select
                 id="ai-provider-model"
                 className={fieldClass}
                 value={defaultModel}
                 onChange={(event) => setDefaultModel(event.target.value)}
-                disabled={availableModels.length === 0}
+                disabled={selectedModels.length === 0}
               >
-                {availableModels.length === 0 && (
-                  <option value="">{t("ai.detectFirst")}</option>
+                {selectedModels.length === 0 && (
+                  <option value="">
+                    {availableModels.length === 0
+                      ? t("ai.detectFirst")
+                      : "Select at least one model above"}
+                  </option>
                 )}
-                {availableModels.map((model) => (
+                {selectedModels.map((model) => (
                   <option key={model} value={model}>
                     {model}
                   </option>
                 ))}
-                {defaultModel &&
-                  !availableModels.includes(defaultModel) && (
-                    <option value={defaultModel}>{defaultModel}</option>
-                  )}
               </select>
               <p className="text-xs leading-5 text-muted-foreground">
-                {availableModels.length > 0
-                  ? t("ai.modelsAvailableCount", {
-                      count: availableModels.length,
-                    })
+                {selectedModels.length > 0
+                  ? `${selectedModels.length} selected for workflows (${availableModels.length} detected).`
                   : t("ai.detectHint")}
               </p>
             </div>

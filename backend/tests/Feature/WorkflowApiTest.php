@@ -404,4 +404,21 @@ class WorkflowApiTest extends TestCase
             ->postJson("/api/v1/workflows/{$source->id}/duplicate")
             ->assertNotFound();
     }
+
+    public function test_status_filters_workflows(): void
+    {
+        $owner = $this->user();
+        Workflow::create(['user_id' => $owner->id, 'name' => 'Live Flow', 'status' => 'active']);
+        Workflow::create(['user_id' => $owner->id, 'name' => 'Draft Flow', 'status' => 'draft']);
+
+        $activeResponse = $this->actingAs($owner)
+            ->getJson('/api/v1/workflows?status=active')
+            ->assertOk();
+        $this->assertSame(['Live Flow'], array_column($activeResponse->json('data.data'), 'name'));
+
+        $draftResponse = $this->actingAs($owner)
+            ->getJson('/api/v1/workflows?status=draft')
+            ->assertOk();
+        $this->assertSame(['Draft Flow'], array_column($draftResponse->json('data.data'), 'name'));
+    }
 }

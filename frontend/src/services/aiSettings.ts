@@ -7,6 +7,7 @@ export type AiProviderSetting = {
   label: string;
   configured: boolean;
   models: string[];
+  selected_models: string[];
   default_model: string | null;
   last_checked_at: string | null;
 };
@@ -38,6 +39,7 @@ export async function updateAiSettings(payload: {
   provider?: AiProvider;
   api_key?: string;
   default_model?: string;
+  selected_models?: string[];
   debounce_ms?: number;
 }): Promise<AiSettings> {
   const response = await api.put<{ data: AiSettings }>("/ai-settings", payload);

@@ -22,10 +22,14 @@ class WorkflowService
     public function getWorkflows(User $user, array $filters = []): array
     {
         $search = trim((string) ($filters['search'] ?? ''));
+        $status = trim((string) ($filters['status'] ?? ''));
         $page = max(1, (int) ($filters['page'] ?? 1));
         $perPage = max(1, (int) ($filters['per_page'] ?? 10));
 
         $query = $user->workflows()
+            ->when(in_array($status, ['active', 'draft'], true), function ($query) use ($status): void {
+                $query->where('status', $status);
+            })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query

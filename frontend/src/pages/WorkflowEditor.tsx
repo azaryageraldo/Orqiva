@@ -1104,7 +1104,7 @@ export default function WorkflowEditor({
     if (issues.length > 0) {
       setNoticeTone("error");
       setNotice(
-        `Workflow belum disimpan. Ada ${issues.length} hal yang perlu diperbaiki.`,
+        `Workflow not saved yet. ${issues.length} issue(s) need to be fixed.`,
       );
       return false;
     }
@@ -1153,7 +1153,7 @@ export default function WorkflowEditor({
   }
 
   return (
-    <section className="relative flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-background text-foreground">
+    <section className="relative flex h-[calc(100dvh-3rem)] min-h-0 flex-col overflow-hidden bg-background text-foreground">
       {/* Editor header */}
       <EditorHeader
         workflowName={workflowName}

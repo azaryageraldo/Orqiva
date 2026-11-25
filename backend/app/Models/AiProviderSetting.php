@@ -12,6 +12,7 @@ class AiProviderSetting extends Model
         'provider',
         'api_key',
         'models',
+        'selected_models',
         'default_model',
         'last_checked_at',
     ];
@@ -25,6 +26,7 @@ class AiProviderSetting extends Model
         return [
             'api_key' => 'encrypted',
             'models' => 'array',
+            'selected_models' => 'array',
             'last_checked_at' => 'datetime',
         ];
     }

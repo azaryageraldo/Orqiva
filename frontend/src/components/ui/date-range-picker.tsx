@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { format, startOfDay, endOfDay, subDays } from "date-fns";
+import { addMonths, endOfDay, format, startOfDay, subMonths } from "date-fns";
 import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -24,23 +24,32 @@ interface DateRangePickerProps {
 export function DateRangePicker({
   value,
   onChange,
-  label = "Rentang tanggal",
+  label = "Date range",
   className,
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState<{ from: Date | null; to: Date | null } | null>(value);
   const [hoveredDate, setHoveredDate] = React.useState<Date | null>(null);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraft(value);
+      setHoveredDate(null);
+    }
+    setOpen(nextOpen);
+  };
+
   const isSelected = (date: Date) => {
-    if (!value?.from || !value?.to) return false;
+    if (!draft?.from || !draft?.to) return false;
     return (
-      date >= startOfDay(value.from) && date <= endOfDay(value.to)
+      date >= startOfDay(draft.from) && date <= endOfDay(draft.to)
     );
   };
 
   const isInRange = (date: Date) => {
-    if (!value?.from || !hoveredDate) return false;
-    const start = startOfDay(value.from);
-    const end = endOfDay(value.to || value.from);
+    if (!draft?.from || !hoveredDate) return false;
+    const start = startOfDay(draft.from);
+    const end = endOfDay(draft.to || draft.from);
     const d = startOfDay(date);
     const h = startOfDay(hoveredDate);
 
@@ -59,19 +68,20 @@ export function DateRangePicker({
   };
 
   const handleDateClick = (date: Date) => {
-    if (!value?.from) {
-      onChange({ from: date, to: null });
-    } else if (!value?.to) {
-      onChange({
-        from: date < value.from ? date : value.from,
-        to: date < value.from ? value.from : date,
+    if (!draft?.from) {
+      setDraft({ from: date, to: null });
+    } else if (!draft?.to) {
+      setDraft({
+        from: date < draft.from ? date : draft.from,
+        to: date < draft.from ? draft.from : date,
       });
     } else {
-      onChange({ from: date, to: null });
+      setDraft({ from: date, to: null });
     }
   };
 
   const handleClear = () => {
+    setDraft(null);
     onChange(null);
   };
 
@@ -101,48 +111,51 @@ export function DateRangePicker({
   const monthLabel = format(currentMonth, "MMMM yyyy");
 
   const goToPreviousMonth = () => {
-    setCurrentMonth(subDays(currentMonth, 30));
+    setCurrentMonth((prev) => subMonths(prev, 1));
   };
 
   const goToNextMonth = () => {
-    setCurrentMonth(subDays(currentMonth, -30));
+    setCurrentMonth((prev) => addMonths(prev, 1));
   };
 
-  const hasValue = value && value.from !== null;
-  const fromDate = hasValue ? value.from : null;
+  const hasValue = Boolean(value?.from);
+  const fromDate = value?.from ?? null;
   const toDate = value?.to ?? null;
-  const displayValue = hasValue ? (
+  const displayValue = fromDate ? (
     <>
-      {format(fromDate!, "dd MMM")}
+      {format(fromDate, "dd MMM")}
       {toDate !== null && <span className="ml-1">— {format(toDate, "dd MMM yyyy")}</span>}
     </>
   ) : (
-    <span className="text-muted-foreground">Pilih tanggal</span>
+    <span className="text-muted-foreground">Select dates</span>
   );
 
   const buttonVariant = hasValue ? "default" : "outline";
 
   return (
     <div className={cn("relative inline-block", className)}>
-      <div className="relative inline-flex items-center gap-2 w-full">
+      <div className="relative inline-flex items-center gap-1.5 w-full">
         <Button
+          type="button"
           variant={buttonVariant}
           className={cn(
-            "w-full px-3 py-2 text-left text-[11px] font-medium",
+            "w-full px-3 py-2 text-left text-[11px] font-medium justify-between gap-2",
             hasValue
               ? "bg-primary text-primary-foreground hover:bg-primary/90"
-              : "border border-white/10 hover:bg-white/5 hover:text-zinc-200",
+              : "border border-border hover:bg-muted/40",
           )}
-          onClick={() => setOpen(true)}
+          onClick={() => handleOpenChange(true)}
         >
-          {displayValue}
-          <Calendar className="mr-2 size-3.5 text-muted-foreground" />
+          <span className="truncate">{displayValue}</span>
+          <Calendar className={cn("size-3.5 shrink-0", hasValue ? "text-primary-foreground" : "text-muted-foreground")} />
         </Button>
         {hasValue && (
           <Button
+            type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 p-0 text-muted-foreground hover:bg-white/10 hover:text-zinc-200"
+            aria-label="Clear date range"
+            className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
               handleClear();
@@ -153,7 +166,7 @@ export function DateRangePicker({
           </Button>
         )}
       </div>
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent className="w-[300px] p-4 max-h-[450px] overflow-y-auto">
           <SheetHeader className="pb-2">
             <SheetTitle className="text-sm">{label}</SheetTitle>
@@ -162,9 +175,11 @@ export function DateRangePicker({
 
           <div className="flex items-center justify-between mb-2">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 p-0 text-muted-foreground hover:bg-white/5"
+              aria-label="Previous month"
+              className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted/40"
               onClick={goToPreviousMonth}
             >
               <ChevronLeft className="size-3.5" />
@@ -173,9 +188,11 @@ export function DateRangePicker({
               {monthLabel}
             </span>
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 p-0 text-muted-foreground hover:bg-white/5"
+              aria-label="Next month"
+              className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted/40"
               onClick={goToNextMonth}
             >
               <ChevronRight className="size-3.5" />
@@ -183,7 +200,7 @@ export function DateRangePicker({
           </div>
 
           <div className="grid grid-cols-7 gap-0.5 text-[9px] font-medium text-muted-foreground mb-2">
-            {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
               <div key={day} className="text-center">
                 {day}
               </div>
@@ -203,6 +220,7 @@ export function DateRangePicker({
               return (
                 <button
                   key={date.getTime()}
+                  type="button"
                   onClick={() => handleDateClick(date)}
                   onMouseEnter={() => setHoveredDate(date)}
                   onMouseLeave={() => setHoveredDate(null)}
@@ -211,9 +229,9 @@ export function DateRangePicker({
                     !isSameMonth && "text-muted-foreground/30",
                     selected &&
                       "bg-primary text-primary-foreground",
-                    inRange && "bg-primary/5",
-                    today && !selected && "ring-1 ring-ring ring-primary",
-                    !selected && !inRange && "hover:bg-white/5"
+                    inRange && !selected && "bg-primary/10",
+                    today && !selected && "ring-1 ring-primary",
+                    !selected && !inRange && "hover:bg-muted/40"
                   )}
                 >
                   {date.getDate()}
@@ -223,14 +241,26 @@ export function DateRangePicker({
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-2">
-            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDraft(value);
+                setOpen(false);
+              }}
+            >
               Cancel
             </Button>
             <Button
+              type="button"
               variant="default"
               size="sm"
-              onClick={() => setOpen(false)}
-              disabled={!value?.from || !value?.to}
+              onClick={() => {
+                onChange(draft);
+                setOpen(false);
+              }}
+              disabled={!draft?.from || !draft?.to}
             >
               Apply
             </Button>

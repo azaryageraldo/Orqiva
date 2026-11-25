@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { format } from "date-fns";
 import {
   Activity as ActivityIcon,
   ArrowUpRight,
@@ -278,13 +279,22 @@ export default function Dashboard({
 
   const [loading, setLoading] = useState(true);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError] = useState("");
+
+  const activityFilters = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return {};
+    return {
+      from: format(dateRange.from, "yyyy-MM-dd"),
+      to: format(dateRange.to, "yyyy-MM-dd"),
+    };
+  }, [dateRange]);
 
   useEffect(() => {
     let active = true;
 
-    Promise.allSettled([getWorkflows(), getActivity(8), getAiSettings()])
-      .then(([workflowsResult, activityResult, aiSettingsResult]) => {
+    Promise.allSettled([getWorkflows(), getAiSettings()])
+      .then(([workflowsResult, aiSettingsResult]) => {
         if (!active) return;
 
         if (workflowsResult.status === "fulfilled") {
@@ -293,30 +303,45 @@ export default function Dashboard({
           setError(t("dashboard.errorLoad"));
         }
 
-        if (activityResult.status === "fulfilled") {
-          setActivity(activityResult.value);
-          const executions = activityResult.value.executions;
-          setConversations({
-            activeToday: computeActiveConversationsToday(executions),
-            total: executions.length,
-          });
-        }
-
         if (aiSettingsResult.status === "fulfilled") {
           const settings = aiSettingsResult.value;
-          const defaultProvider = (settings.providers as Array<{ configured: boolean; default_model: string | null; provider: string }>).find(
+          const defaultProvider = settings.providers.find(
             (p) => p.configured,
           );
           const defaultModel = defaultProvider
-            ? (settings.models as Array<{ id: string }>).find(
+            ? settings.models.find(
                 (m) => m.id === defaultProvider.default_model,
               )
             : null;
           setAiSettings({
             provider: defaultProvider?.provider ?? null,
-            model: defaultModel?.id ?? null,
+            model: defaultModel?.id ?? defaultProvider?.default_model ?? null,
           });
         }
+      });
+
+    return () => {
+      active = false;
+    };
+    // Workflows & AI settings only load once per page visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    getActivity(50, activityFilters)
+      .then((activityResult) => {
+        if (!active) return;
+        setActivity(activityResult);
+        const executions = activityResult.executions;
+        setConversations({
+          activeToday: computeActiveConversationsToday(executions),
+          total: executions.length,
+        });
+      })
+      .catch(() => {
+        if (active) setError(t("dashboard.errorLoad"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -325,9 +350,7 @@ export default function Dashboard({
     return () => {
       active = false;
     };
-    // Dashboard data should only load once per page visit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activityFilters, t]);
 
   useEffect(() => {
     let active = true;
@@ -363,14 +386,14 @@ export default function Dashboard({
     const [workflowsResult, activityResult, usageResult] =
       await Promise.allSettled([
         getWorkflows(),
-        getActivity(8),
+        getActivity(50, activityFilters),
         getTokenUsage(period),
       ]);
 
     if (workflowsResult.status === "fulfilled") {
       setWorkflows(workflowsResult.value.data);
     } else {
-      setError("Sebagian data dashboard gagal dimuat. Periksa koneksi API.");
+      setError("Failed to load some dashboard data. Check your API connection.");
     }
 
     if (activityResult.status === "fulfilled") {
@@ -380,6 +403,8 @@ export default function Dashboard({
         activeToday: computeActiveConversationsToday(executions),
         total: executions.length,
       });
+    } else {
+      setError("Failed to load some dashboard data. Check your API connection.");
     }
 
     if (usageResult.status === "fulfilled") {
@@ -391,26 +416,34 @@ export default function Dashboard({
   }
 
   async function handleExportPDF() {
-    if (!dashboardRef.current) return;
+    if (!dashboardRef.current || exportingPdf) return;
+    setExportingPdf(true);
+    setError("");
 
-    const canvas = await html2canvas(dashboardRef.current, {
-      backgroundColor: "#090a0c",
-      scale: 2,
-      logging: false,
-    });
+    try {
+      const canvas = await html2canvas(dashboardRef.current, {
+        backgroundColor: "#090a0c",
+        scale: 2,
+        logging: false,
+      });
 
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
-    const imgX = (pageWidth - imgWidth * ratio) / 2;
-    const imgY = (pageHeight - imgHeight * ratio) / 2;
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+      const imgX = (pageWidth - imgWidth * ratio) / 2;
+      const imgY = (pageHeight - imgHeight * ratio) / 2;
 
-    pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-    pdf.save(`orqiva-dashboard-${new Date().toISOString().slice(0, 10)}.pdf`);
+      pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.save(`orqiva-dashboard-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch {
+      setError("Failed to export dashboard PDF. Please try again.");
+    } finally {
+      setExportingPdf(false);
+    }
   }
 
   const stats = useMemo(() => {
@@ -464,37 +497,45 @@ export default function Dashboard({
       .slice(0, 5);
   }, [activity]);
 
-  // Cost projection for current month
+  // Cost projection for current month normalized by active period window
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const dailyCost = estimatedCost; // cost for current period
+  const periodDays = period === "yearly" ? 5 * 365 : period === "monthly" ? 12 * 30.4375 : 14;
+  const dailyCost = estimatedCost / periodDays;
   const costProjection = dailyCost * daysInMonth;
 
   return (
     <section ref={dashboardRef} className="min-h-[calc(100vh-3rem)] bg-background">
       <div className="w-full px-4 py-5 sm:px-6 lg:px-8 lg:py-6 space-y-6">
         {/* Heading */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <h1 className="mt-0 text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground font-heading">
               {t("dashboard.title")}
             </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Real-time system telemetry, active sessions, and AI token consumption.
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
             <DateRangePicker
               value={dateRange}
-              onChange={setDateRange}
-              label="Rentang tanggal"
-              className="max-w-[220px]"
+              onChange={(next) => {
+                setLoading(true);
+                setDateRange(next);
+              }}
+              label="Date range"
+              className="max-w-[240px]"
             />
             <Button
               type="button"
               variant="outline"
-              onClick={handleExportPDF}
+              disabled={exportingPdf}
+              onClick={() => void handleExportPDF()}
               className="h-9 px-3.5"
             >
-              <Download className="size-4" />
+              {exportingPdf ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
               {t("dashboard.exportPDF")}
             </Button>
           </div>
@@ -697,13 +738,13 @@ export default function Dashboard({
               <h2 className="text-[13px] font-semibold tracking-tight text-foreground">
                 {t("dashboard.modelDistribution")}
               </h2>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground capitalize">
                 {aiSettings?.provider ?? t("dashboard.noModel")}
               </p>
             </div>
             <div className="flex items-center justify-center">
               <div className="relative size-48">
-                <svg viewBox="0 0 88 88" className="size-full">
+                <svg viewBox="0 0 88 88" className="size-full -rotate-90">
                   <circle
                     cx="44"
                     cy="44"
@@ -712,23 +753,25 @@ export default function Dashboard({
                     stroke="var(--border)"
                     strokeWidth="8"
                   />
-                  <circle
-                    cx="44"
-                    cy="44"
-                    r="36"
-                    fill="none"
-                    stroke="var(--primary)"
-                    strokeWidth="8"
-                    strokeDasharray="75"
-                    strokeDashoffset="25"
-                    className="text-primary"
-                  />
+                  {aiSettings?.model && (
+                    <circle
+                      cx="44"
+                      cy="44"
+                      r="36"
+                      fill="none"
+                      stroke="var(--primary)"
+                      strokeWidth="8"
+                      strokeDasharray={2 * Math.PI * 36}
+                      strokeDashoffset={0}
+                      className="text-primary"
+                    />
+                  )}
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-xs font-semibold text-foreground">
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+                  <span className="max-w-full truncate text-xs font-semibold text-foreground">
                     {aiSettings?.model ?? "—"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="mt-0.5 text-[10px] text-muted-foreground capitalize">
                     {aiSettings?.provider ?? "Not connected"}
                   </span>
                 </div>
@@ -879,7 +922,7 @@ export default function Dashboard({
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 p-5">
                 {/* Daily executions bar chart */}
                 <div>
                   <p className="text-[10px] font-medium text-muted-foreground uppercase mb-3">
@@ -887,7 +930,7 @@ export default function Dashboard({
                   </p>
                   <DailyExecutionsChart executions={activity.executions} />
                 </div>
-                <div className="max-h-60 overflow-y-auto">
+                <div className="max-h-60 overflow-y-auto rounded-lg border border-border/60">
                   <ul className="divide-y divide-border">
                     {activity.executions.map((execution) => {
                       const meta = STATUS_META[execution.status];
@@ -1213,26 +1256,32 @@ function DailyExecutionsChart({ executions }: { executions: ActivityExecution[] 
   const maxCount = Math.max(1, ...dailyCounts.map((d) => d.count));
 
   return (
-    <div className="h-48 flex items-end gap-1">
+    <div className="h-44 flex items-end gap-2 px-3 pb-1">
       {dailyCounts.map((day) => {
-        const barHeight = (day.count / maxCount) * 100;
+        const barHeight = day.count > 0 ? Math.max(8, (day.count / maxCount) * 100) : 4;
         const isToday = day.date.getTime() === now.getTime();
         return (
           <div
             key={day.date.getTime()}
-            className="flex flex-col items-center gap-1.5"
+            className="flex flex-1 h-full flex-col items-center gap-1.5"
           >
-            <div
-              className={cn(
-                "w-full rounded-t-md transition-all duration-300",
-                isToday ? "bg-primary" : "bg-white/5",
-              )}
-              style={{ height: `${barHeight}%` }}
-            />
-            <span className="text-[9px] text-muted-foreground">
+            <div className="flex flex-1 w-full items-end">
+              <div
+                className={cn(
+                  "w-full rounded-t-md transition-all duration-300",
+                  day.count === 0
+                    ? "bg-muted/40"
+                    : isToday
+                      ? "bg-primary"
+                      : "bg-primary/40",
+                )}
+                style={{ height: `${barHeight}%` }}
+              />
+            </div>
+            <span className="text-[9px] font-mono text-muted-foreground">
               {day.date.getDate()}
             </span>
-            <span className="text-[10px] font-medium text-foreground">
+            <span className="text-[10px] font-mono font-medium text-foreground">
               {day.count}
             </span>
           </div>

@@ -20,6 +20,8 @@ const EN: Dictionary = {
   "common.active": "Active",
   "nav.dashboard": "Dashboard",
   "nav.workflows": "Workflows",
+  "nav.datapoints": "Datapoints",
+  "nav.data": "Data Table",
   "nav.inbox": "Inbox",
   "nav.channel": "Channel",
   "nav.activity": "Audit Log",
@@ -907,7 +909,7 @@ const EN: Dictionary = {
   "wf.deleteSelectedTitle": "Delete selected workflows?",
   "wf.deleteSelectedDesc": "{count} workflows will be permanently deleted.",
 
-  "dashboard.title": "DASHBOARD",
+  "dashboard.title": "Dashboard",
   "dashboard.subtitle": "",
   "dashboard.refresh": "Refresh",
   "dashboard.exportPDF": "Export PDF",
@@ -1145,6 +1147,6 @@ export function useI18n() {
   return { language, t };
 }
 
-export function formatLocale(_language: Language): string {
-  return "en-US";
+export function formatLocale(language: Language): string {
+  return language === "en" ? "en-US" : "en-US";
 }

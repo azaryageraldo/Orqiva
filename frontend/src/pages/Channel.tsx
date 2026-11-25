@@ -472,11 +472,11 @@ export default function Channel() {
     <section className="min-h-[calc(100vh-3rem)] bg-background">
       <div className="w-full px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
         <div className="mb-4">
-          <h1 className="text-[1.5rem] leading-tight font-semibold tracking-[-0.02em] text-foreground">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground font-heading">
             Channel Connector
           </h1>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Add and set the channels you want to connect to
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Configure deployment endpoints and communication channels for AI interaction.
           </p>
         </div>
 

@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import Sidebar, { type Health, type NavKey } from "./Sidebar";
 import Header, { type HeaderUser, type NotificationItem } from "./Header";
+import { cn } from "@/lib/utils";
 
 interface DashboardLayoutProps {
   health: Health;
@@ -11,6 +12,8 @@ interface DashboardLayoutProps {
   activeNav: NavKey;
   onDashboardClick: () => void;
   onWorkflowsClick: () => void;
+  onDatapointsClick?: () => void;
+  onDataClick?: () => void;
   onInboxClick: () => void;
   onChannelClick: () => void;
   onActivityClick: () => void;
@@ -32,6 +35,8 @@ export default function DashboardLayout({
   activeNav,
   onDashboardClick,
   onWorkflowsClick,
+  onDatapointsClick,
+  onDataClick,
   onInboxClick,
   onChannelClick,
   onActivityClick,
@@ -45,11 +50,43 @@ export default function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("orqiva_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapse = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("orqiva_sidebar_collapsed", String(next));
+      } catch {
+        // Ignore storage write errors in restricted browsing contexts.
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleCollapse();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleCollapse]);
 
   const navigate = (key: NavKey) => {
     const handlers: Record<NavKey, () => void> = {
       dashboard: onDashboardClick,
       workflows: onWorkflowsClick,
+      datapoints: onDatapointsClick ?? onWorkflowsClick,
+      data: onDataClick ?? onWorkflowsClick,
       inbox: onInboxClick,
       channel: onChannelClick,
       activity: onActivityClick,
@@ -58,7 +95,7 @@ export default function DashboardLayout({
       settings: onSettingsClick,
     };
 
-    handlers[key]();
+    handlers[key]?.();
     setMobileOpen(false);
   };
 
@@ -79,11 +116,18 @@ export default function DashboardLayout({
 
       <div className="flex min-h-[calc(100vh-3rem)]">
         {!hideSidebar && (
-          <div className="sticky top-12 hidden h-[calc(100vh-3rem)] w-56 shrink-0 lg:block">
+          <div
+            className={cn(
+              "sticky top-12 hidden h-[calc(100vh-3rem)] shrink-0 transition-all duration-200 lg:block",
+              collapsed ? "w-14" : "w-56",
+            )}
+          >
             <Sidebar
               health={health}
               activeNav={activeNav}
               onNavigate={navigate}
+              collapsed={collapsed}
+              onToggleCollapse={toggleCollapse}
             />
           </div>
         )}

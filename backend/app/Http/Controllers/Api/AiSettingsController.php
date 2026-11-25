@@ -30,6 +30,8 @@ class AiSettingsController extends Controller
             'provider' => ['sometimes', 'nullable', 'string', Rule::in(array_keys(AiProviderCatalog::PROVIDERS))],
             'api_key' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'default_model' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'selected_models' => ['sometimes', 'array', 'min:1'],
+            'selected_models.*' => ['required', 'string', 'max:255'],
             'debounce_ms' => ['sometimes', 'integer', 'min:0', 'max:5000'],
         ]);
 
@@ -37,7 +39,11 @@ class AiSettingsController extends Controller
         $providerInput = trim((string) ($validated['provider'] ?? ''));
 
         if ($providerInput === '') {
-            if (array_key_exists('api_key', $validated) || array_key_exists('default_model', $validated)) {
+            if (
+                array_key_exists('api_key', $validated)
+                || array_key_exists('default_model', $validated)
+                || array_key_exists('selected_models', $validated)
+            ) {
                 throw ValidationException::withMessages([
                     'provider' => 'Pilih provider AI terlebih dahulu.',
                 ]);
@@ -98,21 +104,70 @@ class AiSettingsController extends Controller
             ]);
         }
 
-        $models = is_array($setting->models) ? $setting->models : [];
-        $defaultModel = array_key_exists('default_model', $validated)
+        $models = $this->normalizeModels($setting->models);
+        $requestedDefault = array_key_exists('default_model', $validated)
             ? trim((string) ($validated['default_model'] ?? ''))
             : trim((string) ($setting->default_model ?? ''));
 
-        if ($defaultModel === '' && $models !== []) {
-            $defaultModel = (string) $models[0];
-        }
-
-        if ($defaultModel !== '' && $models !== [] && ! in_array($defaultModel, $models, true)) {
+        if ($requestedDefault !== '' && $models !== [] && ! in_array($requestedDefault, $models, true)) {
             throw ValidationException::withMessages([
                 'default_model' => 'Model default harus dipilih dari model yang terdeteksi.',
             ]);
         }
 
+        if (array_key_exists('selected_models', $validated)) {
+            $selectedModels = $this->normalizeModels($validated['selected_models']);
+
+            if ($selectedModels === []) {
+                throw ValidationException::withMessages([
+                    'selected_models' => 'Select at least one model.',
+                ]);
+            }
+
+            if ($models !== []) {
+                foreach ($selectedModels as $selectedModel) {
+                    if (! in_array($selectedModel, $models, true)) {
+                        throw ValidationException::withMessages([
+                            'selected_models' => 'Selected models must come from detected provider models.',
+                        ]);
+                    }
+                }
+            }
+        } else {
+            $existingSelected = $this->normalizeModels($setting->selected_models);
+            if ($models !== []) {
+                $existingSelected = array_values(array_intersect($existingSelected, $models));
+            }
+
+            if ($existingSelected !== []) {
+                if (
+                    array_key_exists('default_model', $validated)
+                    && $requestedDefault !== ''
+                    && ! in_array($requestedDefault, $existingSelected, true)
+                ) {
+                    $existingSelected[] = $requestedDefault;
+                }
+                $selectedModels = array_values(array_unique($existingSelected));
+            } elseif ($requestedDefault !== '') {
+                $selectedModels = [$requestedDefault];
+            } elseif ($models !== []) {
+                $selectedModels = [(string) $models[0]];
+            } else {
+                $selectedModels = [];
+            }
+        }
+
+        $defaultModel = $requestedDefault;
+        if ($defaultModel === '' || ($selectedModels !== [] && ! in_array($defaultModel, $selectedModels, true))) {
+            if (array_key_exists('default_model', $validated) && $defaultModel !== '') {
+                throw ValidationException::withMessages([
+                    'default_model' => 'Default model must be one of the selected models.',
+                ]);
+            }
+            $defaultModel = (string) ($selectedModels[0] ?? ($models[0] ?? ''));
+        }
+
+        $setting->selected_models = $selectedModels !== [] ? $selectedModels : null;
         $setting->default_model = $defaultModel !== '' ? $defaultModel : null;
         $setting->save();
 
@@ -206,23 +261,20 @@ class AiSettingsController extends Controller
 
         foreach (AiProviderCatalog::PROVIDERS as $provider => $label) {
             $setting = $settings->get($provider);
-            $providerModels = is_array($setting?->models)
-                ? array_values(array_filter(
-                    $setting->models,
-                    fn (mixed $model): bool => is_string($model) && trim($model) !== ''
-                ))
-                : [];
+            $providerModels = $this->normalizeModels($setting?->models);
+            $selectedModels = $this->resolveSelectedModels($setting, $providerModels);
 
             $providers[] = [
                 'provider' => $provider,
                 'label' => $label,
                 'configured' => $setting !== null,
                 'models' => $providerModels,
+                'selected_models' => $selectedModels,
                 'default_model' => $setting?->default_model,
                 'last_checked_at' => $setting?->last_checked_at?->toISOString(),
             ];
 
-            foreach ($providerModels as $model) {
+            foreach ($selectedModels as $model) {
                 $models[] = [
                     'id' => $model,
                     'provider' => $provider,
@@ -236,5 +288,59 @@ class AiSettingsController extends Controller
             'models' => $models,
             'debounce_ms' => (int) ($request->user()?->ai_reply_debounce_ms ?? 0),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeModels(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($raw as $item) {
+            if (! is_string($item)) {
+                continue;
+            }
+            $trimmed = trim($item);
+            if ($trimmed !== '') {
+                $normalized[] = $trimmed;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * Resolve curated models exposed to workflow canvas (legacy rows default to [default_model]).
+     *
+     * @param  list<string>  $providerModels
+     * @return list<string>
+     */
+    private function resolveSelectedModels(?AiProviderSetting $setting, array $providerModels): array
+    {
+        if ($setting === null) {
+            return [];
+        }
+
+        if (is_array($setting->selected_models)) {
+            $selected = $this->normalizeModels($setting->selected_models);
+            if ($providerModels !== []) {
+                $selected = array_values(array_intersect($selected, $providerModels));
+            }
+
+            if ($selected !== []) {
+                return $selected;
+            }
+        }
+
+        $defaultModel = trim((string) ($setting->default_model ?? ''));
+        if ($defaultModel !== '' && ($providerModels === [] || in_array($defaultModel, $providerModels, true))) {
+            return [$defaultModel];
+        }
+
+        return isset($providerModels[0]) ? [$providerModels[0]] : [];
     }
 }
