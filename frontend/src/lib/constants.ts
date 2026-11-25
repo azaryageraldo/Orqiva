@@ -1,6 +1,6 @@
 export const APP_NAME = "Orqiva";
 export const APP_TAGLINE = "Connect Intelligence. Automate Everything.";
-export const APP_VERSION = "0.2.0";
+export const APP_VERSION = "0.3.0";
 export const APP_DEVELOPER = "Azarya Geraldo";
 export const APP_LICENSE = "MIT";
 export const REPOSITORY_URL = "https://github.com/azaryageraldo/Orqiva";
