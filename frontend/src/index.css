@@ -182,3 +182,15 @@
     transform: translateY(-3px);
   }
 }
+
+.orqiva-direct-panel {
+  width: 100vw;
+  height: 100dvh;
+}
+
+@media (min-width: 640px) {
+  .orqiva-direct-panel {
+    width: min(var(--widget-w, 390px), calc(100vw - 40px));
+    height: min(var(--widget-h, 640px), calc(100dvh - 40px));
+  }
+}

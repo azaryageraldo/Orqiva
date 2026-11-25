@@ -34,7 +34,7 @@
     ".orqiva-launcher img{height:34px;width:34px;border-radius:999px;background:#fff;padding:2px;object-fit:cover}",
     ".orqiva-launcher svg{height:24px;width:24px}",
     ".orqiva-fallback{display:none}",
-    ".orqiva-panel{position:fixed;right:20px;bottom:20px;z-index:2147483000;display:none;height:min(640px,calc(100dvh - 40px));width:min(390px,calc(100vw - 40px));overflow:hidden;border:1px solid rgba(148,163,184,.22);border-radius:12px;background:#17212b;box-shadow:0 30px 80px rgba(2,8,23,.55)}",
+    ".orqiva-panel{position:fixed;right:20px;bottom:20px;z-index:2147483000;display:none;height:min(var(--orqiva-height,640px),calc(100dvh - 40px));width:min(var(--orqiva-width,390px),calc(100vw - 40px));overflow:hidden;border:1px solid rgba(148,163,184,.22);border-radius:12px;background:#17212b;box-shadow:0 30px 80px rgba(2,8,23,.55)}",
     ".orqiva-panel[data-open='true']{display:block}",
     "iframe{height:100%;width:100%;border:0;background:#0e1621}",
     "@media(max-width:640px){.orqiva-launcher{right:16px;bottom:16px}.orqiva-panel{right:0;bottom:0;height:100dvh;width:100vw;border-radius:0}}",
@@ -71,6 +71,12 @@
     return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
   }
 
+  function clampNumber(value, min, max, fallback) {
+    var num = Number(value);
+    if (!Number.isFinite(num)) return fallback;
+    return Math.max(min, Math.min(max, Math.round(num)));
+  }
+
   function setOpen(open) {
     panel.setAttribute("data-open", String(open));
     launcher.setAttribute("aria-expanded", String(open));
@@ -93,7 +99,11 @@
     var accent = isHex(config && config.accent) ? config.accent : "#2b5278";
     var icon = absoluteIcon(config && config.icon);
     var mode = config && config.mode === "always" ? "always" : "manual";
+    var width = clampNumber(config && config.width, 280, 1000, 390);
+    var height = clampNumber(config && config.height, 400, 900, 640);
 
+    panel.style.setProperty("--orqiva-width", width + "px");
+    panel.style.setProperty("--orqiva-height", height + "px");
     launcher.style.background = accent;
     launcherImage.src = icon;
 

@@ -8,11 +8,15 @@ export type ChannelAppearance = {
 };
 
 export type ChannelOpenMode = "manual" | "always";
+export type ChannelPosition = "bottom-right";
 
 export type ChannelSettings = {
   welcome_message?: string;
   placeholder?: string;
   open_mode?: ChannelOpenMode;
+  width?: number;
+  height?: number;
+  position?: ChannelPosition;
   appearance?: Partial<ChannelAppearance>;
 };
 

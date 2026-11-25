@@ -28,7 +28,7 @@ const EN: Dictionary = {
   "nav.aiProviders": "AI Providers",
   "nav.apiKeys": "API Keys",
   "nav.settings": "Settings",
-  "nav.help": "Help & Support",
+  "nav.help": "Help & Docs",
   "nav.workspace": "Workspace",
   "nav.preferences": "Preferences",
 
@@ -642,7 +642,7 @@ const EN: Dictionary = {
   "settings.madeBy": "Built by Azarya Geraldo.",
 
   "help.eyebrow": "Help center",
-  "help.title": "Help & Support",
+  "help.title": "Help & Documentation",
   "help.subtitle":
     "Complete guides to install Orqiva, build workflows, connect channels, and run it in production.",
   "help.search": "Search documentation...",

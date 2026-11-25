@@ -108,6 +108,8 @@ export default function DashboardLayout({
         onLogout={onLogout}
         onNavigate={navigate}
         onToggleSidebar={() => setMobileOpen((open) => !open)}
+        sidebarCollapsed={collapsed}
+        onToggleDesktopSidebar={toggleCollapse}
         showSidebarToggle={!hideSidebar}
         notifications={notifications}
         onMarkAsRead={onMarkAsRead}
@@ -127,7 +129,6 @@ export default function DashboardLayout({
               activeNav={activeNav}
               onNavigate={navigate}
               collapsed={collapsed}
-              onToggleCollapse={toggleCollapse}
             />
           </div>
         )}

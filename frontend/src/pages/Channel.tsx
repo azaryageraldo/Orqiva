@@ -64,6 +64,17 @@ import {
   type WorkflowOption,
 } from "../services/channel";
 
+const WIDGET_SIZE_PRESETS: Array<{
+  label: string;
+  width: number;
+  height: number;
+}> = [
+  { label: "Compact", width: 340, height: 520 },
+  { label: "Standard", width: 390, height: 640 },
+  { label: "Wide", width: 440, height: 700 },
+  { label: "Large", width: 560, height: 760 },
+];
+
 const CHANNEL_CATALOG = [
   {
     id: "widget",
@@ -124,6 +135,8 @@ export default function Channel() {
   const [welcome, setWelcome] = useState("");
   const [placeholder, setPlaceholder] = useState("");
   const [openMode, setOpenMode] = useState<ChannelOpenMode>("manual");
+  const [widgetWidthInput, setWidgetWidthInput] = useState("390");
+  const [widgetHeightInput, setWidgetHeightInput] = useState("640");
   const [appearance, setAppearance] =
     useState<ChannelAppearance>(TELEGRAM_APPEARANCE);
   const [icons, setIcons] = useState<{
@@ -162,6 +175,8 @@ export default function Channel() {
     setWelcome(value.settings.welcome_message ?? "");
     setPlaceholder(value.settings.placeholder ?? "");
     setOpenMode(value.settings.open_mode ?? "manual");
+    setWidgetWidthInput(String(value.settings.width ?? 390));
+    setWidgetHeightInput(String(value.settings.height ?? 640));
     setAppearance({
       ...TELEGRAM_APPEARANCE,
       ...value.settings.appearance,
@@ -234,6 +249,17 @@ export default function Channel() {
     setError("");
     setNotice("");
 
+    const parsedWidth = Number.parseInt(widgetWidthInput, 10);
+    const parsedHeight = Number.parseInt(widgetHeightInput, 10);
+    const clampedWidth = Math.max(
+      280,
+      Math.min(1000, Number.isFinite(parsedWidth) ? parsedWidth : 390),
+    );
+    const clampedHeight = Math.max(
+      400,
+      Math.min(900, Number.isFinite(parsedHeight) ? parsedHeight : 640),
+    );
+
     try {
       const updated = await updateChannel({
         name: name.trim() || channel.name,
@@ -243,6 +269,9 @@ export default function Channel() {
           welcome_message: welcome.trim(),
           placeholder: placeholder.trim(),
           open_mode: openMode,
+          width: clampedWidth,
+          height: clampedHeight,
+          position: "bottom-right",
           appearance,
         },
       });
@@ -464,6 +493,15 @@ export default function Channel() {
     );
   }
 
+  const displayWidth = Math.max(
+    280,
+    Math.min(1000, Number.parseInt(widgetWidthInput, 10) || 390),
+  );
+  const displayHeight = Math.max(
+    400,
+    Math.min(900, Number.parseInt(widgetHeightInput, 10) || 640),
+  );
+
   const entryWorkflowName =
     entryWorkflows.find((workflow) => String(workflow.id) === workflowId)
       ?.name ?? t("channel.noneSelected");
@@ -552,7 +590,7 @@ export default function Channel() {
                     </span>
                   </div>
 
-                  <dl className="mt-5 grid gap-2 sm:grid-cols-2">
+                  <dl className="mt-5 grid gap-2 sm:grid-cols-3">
                     <div className="min-w-0 rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                       <dt className="text-[10.5px] tracking-[0.06em] text-muted-foreground">
                         {t("channel.workflowLabel")}
@@ -572,6 +610,14 @@ export default function Channel() {
                         {openMode === "always"
                           ? t("channel.openModeAlways")
                           : t("channel.openModeManual")}
+                      </dd>
+                    </div>
+                    <div className="min-w-0 rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
+                      <dt className="text-[10.5px] tracking-[0.06em] text-muted-foreground">
+                        Dimensions
+                      </dt>
+                      <dd className="mt-1 truncate font-mono text-[12px] font-medium text-foreground">
+                        {displayWidth} × {displayHeight} px
                       </dd>
                     </div>
                   </dl>
@@ -685,7 +731,11 @@ export default function Channel() {
                       </div>
                     </div>
                     <span className="text-[11px] text-muted-foreground/70">
-                      {t("channel.previewTitle")}
+                      {t("channel.previewTitle")} ·{" "}
+                      <span className="font-mono">
+                        {displayWidth} × {displayHeight} px
+                      </span>{" "}
+                      · Bottom right
                     </span>
                   </div>
                 </div>
@@ -1064,6 +1114,77 @@ export default function Channel() {
                     </span>
                   </span>
                 </label>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Widget Dimensions
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Configure floating popup width and height at the bottom-right corner on desktop (mobile fills full screen).
+                  </p>
+                </div>
+                <span className="rounded border border-border bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  {displayWidth} × {displayHeight} px
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {WIDGET_SIZE_PRESETS.map((preset) => {
+                  const selected =
+                    displayWidth === preset.width && displayHeight === preset.height;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        setWidgetWidthInput(String(preset.width));
+                        setWidgetHeightInput(String(preset.height));
+                      }}
+                      className={cn(
+                        "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                        selected
+                          ? "border-primary/40 bg-primary/10 text-primary"
+                          : "border-border bg-background text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {preset.label}{" "}
+                      <span className="ml-1 font-mono text-[10px] opacity-80">
+                        {preset.width}×{preset.height}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="channel-widget-width">Width (px)</Label>
+                  <Input
+                    id="channel-widget-width"
+                    type="number"
+                    min={280}
+                    max={1000}
+                    value={widgetWidthInput}
+                    onChange={(event) => setWidgetWidthInput(event.target.value)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">Range: 280–1000 px</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="channel-widget-height">Height (px)</Label>
+                  <Input
+                    id="channel-widget-height"
+                    type="number"
+                    min={400}
+                    max={900}
+                    value={widgetHeightInput}
+                    onChange={(event) => setWidgetHeightInput(event.target.value)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">Range: 400–900 px</p>
+                </div>
               </div>
             </div>
 

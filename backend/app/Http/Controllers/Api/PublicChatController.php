@@ -40,6 +40,9 @@ class PublicChatController extends Controller
         $config = [
             'mode' => $settings['open_mode'],
             'name' => $channel->name,
+            'width' => $settings['width'],
+            'height' => $settings['height'],
+            'position' => $settings['position'],
             'accent' => $settings['appearance']['accent_color'],
             'icon' => $this->iconUrl($channel, 'launcher'),
             'active' => (bool) $channel->is_active,
@@ -214,6 +217,9 @@ class PublicChatController extends Controller
             'welcome_message' => $settings['welcome_message'],
             'placeholder' => $settings['placeholder'],
             'open_mode' => $settings['open_mode'],
+            'width' => $settings['width'],
+            'height' => $settings['height'],
+            'position' => $settings['position'],
             'appearance' => $settings['appearance'],
         ];
     }
@@ -240,6 +246,14 @@ class PublicChatController extends Controller
             }
         }
 
+        $width = is_numeric($settings['width'] ?? null)
+            ? max(280, min(1000, (int) $settings['width']))
+            : 390;
+        $height = is_numeric($settings['height'] ?? null)
+            ? max(400, min(900, (int) $settings['height']))
+            : 640;
+        $position = 'bottom-right';
+
         return [
             'welcome_message' => (string) ($settings['welcome_message'] ?? ''),
             'placeholder' => (string) ($settings['placeholder'] ?? ''),
@@ -248,6 +262,9 @@ class PublicChatController extends Controller
                 ['manual', 'always'],
                 true
             ) ? $settings['open_mode'] : 'manual',
+            'width' => $width,
+            'height' => $height,
+            'position' => $position,
             'appearance' => $appearance,
             'icons' => [
                 'chat' => is_string($icons['chat'] ?? null)

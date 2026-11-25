@@ -46,10 +46,10 @@ export const QUICK_START: HelpSection = {
   },
   blocks: [
     {
-      title: { id: "1. Hubungkan provider AI", en: "1. Connect an AI provider" },
+      title: { id: "1. Hubungkan AI Providers", en: "1. Connect AI Providers" },
       body: {
-        id: "Buka API Keys, pilih Gemini, OpenAI, atau OpenRouter, lalu simpan API key Anda. Key disimpan terenkripsi dan hanya dipakai di server.",
-        en: "Open API Keys, choose Gemini, OpenAI, or OpenRouter, then save your key. Keys are encrypted at rest and only used on the server.",
+        id: "Buka AI Providers, pilih Gemini, OpenAI, atau OpenRouter, simpan API key, lalu centang model yang ingin dipakai di workflow.",
+        en: "Open AI Providers, choose Gemini, OpenAI, or OpenRouter, save your key, and check only the models you want available in the workflow editor.",
       },
     },
     {
@@ -62,15 +62,15 @@ export const QUICK_START: HelpSection = {
     {
       title: { id: "3. Aktifkan channel", en: "3. Activate a channel" },
       body: {
-        id: "Buka Channel, pilih workflow entry, lalu pasang widget atau hubungkan bot Telegram. Channel yang sama menampung semua percakapan di Inbox.",
-        en: "Open Channel, pick an entry workflow, then embed the widget or connect a Telegram bot. Every channel lands in the same Inbox.",
+        id: "Buka Channel, pilih workflow entry, lalu pasang widget website atau hubungkan bot Telegram (Webhook atau Long Polling).",
+        en: "Open Channel, pick an entry workflow, then embed the website widget or connect a Telegram bot (Webhook or Long Polling). Every channel lands in the same Inbox.",
       },
     },
     {
       title: { id: "4. Uji dan pantau", en: "4. Test and monitor" },
       body: {
-        id: "Kirim pesan percobaan dari widget atau Telegram, lalu periksa Inbox dan Audit Log untuk melihat langkah, token, dan error.",
-        en: "Send a test message from the widget or Telegram, then review Inbox and Audit Log to inspect steps, tokens, and errors.",
+        id: "Kirim pesan percobaan dari widget atau Telegram, lalu periksa Inbox, Dashboard, dan Audit Log untuk melihat langkah, token, dan error.",
+        en: "Send a test message from the widget or Telegram, then review Inbox, Dashboard, and Audit Log to inspect steps, tokens, and errors.",
       },
     },
   ],
@@ -104,6 +104,68 @@ export const CONCEPTS: HelpSection = {
     {
       id: "Eksekusi berjalan di queue. Balasan diproses di background, sehingga worker harus tetap berjalan.",
       en: "Executions run on the queue. Replies are processed in the background, so the worker must stay running.",
+    },
+  ],
+};
+
+export const AI_PROVIDERS_HELP: HelpSection = {
+  id: "ai-providers",
+  title: { id: "AI Providers & kurasi model", en: "AI Providers and model selection" },
+  intro: {
+    en: "Connect your own provider keys (BYOK), curate which models appear in workflows, and tune reply debouncing.",
+  },
+  blocks: [
+    {
+      title: { en: "Encrypted BYOK credentials" },
+      body: {
+        en: "Configure Google Gemini, OpenAI, or OpenRouter under AI Providers. API keys are encrypted at rest in the database and never sent back to the browser.",
+      },
+    },
+    {
+      title: { en: "Curated workflow model list" },
+      body: {
+        en: "Click Detect models to fetch available chat models for your key, filter the list, and check only the models you want to see in the Workflow Editor AI model dropdown. Your Default model must remain checked, and all detected models stay cached so you can adjust your selection anytime.",
+      },
+    },
+    {
+      title: { en: "Reply debounce (0–5000 ms)" },
+      body: {
+        en: "Configure how long Orqiva waits after receiving a customer message before triggering the AI workflow. Increasing debounce helps batch rapid back-to-back messages into one AI turn.",
+      },
+    },
+  ],
+};
+
+export const STUDIO_HELP: HelpSection = {
+  id: "studio",
+  title: { id: "Studio, shortcut & modul", en: "Studio, shortcuts, and modules" },
+  intro: {
+    en: "Productivity shortcuts, workflow portability, dashboard telemetry, and upcoming workspace modules.",
+  },
+  blocks: [
+    {
+      title: { en: "Keyboard shortcuts" },
+      body: {
+        en: "Press ⌘K (or Ctrl+K) anywhere to open the Command Palette and jump between pages. Press ⌘B (or Ctrl+B) to collapse or expand the sidebar rail.",
+      },
+    },
+    {
+      title: { en: "Workflow templates (Import, Export & Duplicate)" },
+      body: {
+        en: "Export any workflow as a portable JSON template, import templates into a new workflow, duplicate existing flows as drafts, and filter by Active or Draft status across all pages.",
+      },
+    },
+    {
+      title: { en: "Dashboard telemetry & PDF export" },
+      body: {
+        en: "Filter execution telemetry by date range, inspect Daily / Monthly / Yearly token consumption, monitor background queue worker health, and export a snapshot report to PDF.",
+      },
+    },
+    {
+      title: { en: "Modules in development (Datapoints & Data Table)" },
+      body: {
+        en: "Datapoints (schema registry for dynamic workflow variables) and Data Table (spreadsheet explorer for structured customer records) are currently marked In Development and will ship in upcoming releases.",
+      },
     },
   ],
 };
@@ -142,7 +204,7 @@ export const NODES: HelpNode[] = [
   "type": "Trigger",
   "data": {
     "label": "Trigger",
-    "nodeName": "Pesan masuk"
+    "nodeName": "Incoming message"
   }
 }`,
   },
@@ -156,8 +218,8 @@ export const NODES: HelpNode[] = [
     },
     config: [
       {
-        id: "Provider dan model: Gemini, OpenAI, atau OpenRouter sesuai API key yang tersimpan.",
-        en: "Provider and model: Gemini, OpenAI, or OpenRouter based on the saved API key.",
+        id: "Provider dan model: Gemini, OpenAI, atau OpenRouter sesuai model yang Anda pilih di AI Providers.",
+        en: "Provider and model: Gemini, OpenAI, or OpenRouter based on the models enabled in AI Providers.",
       },
       {
         id: "System prompt: instruksi utama; dapat memakai variabel upstream seperti {{customer_message}}.",
@@ -173,8 +235,8 @@ export const NODES: HelpNode[] = [
       },
     ],
     output: {
-      id: "Variabel dinamai dari node, misalnya {{respons-ai.respond.replies}} atau {{respons-ai.mau_beli}}.",
-      en: "Variables are namespaced by node, for example {{ai-response.respond.replies}} or {{ai-response.mau_beli}}.",
+      id: "Variabel dinamai dari node, misalnya {{ai-response.respond.replies}} atau {{ai-response.ready_to_buy}}.",
+      en: "Variables are namespaced by node, for example {{ai-response.respond.replies}} or {{ai-response.ready_to_buy}}.",
     },
     notes: [
       {
@@ -195,10 +257,10 @@ export const NODES: HelpNode[] = [
   "type": "AI Agent",
   "data": {
     "label": "AI Agent",
-    "nodeName": "Respons AI",
+    "nodeName": "AI Response",
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
-    "systemMessage": "Anda asisten toko yang ramah.",
+    "model": "gemini-2.5-flash",
+    "systemMessage": "You are a friendly store assistant.",
     "temperature": 0.7,
     "verbosity": "concise",
     "contextMessages": 10,
@@ -207,12 +269,12 @@ export const NODES: HelpNode[] = [
         "name": "respond",
         "type": "array",
         "itemField": "replies",
-        "description": "Balasan singkat; tiap item satu bubble."
+        "description": "Short replies; each item becomes one chat bubble."
       },
       {
-        "name": "mau_beli",
+        "name": "ready_to_buy",
         "type": "boolean",
-        "description": "True bila pelanggan ingin membeli."
+        "description": "True when the customer wants to purchase."
       }
     ]
   }
@@ -251,9 +313,9 @@ export const NODES: HelpNode[] = [
   "type": "Send Message",
   "data": {
     "label": "Send Message",
-    "nodeName": "Kirim balasan",
+    "nodeName": "Send reply",
     "messageMode": "smart_value",
-    "messageTemplate": "{{respons-ai.respond.replies}}"
+    "messageTemplate": "{{ai-response.respond.replies}}"
   }
 }`,
   },
@@ -267,8 +329,8 @@ export const NODES: HelpNode[] = [
     },
     config: [
       {
-        id: "Pilih satu variabel boolean upstream, misalnya {{respons-ai.mau_beli}}.",
-        en: "Pick one boolean upstream variable, for example {{respons-ai.mau_beli}}.",
+        id: "Pilih satu variabel boolean upstream, misalnya {{ai-response.ready_to_buy}}.",
+        en: "Pick one boolean upstream variable, for example {{ai-response.ready_to_buy}}.",
       },
       {
         id: "Hubungkan port If match (true) dan Else (false) ke node berikutnya.",
@@ -294,8 +356,8 @@ export const NODES: HelpNode[] = [
   "type": "Condition",
   "data": {
     "label": "Condition",
-    "nodeName": "Pelanggan ingin membeli?",
-    "conditionVariable": "respons-ai.mau_beli"
+    "nodeName": "Ready to buy?",
+    "conditionVariable": "ai-response.ready_to_buy"
   }
 }`,
   },
@@ -340,7 +402,7 @@ export const NODES: HelpNode[] = [
   "type": "Go To",
   "data": {
     "label": "Go To",
-    "nodeName": "Lanjut ke closing",
+    "nodeName": "Continue to closing",
     "targetWorkflowId": 36,
     "targetNodeId": "ai-closing",
     "endFlow": false,
@@ -381,7 +443,7 @@ export const NODES: HelpNode[] = [
   "type": "Relocate",
   "data": {
     "label": "Relocate",
-    "nodeName": "Alihkan ke admin"
+    "nodeName": "Hand off to admin"
   }
 }`,
   },
@@ -418,7 +480,7 @@ export const NODES: HelpNode[] = [
   "type": "Stopper",
   "data": {
     "label": "Stopper",
-    "nodeName": "Tunggu pesan berikutnya"
+    "nodeName": "Wait for next message"
   }
 }`,
   },
@@ -472,23 +534,23 @@ export const EXAMPLES: HelpExample[] = [
     {
       "id": "trigger-1",
       "type": "Trigger",
-      "data": { "label": "Trigger", "nodeName": "Pesan masuk" }
+      "data": { "label": "Trigger", "nodeName": "Incoming message" }
     },
     {
       "id": "ai-1",
       "type": "AI Agent",
       "data": {
         "label": "AI Agent",
-        "nodeName": "Respons AI",
+        "nodeName": "AI Response",
         "provider": "gemini",
-        "model": "gemini-3.8-flash",
-        "systemMessage": "Jawab pertanyaan pelanggan dengan ringkas dan ramah.",
+        "model": "gemini-2.5-flash",
+        "systemMessage": "Answer customer questions concisely and politely.",
         "outputVariables": [
           {
             "name": "respond",
             "type": "array",
             "itemField": "replies",
-            "description": "Balasan singkat; tiap item satu bubble."
+            "description": "Short replies; each item becomes one chat bubble."
           }
         ]
       }
@@ -498,9 +560,9 @@ export const EXAMPLES: HelpExample[] = [
       "type": "Send Message",
       "data": {
         "label": "Send Message",
-        "nodeName": "Kirim balasan",
+        "nodeName": "Send reply",
         "messageMode": "smart_value",
-        "messageTemplate": "{{respons-ai.respond.replies}}"
+        "messageTemplate": "{{ai-response.respond.replies}}"
       }
     }
   ],
@@ -522,28 +584,28 @@ export const EXAMPLES: HelpExample[] = [
     {
       "id": "trigger-1",
       "type": "Trigger",
-      "data": { "label": "Trigger", "nodeName": "Pesan masuk" }
+      "data": { "label": "Trigger", "nodeName": "Incoming message" }
     },
     {
       "id": "ai-1",
       "type": "AI Agent",
       "data": {
         "label": "AI Agent",
-        "nodeName": "Respons AI",
+        "nodeName": "AI Response",
         "provider": "gemini",
-        "model": "gemini-3.8-flash",
-        "systemMessage": "Bantu pelanggan dan nilai apakah ia siap membeli.",
+        "model": "gemini-2.5-flash",
+        "systemMessage": "Help the customer and assess whether they are ready to purchase.",
         "outputVariables": [
           {
             "name": "respond",
             "type": "array",
             "itemField": "replies",
-            "description": "Balasan untuk pelanggan."
+            "description": "Reply messages for the customer."
           },
           {
-            "name": "mau_beli",
+            "name": "ready_to_buy",
             "type": "boolean",
-            "description": "True bila pelanggan ingin membeli."
+            "description": "True when the customer wants to purchase."
           }
         ]
       }
@@ -553,9 +615,9 @@ export const EXAMPLES: HelpExample[] = [
       "type": "Send Message",
       "data": {
         "label": "Send Message",
-        "nodeName": "Kirim balasan",
+        "nodeName": "Send reply",
         "messageMode": "smart_value",
-        "messageTemplate": "{{respons-ai.respond.replies}}"
+        "messageTemplate": "{{ai-response.respond.replies}}"
       }
     },
     {
@@ -563,23 +625,23 @@ export const EXAMPLES: HelpExample[] = [
       "type": "Condition",
       "data": {
         "label": "Condition",
-        "nodeName": "Ingin membeli?",
-        "conditionVariable": "respons-ai.mau_beli"
+        "nodeName": "Ready to buy?",
+        "conditionVariable": "ai-response.ready_to_buy"
       }
     },
     {
       "id": "relocate-1",
       "type": "Relocate",
-      "data": { "label": "Relocate", "nodeName": "Alihkan ke admin" }
+      "data": { "label": "Relocate", "nodeName": "Hand off to admin" }
     },
     {
       "id": "send-2",
       "type": "Send Message",
       "data": {
         "label": "Send Message",
-        "nodeName": "Tawarkan bantuan lanjutan",
+        "nodeName": "Offer follow-up help",
         "messageMode": "smart_value",
-        "messageTemplate": "Ada lagi yang bisa saya bantu?"
+        "messageTemplate": "Is there anything else I can help you with?"
       }
     }
   ],
@@ -614,14 +676,14 @@ export const EXAMPLES: HelpExample[] = [
     {
       "id": "trigger-1",
       "type": "Trigger",
-      "data": { "label": "Trigger", "nodeName": "Pesan masuk" }
+      "data": { "label": "Trigger", "nodeName": "Incoming message" }
     },
     {
       "id": "goto-1",
       "type": "Go To",
       "data": {
         "label": "Go To",
-        "nodeName": "Lanjut ke closing",
+        "nodeName": "Continue to closing",
         "targetWorkflowId": 36,
         "targetNodeId": "ai-closing",
         "endFlow": false,
@@ -648,21 +710,20 @@ export const CHANNELS: HelpSection = {
       title: { id: "Widget website", en: "Website widget" },
       body: {
         id: "Buka Channel → widget, pilih workflow entry, lalu salin snippet ke website sebelum tag </body>. Aktifkan widget agar pelanggan dapat memulai chat.",
-        en: "Open Channel → widget, choose an entry workflow, then paste the snippet into your site before the </body> tag. Activate the widget so customers can start chatting.",
+        en: "Open Channel → Web Chat Widget, choose an entry workflow, customize colors and icons, then paste the snippet into your site before the </body> tag. Activate the widget so customers can start chatting.",
       },
     },
     {
-      title: { id: "Bot Telegram", en: "Telegram bot" },
+      title: { id: "Bot Telegram (Webhook vs Long Polling)", en: "Telegram bot (Webhook vs Long Polling)" },
       body: {
-        id: "Buat bot di @BotFather, salin token, lalu hubungkan di Channel → Telegram. Pesan diambil dengan long polling sehingga tidak perlu URL publik.",
-        en: "Create a bot with @BotFather, copy the token, then connect it in Channel → Telegram. Messages use long polling, so no public URL is required.",
+        en: "Create a bot with @BotFather, paste the token in Channel → Telegram, pick an entry workflow, and activate it. Choose Long Polling for local setups without a public HTTPS URL, or register a Webhook directly from the Telegram dialog when running on HTTPS (or behind ngrok / Cloudflare Tunnel) for instant delivery.",
       },
     },
     {
-      title: { id: "Menjalankan poller", en: "Running the poller" },
+      title: { id: "Menjalankan worker & poller", en: "Running the worker & poller" },
       body: {
-        id: "Saat memakai CLI, poller berjalan otomatis bersama orqiva start. Dari source, jalankan php artisan channels:telegram-poll; queue worker tetap wajib berjalan.",
-        en: "With the CLI, the poller starts automatically with orqiva start. From source, run php artisan channels:telegram-poll; the queue worker must still be running.",
+        id: "Saat memakai CLI, poller berjalan otomatis bersama orqiva start. Dari source, jalankan php artisan channels:telegram-poll (jika mode polling); queue worker tetap wajib berjalan.",
+        en: "With the CLI, the worker and poller start automatically with orqiva. From source, keep php artisan queue:work running, and run php artisan channels:telegram-poll when using Long Polling mode.",
       },
     },
   ],
@@ -715,8 +776,8 @@ export const AUDIT: HelpSection = {
     {
       title: { id: "Tidak ada balasan", en: "No reply" },
       body: {
-        id: "Pastikan channel aktif, workflow entry memiliki Trigger dan Send Message/Relocate, provider AI punya API key, lalu periksa queue worker.",
-        en: "Make sure the channel is active, the entry workflow has a Trigger and Send Message/Relocate, the AI provider has an API key, then check the queue worker.",
+        id: "Pastikan channel aktif, workflow entry memiliki Trigger dan Send Message/Relocate, AI Providers punya API key & model terpilih, lalu periksa queue worker.",
+        en: "Make sure the channel is active, the entry workflow has a Trigger and Send Message/Relocate, AI Providers has a saved key and selected model, and check Dashboard Background Queue health.",
       },
     },
     {
@@ -761,6 +822,8 @@ export const SECURITY: HelpSection = {
 export const SECTIONS: HelpSection[] = [
   QUICK_START,
   CONCEPTS,
+  AI_PROVIDERS_HELP,
+  STUDIO_HELP,
   {
     id: "nodes",
     title: { id: "Referensi node", en: "Node reference" },

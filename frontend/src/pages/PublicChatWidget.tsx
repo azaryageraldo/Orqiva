@@ -112,6 +112,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
   const [sending, setSending] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const started = useRef(false);
@@ -123,6 +124,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
 
   const appearance = channel?.settings.appearance ?? DEFAULT_APPEARANCE;
   const chatIcon = channel?.icon_urls.chat || orqivaMark;
+  const launcherIcon = channel?.icon_urls.launcher || orqivaMark;
 
   const beginSession = useCallback(async () => {
     if (started.current) return;
@@ -157,6 +159,7 @@ export default function PublicChatWidget({ token }: { token: string }) {
         setChannel(result);
 
         if (result.is_active && result.settings.open_mode === "always") {
+          setPanelOpen(true);
           void beginSession();
         }
       })
@@ -241,7 +244,11 @@ export default function PublicChatWidget({ token }: { token: string }) {
   }
 
   function closeWidget() {
-    window.parent.postMessage({ type: "orqiva:close" }, "*");
+    if (embedded) {
+      window.parent.postMessage({ type: "orqiva:close" }, "*");
+    } else {
+      setPanelOpen(false);
+    }
   }
 
   const typing = sending || processing;
@@ -252,34 +259,41 @@ export default function PublicChatWidget({ token }: { token: string }) {
     return t("public.online");
   }, [typing, sessionStatus, t]);
 
+  const widgetWidth = Math.max(280, Math.min(1000, channel?.settings.width ?? 390));
+  const widgetHeight = Math.max(400, Math.min(900, channel?.settings.height ?? 640));
+
   const style = {
     "--tg-header": appearance.header_color,
     "--tg-bg": appearance.background_color,
     "--tg-outgoing": appearance.outgoing_color,
     "--tg-accent": appearance.accent_color,
     "--tg-outgoing-text": readableText(appearance.outgoing_color),
+    "--widget-w": `${widgetWidth}px`,
+    "--widget-h": `${widgetHeight}px`,
   } as CSSProperties;
 
   const unavailable =
     !loadingChannel && (!channel || !channel.is_active || Boolean(error && !chatOpen));
 
-  return (
+  const widgetShell = (
     <div
-      className="flex h-dvh min-h-dvh flex-col overflow-hidden bg-[var(--tg-bg)] text-[#f5f5f5]"
+      className={
+        embedded
+          ? "flex h-dvh min-h-dvh w-full flex-col overflow-hidden bg-[var(--tg-bg)] text-[#f5f5f5]"
+          : "orqiva-direct-panel flex flex-col overflow-hidden bg-[var(--tg-bg)] text-[#f5f5f5] sm:rounded-2xl sm:border sm:border-white/10 sm:shadow-[0_24px_80px_-20px_rgba(0,0,0,0.85)]"
+      }
       style={style}
     >
       {!chatOpen ? (
         <div className="tg-chat-wallpaper relative flex h-full flex-col">
-          {embedded && (
-            <button
-              type="button"
-              onClick={closeWidget}
-              className="absolute top-3 right-3 z-10 flex size-9 items-center justify-center rounded-full bg-black/25 text-white/80 transition hover:bg-black/40"
-              aria-label={t("public.closeChat")}
-            >
-              <X className="size-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={closeWidget}
+            className="absolute top-3 right-3 z-10 flex size-9 items-center justify-center rounded-full bg-black/25 text-white/80 transition hover:bg-black/40"
+            aria-label={t("public.closeChat")}
+          >
+            <X className="size-4" />
+          </button>
 
           <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
             <div className="relative">
@@ -337,16 +351,14 @@ export default function PublicChatWidget({ token }: { token: string }) {
             className="flex h-14 shrink-0 items-center gap-3 px-3 shadow-sm"
             style={{ backgroundColor: appearance.header_color }}
           >
-            {embedded && (
-              <button
-                type="button"
-                onClick={closeWidget}
-                className="flex size-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10"
-                aria-label={t("public.closeChat")}
-              >
-                <X className="size-4" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={closeWidget}
+              className="flex size-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10"
+              aria-label={t("public.closeChat")}
+            >
+              <X className="size-4" />
+            </button>
 
             <img
               src={chatIcon}
@@ -551,6 +563,34 @@ export default function PublicChatWidget({ token }: { token: string }) {
             </form>
           </main>
         </>
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return widgetShell;
+  }
+
+  return (
+    <div className="min-h-dvh w-full bg-[#090c10]" style={style}>
+      {panelOpen ? (
+        <div className="fixed right-0 bottom-0 sm:right-5 sm:bottom-5 z-50">
+          {widgetShell}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPanelOpen(true)}
+          aria-label="Open chat"
+          className="fixed right-4 bottom-4 sm:right-5 sm:bottom-5 z-50 flex size-14 items-center justify-center rounded-full shadow-[0_16px_40px_rgba(2,8,23,0.45)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+          style={{ backgroundColor: appearance.accent_color }}
+        >
+          <img
+            src={launcherIcon}
+            alt={channel?.name || t("public.customerService")}
+            className="size-9 rounded-full bg-white p-0.5 object-cover"
+          />
+        </button>
       )}
     </div>
   );

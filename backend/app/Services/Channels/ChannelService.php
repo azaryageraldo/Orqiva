@@ -21,6 +21,12 @@ class ChannelService
         'accent_color' => '#64b5ef',
     ];
 
+    public const DEFAULT_WIDTH = 390;
+
+    public const DEFAULT_HEIGHT = 640;
+
+    public const DEFAULT_POSITION = 'bottom-right';
+
     public const ICON_KINDS = ['chat', 'launcher'];
 
     public function __construct(
@@ -463,6 +469,14 @@ class ChannelService
             }
         }
 
+        $width = is_numeric($settings['width'] ?? null)
+            ? max(280, min(1000, (int) $settings['width']))
+            : self::DEFAULT_WIDTH;
+        $height = is_numeric($settings['height'] ?? null)
+            ? max(400, min(900, (int) $settings['height']))
+            : self::DEFAULT_HEIGHT;
+        $position = self::DEFAULT_POSITION;
+
         return [
             'welcome_message' => array_key_exists('welcome_message', $settings)
                 ? (string) ($settings['welcome_message'] ?? '')
@@ -475,6 +489,9 @@ class ChannelService
                 ['manual', 'always'],
                 true
             ) ? $settings['open_mode'] : 'manual',
+            'width' => $width,
+            'height' => $height,
+            'position' => $position,
             'appearance' => $appearance,
             'icons' => [
                 'chat' => is_string($icons['chat'] ?? null)

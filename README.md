@@ -30,8 +30,9 @@ Orqiva is a self-hostable alternative to hosted customer service bots. It runs e
 
 - **Local-first by default.** SQLite, the app, and the queue worker run on one machine. Your customer data never leaves your infrastructure.
 - **Visual automation.** Design branching conversations on a canvas, validate them on the server, and reuse workflows across channels.
-- **Bring your own key.** Gemini, OpenAI, and OpenRouter are supported with encrypted per-user API keys.
-- **Real operations, not just a demo.** Inbox takeover, human handoff, resumable executions, token accounting, and per-step audit logs are built in.
+- **Bring your own key & model curation.** Gemini, OpenAI, and OpenRouter are supported with encrypted per-user API keys, searchable model selection for the workflow editor, and configurable reply debouncing (`0–5000 ms`).
+- **Real operations, not just a demo.** Inbox takeover, human handoff, resumable executions, workflow template import/export/duplicate, dashboard telemetry & PDF export, and per-step audit logs are built in.
+- **Studio productivity.** Quick-jump Command Palette (`⌘K`), collapsible sidebar navigation (`⌘B`), and upcoming **Datapoints** & **Data Table** modules (`In Development`).
 - **One command to start.** The `orqiva` CLI bundles a FrankenPHP runtime, migrations, the queue worker, and the Telegram poller.
 
 ## How it works
@@ -117,15 +118,15 @@ On first launch, complete the setup form to create the local admin account. Ther
 php artisan db:seed --class=AdminUserSeeder
 ```
 
-Add AI provider keys in **API Keys** inside the app. Keys are encrypted at rest and are never returned to the browser.
+Add AI provider keys, select which models appear in workflows, and configure reply debounce in **AI Providers** inside the app. Keys are encrypted at rest and are never returned to the browser.
 
 ## Telegram
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
 2. Open **Channel → Telegram**, paste the token, choose an entry workflow, and activate the bot.
-3. Send a message to the bot. Orqiva fetches updates through long polling, so no public URL, webhook, or tunnel is required.
+3. Choose **Long Polling** for local setups without a public HTTPS URL, or register a **Telegram Webhook** directly from the dialog when running behind HTTPS (or a tunnel like ngrok / Cloudflare Tunnel).
 
-When you use the CLI, the poller starts automatically with `orqiva`. From source, run `php artisan channels:telegram-poll` alongside `php artisan queue:work`.
+When you use the CLI, the poller starts automatically with `orqiva`. From source, run `php artisan channels:telegram-poll` alongside `php artisan queue:work` when using polling mode.
 
 ## Testing and quality checks
 
@@ -148,7 +149,7 @@ Backend tests run against in-memory SQLite and mock AI providers. They do not re
 
 - [`README-SETUP.md`](README-SETUP.md) — installation, environment variables, operations, and troubleshooting.
 - [`packages/cli/README.md`](packages/cli/README.md) — CLI runtime, data directory, and platform notes.
-- **Help & Support** inside the app — quick start, all seven nodes with schema examples, variables, channel setup, inbox, audit logs, and security.
+- **Help & Docs** inside the app — quick start, AI Providers & model curation, Studio shortcuts (`⌘K` / `⌘B`), all seven nodes with schema examples, variables, channel setup, inbox, audit logs, and security.
 
 ## Contributing
 

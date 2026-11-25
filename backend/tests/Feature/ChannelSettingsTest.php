@@ -56,6 +56,9 @@ class ChannelSettingsTest extends TestCase
 
         $response
             ->assertJsonPath('data.settings.open_mode', 'manual')
+            ->assertJsonPath('data.settings.width', 390)
+            ->assertJsonPath('data.settings.height', 640)
+            ->assertJsonPath('data.settings.position', 'bottom-right')
             ->assertJsonPath('data.settings.appearance.header_color', '#17212b')
             ->assertJsonPath('data.settings.appearance.background_color', '#0e1621')
             ->assertJsonPath('data.settings.appearance.outgoing_color', '#2b5278')
@@ -73,6 +76,9 @@ class ChannelSettingsTest extends TestCase
             ->putJson('/api/v1/channel', [
                 'settings' => [
                     'open_mode' => 'always',
+                    'width' => 520,
+                    'height' => 760,
+                    'position' => 'bottom-right',
                     'appearance' => [
                         'header_color' => '#112233',
                         'background_color' => '#223344',
@@ -85,6 +91,9 @@ class ChannelSettingsTest extends TestCase
 
         $response
             ->assertJsonPath('data.settings.open_mode', 'always')
+            ->assertJsonPath('data.settings.width', 520)
+            ->assertJsonPath('data.settings.height', 760)
+            ->assertJsonPath('data.settings.position', 'bottom-right')
             ->assertJsonPath('data.settings.appearance.header_color', '#112233')
             ->assertJsonPath('data.settings.appearance.background_color', '#223344')
             ->assertJsonPath('data.settings.appearance.outgoing_color', '#334455')
@@ -100,12 +109,18 @@ class ChannelSettingsTest extends TestCase
             ->putJson('/api/v1/channel', [
                 'settings' => [
                     'open_mode' => 'sometimes',
+                    'width' => 150,
+                    'height' => 1200,
+                    'position' => 'top-left',
                     'appearance' => ['header_color' => 'red'],
                 ],
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'settings.open_mode',
+                'settings.width',
+                'settings.height',
+                'settings.position',
                 'settings.appearance.header_color',
             ]);
     }
@@ -147,6 +162,9 @@ class ChannelSettingsTest extends TestCase
         $user = $this->user();
         $this->channel($user, [
             'open_mode' => 'always',
+            'width' => 420,
+            'height' => 680,
+            'position' => 'bottom-right',
             'appearance' => [
                 'header_color' => '#17212b',
                 'background_color' => '#0e1621',
@@ -166,6 +184,9 @@ class ChannelSettingsTest extends TestCase
         $script = $response->getContent();
 
         $this->assertStringContainsString('"mode":"always"', $script);
+        $this->assertStringContainsString('"width":420', $script);
+        $this->assertStringContainsString('"height":680', $script);
+        $this->assertStringContainsString('"position":"bottom-right"', $script);
         $this->assertStringContainsString('"accent":"#abcdef"', $script);
         $this->assertStringNotContainsString('workflow', $script);
     }

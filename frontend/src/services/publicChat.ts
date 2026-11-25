@@ -1,5 +1,5 @@
 import api from "./api";
-import type { ChannelAppearance, ChannelOpenMode } from "./channel";
+import type { ChannelAppearance, ChannelOpenMode, ChannelPosition } from "./channel";
 
 export type PublicMessage = {
   id: number;
@@ -13,6 +13,9 @@ export type PublicChannelSettings = {
   welcome_message: string;
   placeholder: string;
   open_mode: ChannelOpenMode;
+  width?: number;
+  height?: number;
+  position?: ChannelPosition;
   appearance: ChannelAppearance;
 };
 

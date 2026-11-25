@@ -1,13 +1,21 @@
 import { useState, type ReactNode } from "react";
 import {
+  GithubLogo,
+  InstagramLogo,
+  LinkedinLogo,
+  TiktokLogo,
+} from "@phosphor-icons/react";
+import {
   Activity,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
   Braces,
+  BrainCircuit,
   Check,
   Code2,
   Copy,
+  FolderGit2,
   Globe2,
   Inbox,
   Layers,
@@ -15,6 +23,7 @@ import {
   Rocket,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   Workflow,
   type LucideIcon,
 } from "lucide-react";
@@ -42,6 +51,7 @@ import {
   REPOSITORY_URL,
 } from "@/lib/constants";
 import {
+  AI_PROVIDERS_HELP,
   AUDIT,
   CHANNELS,
   CONCEPTS,
@@ -50,6 +60,7 @@ import {
   NODES,
   QUICK_START,
   SECURITY,
+  STUDIO_HELP,
   VARIABLES,
   type HelpExample,
   type HelpNode,
@@ -67,6 +78,8 @@ interface HelpProps {
 const SECTION_ICONS: Record<string, LucideIcon> = {
   quickstart: Rocket,
   concepts: BookOpen,
+  "ai-providers": BrainCircuit,
+  studio: SlidersHorizontal,
   nodes: Workflow,
   variables: Braces,
   examples: Layers,
@@ -77,10 +90,10 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
 };
 
 const SOCIALS = [
-  { labelKey: "help.socialGithub", href: DEVELOPER_GITHUB, icon: Code2 },
-  { labelKey: "help.socialTiktok", href: DEVELOPER_TIKTOK, icon: Code2 },
-  { labelKey: "help.socialLinkedin", href: DEVELOPER_LINKEDIN, icon: Code2 },
-  { labelKey: "help.socialInstagram", href: DEVELOPER_INSTAGRAM, icon: Code2 },
+  { labelKey: "help.socialGithub", href: DEVELOPER_GITHUB, icon: GithubLogo },
+  { labelKey: "help.socialTiktok", href: DEVELOPER_TIKTOK, icon: TiktokLogo },
+  { labelKey: "help.socialLinkedin", href: DEVELOPER_LINKEDIN, icon: LinkedinLogo },
+  { labelKey: "help.socialInstagram", href: DEVELOPER_INSTAGRAM, icon: InstagramLogo },
 ];
 
 export default function Help({
@@ -153,6 +166,8 @@ export default function Help({
   const toc = [
     QUICK_START,
     CONCEPTS,
+    AI_PROVIDERS_HELP,
+    STUDIO_HELP,
     { id: "nodes", title: { id: "Referensi node", en: "Node reference" } },
     { id: "variables", title: { id: "Variabel", en: "Variables" } },
     { id: "examples", title: { id: "Contoh workflow", en: "Examples" } },
@@ -163,8 +178,16 @@ export default function Help({
     { id: "developer", title: { id: "Developer", en: "Developer" } },
   ].filter((item) => {
     if (!normalizedQuery) return true;
-    const section = [QUICK_START, CONCEPTS, CHANNELS, INBOX, AUDIT, SECURITY]
-      .find((candidate) => candidate.id === item.id);
+    const section = [
+      QUICK_START,
+      CONCEPTS,
+      AI_PROVIDERS_HELP,
+      STUDIO_HELP,
+      CHANNELS,
+      INBOX,
+      AUDIT,
+      SECURITY,
+    ].find((candidate) => candidate.id === item.id);
 
     if (section) return sectionMatches(section);
     if (item.id === "nodes") return visibleNodes.length > 0;
@@ -285,6 +308,35 @@ export default function Help({
                 </ul>
               </SectionShell>
             )}
+
+            {([AI_PROVIDERS_HELP, STUDIO_HELP] as HelpSection[])
+              .filter((section) => sectionMatches(section))
+              .map((section) => (
+                <SectionShell
+                  key={section.id}
+                  section={section}
+                  icon={SECTION_ICONS[section.id] ?? BookOpen}
+                  pick={pick}
+                >
+                  <div className="space-y-3">
+                    {section.blocks.map((block, index) => (
+                      <div
+                        key={index}
+                        className="rounded-lg border border-border bg-muted/15 p-3.5"
+                      >
+                        {block.title && (
+                          <p className="text-sm font-medium text-foreground">
+                            {pick(block.title)}
+                          </p>
+                        )}
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {pick(block.body)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </SectionShell>
+              ))}
 
             {visibleNodes.length > 0 && (
               <SectionShell
@@ -491,24 +543,12 @@ export default function Help({
                     className="group flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs font-medium text-foreground transition hover:border-primary/30 hover:bg-primary/[0.06]"
                   >
                     <span className="inline-flex items-center gap-2">
-                      <Code2 className="size-3.5 text-muted-foreground" />
+                      <FolderGit2 className="size-3.5 text-muted-foreground" />
                       {t("help.repository")}
                     </span>
                     <ArrowUpRight className="size-3.5 text-muted-foreground transition group-hover:text-primary" />
                   </a>
-                  <a
-                    href={DEVELOPER_GITHUB}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="group flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs font-medium text-foreground transition hover:border-primary/30 hover:bg-primary/[0.06]"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Code2 className="size-3.5 text-muted-foreground" />
-                      {t("help.socialGithub")}
-                    </span>
-                    <ArrowUpRight className="size-3.5 text-muted-foreground transition group-hover:text-primary" />
-                  </a>
-                  {SOCIALS.slice(1).map((social) => {
+                  {SOCIALS.map((social) => {
                     const Icon = social.icon;
 
                     return (
@@ -520,7 +560,7 @@ export default function Help({
                         className="group flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs font-medium text-foreground transition hover:border-primary/30 hover:bg-primary/[0.06]"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <Icon className="size-3.5 text-muted-foreground" />
+                          <Icon size={15} className="text-muted-foreground" />
                           {t(social.labelKey)}
                         </span>
                         <ArrowUpRight className="size-3.5 text-muted-foreground transition group-hover:text-primary" />

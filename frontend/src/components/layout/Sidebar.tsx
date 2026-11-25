@@ -6,8 +6,6 @@ import {
   GitFork,
   LayoutDashboard,
   MessagesSquare,
-  PanelLeftClose,
-  PanelLeftOpen,
   Radio,
   ScrollText,
   Server,
@@ -39,7 +37,6 @@ interface SidebarProps {
   activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
   collapsed?: boolean;
-  onToggleCollapse?: () => void;
 }
 
 const HEALTH_STYLES: Record<Health, { dot: string; text: string }> = {
@@ -178,7 +175,6 @@ export default function Sidebar({
   activeNav,
   onNavigate,
   collapsed = false,
-  onToggleCollapse,
 }: SidebarProps) {
   const { t } = useI18n();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -273,7 +269,7 @@ export default function Sidebar({
       </div>
 
       {/* Footer Utility & Runtime Status */}
-      <div className={cn("shrink-0 border-t border-sidebar-border", collapsed ? "flex flex-col items-center gap-1.5 p-2" : "space-y-1.5 p-3")}>
+      <div className={cn("shrink-0 border-t border-sidebar-border", collapsed ? "flex flex-col items-center gap-1.5 p-2" : "space-y-2 p-3")}>
         {/* Help & Documentation */}
         <button
           type="button"
@@ -305,40 +301,6 @@ export default function Sidebar({
           {!collapsed && <span className="truncate flex-1">{t(HELP_ITEM.labelKey)}</span>}
         </button>
 
-        {/* Collapse / Expand Sidebar Toggle */}
-        {onToggleCollapse && (
-          <button
-            type="button"
-            onClick={() => {
-              setTooltip(null);
-              onToggleCollapse();
-            }}
-            onMouseEnter={(e) => {
-              if (!collapsed) return;
-              const rect = e.currentTarget.getBoundingClientRect();
-              setTooltip({ label: "Expand sidebar (⌘B)", top: rect.top + rect.height / 2 });
-            }}
-            onMouseLeave={() => collapsed && setTooltip(null)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn(
-              "group flex items-center rounded-lg text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground outline-none",
-              collapsed ? "size-9 justify-center p-0" : "w-full gap-2.5 px-2.5 py-2",
-            )}
-          >
-            {collapsed ? (
-              <PanelLeftOpen size={16} strokeWidth={1.5} className="shrink-0" />
-            ) : (
-              <>
-                <PanelLeftClose size={16} strokeWidth={1.5} className="shrink-0" />
-                <span className="truncate flex-1 text-left">Collapse</span>
-                <kbd className="rounded border border-border bg-muted/50 px-1 font-mono text-[9px] text-muted-foreground">
-                  ⌘B
-                </kbd>
-              </>
-            )}
-          </button>
-        )}
-
         {/* System Runtime Status */}
         <div
           onMouseEnter={(e) => {
@@ -352,7 +314,7 @@ export default function Sidebar({
           onMouseLeave={() => collapsed && setTooltip(null)}
           className={cn(
             "flex items-center rounded-lg border border-sidebar-border bg-card/40 transition-colors",
-            collapsed ? "size-9 justify-center p-0" : "gap-2 px-2.5 py-2",
+            collapsed ? "size-9 justify-center p-0" : "gap-2 px-2 py-2",
           )}
         >
           <span className="relative flex size-6 shrink-0 items-center justify-center rounded-md border border-sidebar-border bg-secondary/50">
@@ -367,7 +329,7 @@ export default function Sidebar({
           {!collapsed && (
             <>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[9px] font-medium tracking-wider text-muted-foreground uppercase">
+                <p className="truncate text-[9px] font-medium tracking-normal text-muted-foreground uppercase">
                   System Runtime
                 </p>
                 <p className={cn("truncate text-[11px] font-medium leading-none", status.text)}>

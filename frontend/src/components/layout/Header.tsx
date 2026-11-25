@@ -16,6 +16,8 @@ import {
   LogOut,
   Menu,
   MessagesSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Radio,
   ScrollText,
@@ -79,6 +81,8 @@ interface HeaderProps {
   onLogout: () => void;
   onNavigate: (key: NavKey) => void;
   onToggleSidebar: () => void;
+  sidebarCollapsed?: boolean;
+  onToggleDesktopSidebar?: () => void;
   showSidebarToggle?: boolean;
   user: HeaderUser | null;
   notifications: NotificationItem[];
@@ -98,7 +102,7 @@ const PAGE_LABELS: Record<NavKey, string> = {
   activity: "Audit Log",
   "ai-providers": "AI Providers",
   settings: "Settings",
-  help: "Help & Support",
+  help: "Help & Docs",
 };
 
 function initialsOf(name: string): string {
@@ -167,7 +171,7 @@ const COMMAND_ITEMS: Array<{
   { nav: "channel", label: "Channel", section: "Channels", keywords: "telegram widget embed webhook", icon: Radio },
   { nav: "ai-providers", label: "AI Providers", section: "Configuration", keywords: "gemini openai openrouter api keys models", icon: BrainCircuit },
   { nav: "settings", label: "Settings", section: "Configuration", keywords: "profile password account preferences", icon: SlidersHorizontal },
-  { nav: "help", label: "Help & Support", section: "Documentation", keywords: "docs guide reference examples", icon: BookOpen },
+  { nav: "help", label: "Help & Docs", section: "Documentation", keywords: "docs guide reference examples shortcuts", icon: BookOpen },
 ];
 
 export default function Header({
@@ -176,6 +180,8 @@ export default function Header({
   onLogout,
   onNavigate,
   onToggleSidebar,
+  sidebarCollapsed = false,
+  onToggleDesktopSidebar,
   showSidebarToggle = true,
   user,
   notifications,
@@ -295,6 +301,22 @@ export default function Header({
             className="flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:text-foreground lg:hidden"
           >
             <Menu size={16} strokeWidth={1.75} />
+          </button>
+        )}
+
+        {showSidebarToggle && onToggleDesktopSidebar && (
+          <button
+            type="button"
+            onClick={onToggleDesktopSidebar}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar (⌘B)" : "Collapse sidebar (⌘B)"}
+            className="hidden lg:flex size-7 shrink-0 items-center justify-center rounded-md border border-border/80 bg-card/60 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen size={15} strokeWidth={1.5} />
+            ) : (
+              <PanelLeftClose size={15} strokeWidth={1.5} />
+            )}
           </button>
         )}
 

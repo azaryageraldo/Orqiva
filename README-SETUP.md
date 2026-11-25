@@ -24,7 +24,7 @@ cd ../frontend
 npm install
 ```
 
-The default database is SQLite at `backend/database/database.sqlite`. Set `DB_CONNECTION=mysql` and the other `DB_*` values in `backend/.env` for a MySQL setup. AI provider keys are not required in `.env`; add them from **API Keys** after signing in.
+The default database is SQLite at `backend/database/database.sqlite`. Set `DB_CONNECTION=mysql` and the other `DB_*` values in `backend/.env` for a MySQL setup. AI provider keys are not required in `.env`; add them from **AI Providers** after signing in.
 
 ## Prepare the database
 
@@ -70,9 +70,9 @@ Connect a Telegram bot from **Channel → Telegram**:
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) using `/newbot`, then copy its token.
 2. Paste the token, choose an entry workflow, and enable the channel.
-3. Keep the poller running. `orqiva start` launches it automatically (log: `telegram.log` in the Orqiva data directory, or run `orqiva logs`). When running from source, start it with `php artisan channels:telegram-poll` (add `--once` to poll a single batch).
+3. Keep the poller running if using **Long Polling** (`orqiva start` launches it automatically; from source run `php artisan channels:telegram-poll`, adding `--once` for a single batch). Or, if deployed on HTTPS / behind a public tunnel, register a **Telegram Webhook** directly from the **Channel → Telegram** dialog (`/api/v1/public/telegram/{token}/webhook`).
 
-The bot receives updates with long polling, so no public URL or HTTPS certificate is required. Orqiva removes any existing webhook when the token is saved; do not enable a webhook for the same bot elsewhere or polling stops. Incoming messages appear in **Inbox** and replies are sent back through the bot. Only one Telegram bot can be connected per account.
+In Long Polling mode, no public URL or HTTPS certificate is required and Orqiva removes any existing webhook when the token is saved. Incoming messages appear in **Inbox** and replies are sent back through the bot. Only one Telegram bot can be connected per account.
 
 The frontend runs at `http://127.0.0.1:5173` and proxies `/api` to `http://127.0.0.1:8000`. Health endpoints: `GET /up` and `GET /api/v1/health`. Messages are queued in the `jobs` table (`QUEUE_CONNECTION=database`); the widget shows a typing indicator while a job is pending or processing.
 
@@ -85,14 +85,16 @@ npm run build
 
 ## Main areas
 
-- **Dashboard** — workflow and execution summary
-- **Workflows** — create, validate, and edit visual workflows
+- **Dashboard** — workflow and execution summary, date range filter, token charts, queue health, and PDF export
+- **Workflows** — create, validate, filter, duplicate, import/export JSON templates, and edit visual workflows
+- **Datapoints** *(In Development)* — dynamic knowledge entity & variable schema registry
+- **Data Table** *(In Development)* — spreadsheet-style customer record explorer
 - **Inbox** — take over conversations and hand them back to AI
-- **Channel** — configure the website widget and connect a Telegram bot
+- **Channel** — configure the website widget and connect a Telegram bot (Webhook or Long Polling)
 - **Audit Log** — inspect execution steps, tokens, variables, and errors
-- **API Keys** — connect Gemini, OpenAI, or OpenRouter with encrypted BYOK keys
-- **Settings** — account, language, theme, service status, and help
-- **Help & Support** — quick start, all seven nodes with schema examples, variables, channels, inbox, audit, security, and license
+- **AI Providers** — connect Gemini, OpenAI, or OpenRouter with encrypted BYOK keys, curate workflow models, and set reply debounce
+- **Settings** — account profile, password updates, AI Providers shortcut, and service status
+- **Help & Docs** — quick start, AI Providers & Studio guides, all seven nodes with schema examples, variables, channels, inbox, audit, security, and license
 
 ## Tests
 
